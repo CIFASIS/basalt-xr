@@ -284,6 +284,10 @@ message(STATUS "Found {fmt} ${fmt_VERSION} in: ${fmt_DIR}")
 
 add_subdirectory(thirdparty)
 
+# custom scoped monado target
+add_library(basalt::monado INTERFACE IMPORTED)
+set_property(TARGET basalt::monado PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/monado)
+
 # custom scoped cli11 target
 add_library(basalt::cli11 INTERFACE IMPORTED)
 set_property(TARGET basalt::cli11 PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/CLI11/include)
@@ -369,6 +373,7 @@ target_sources(basalt
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_abs_sc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_rel_sc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/monado/slam_tracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/optical_flow/optical_flow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/keypoints.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/system_utils.cpp
@@ -386,8 +391,8 @@ target_sources(basalt
 )
 
 target_link_libraries(basalt
-  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb
-  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt)
+  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11
+  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt basalt::monado)
 target_include_directories(basalt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt PUBLIC ${BASALT_COMPILE_DEFINITIONS})
 #target_compile_definitions(basalt PUBLIC BASALT_DISABLE_ASSERTS)

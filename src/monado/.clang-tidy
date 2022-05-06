@@ -1,0 +1,8 @@
+Checks: 'readability-*, -readability-magic-numbers, -readability-function-cognitive-complexity, -readability-else-after-return, -readability-redundant-access-specifiers, performance-*, modernize-*, -modernize-use-trailing-return-type, -modernize-avoid-c-arrays, -modernize-use-nodiscard, -modernize-use-auto, -modernize-pass-by-value, misc-assert-side-effect, -clang-analyzer-osx.*, -clang-analyzer-cplusplus.Move, -clang-analyzer-core.uninitialized.UndefReturn, -clang-analyzer-optin.portability.UnixAPI, -clang-analyzer-unix.Malloc'
+HeaderFilterRegex: '.*/thirdparty/basalt-headers/include/basalt/*'
+
+CheckOptions:
+  - key:    readability-identifier-naming
+    value:  lower_case
+  - key:    readability-braces-around-statements.ShortStatementLines
+    value:  2
