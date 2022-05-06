@@ -1,75 +1,155 @@
-[![pipeline status](https://gitlab.com/VladyslavUsenko/basalt/badges/master/pipeline.svg)](https://gitlab.com/VladyslavUsenko/basalt/commits/master)
+# Basalt for Monado
 
-## Basalt
-For more information see https://vision.in.tum.de/research/vslam/basalt
+This is a fork of [Basalt](https://gitlab.com/VladyslavUsenko/basalt) with some
+modifications so that it can be used from Monado for SLAM tracking. Many thanks
+to the Basalt authors.
 
-![teaser](doc/img/teaser.png)
+Follow this file for instructions on how to get Basalt up and running with
+Monado. This README tries to be as concise as possible, but there are many
+details that need to be addressed on it, so please do not skip any section,
+otherwise it is likely that it won't work. Having said that, this guide has
+been tested in limited setups, so please report any changes you had to make
+in order to get it working in different ones.
 
-This project contains tools for:
-* Camera, IMU and motion capture calibration.
-* Visual-inertial odometry and mapping.
-* Simulated environment to test different components of the system.
+## Index
 
-Some reusable components of the system are available as a separate [header-only library](https://gitlab.com/VladyslavUsenko/basalt-headers) ([Documentation](https://vladyslavusenko.gitlab.io/basalt-headers/)).
-
-There is also a [Github mirror](https://github.com/VladyslavUsenko/basalt-mirror) of this project to enable easy forking.
-
-## Related Publications
-Visual-Inertial Odometry and Mapping:
-* **Visual-Inertial Mapping with Non-Linear Factor Recovery**, V. Usenko, N. Demmel, D. Schubert, J. Stückler, D. Cremers, In IEEE Robotics and Automation Letters (RA-L) [[DOI:10.1109/LRA.2019.2961227]](https://doi.org/10.1109/LRA.2019.2961227) [[arXiv:1904.06504]](https://arxiv.org/abs/1904.06504).
-
-Calibration (explains implemented camera models):
-* **The Double Sphere Camera Model**, V. Usenko and N. Demmel and D. Cremers, In 2018 International Conference on 3D Vision (3DV), [[DOI:10.1109/3DV.2018.00069]](https://doi.org/10.1109/3DV.2018.00069), [[arXiv:1807.08957]](https://arxiv.org/abs/1807.08957).
-
-Calibration (demonstrates how these tools can be used for dataset calibration):
-* **The TUM VI Benchmark for Evaluating Visual-Inertial Odometry**, D. Schubert, T. Goll,  N. Demmel, V. Usenko, J. Stückler, D. Cremers, In 2018 International Conference on Intelligent Robots and Systems (IROS), [[DOI:10.1109/IROS.2018.8593419]](https://doi.org/10.1109/IROS.2018.8593419), [[arXiv:1804.06120]](https://arxiv.org/abs/1804.06120).
-
-Calibration (describes B-spline trajectory representation used in camera-IMU calibration):
-* **Efficient Derivative Computation for Cumulative B-Splines on Lie Groups**, C. Sommer, V. Usenko, D. Schubert, N. Demmel, D. Cremers, In 2020 Conference on Computer Vision and Pattern Recognition (CVPR), [[DOI:10.1109/CVPR42600.2020.01116]](https://doi.org/10.1109/CVPR42600.2020.01116), [[arXiv:1911.08860]](https://arxiv.org/abs/1911.08860).
-
-Optimization (describes square-root optimization and marginalization used in VIO/VO):
-* **Square Root Marginalization for Sliding-Window Bundle Adjustment**, N. Demmel, D. Schubert, C. Sommer, D. Cremers, V. Usenko, In 2021 International Conference on Computer Vision (ICCV), [[arXiv:2109.02182]](https://arxiv.org/abs/2109.02182)
-
+- [Basalt for Monado](#basalt-for-monado)
+  - [Index](#index)
+  - [Installation](#installation)
+    - [Build and Install Directories](#build-and-install-directories)
+    - [Dependencies](#dependencies)
+    - [Build Basalt](#build-basalt)
+    - [Running Basalt](#running-basalt)
+    - [Monado Specifics](#monado-specifics)
+  - [Notes on Basalt Usage](#notes-on-basalt-usage)
+  - [Using Real Hardware](#using-real-hardware)
 
 ## Installation
-### APT installation for Ubuntu 22.04, 20.04 and 18.04 (Fast)
-Set up keys, add the repository to the sources list, update the Ubuntu package index and install Basalt:
-```
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 0AD9A3000D97B6C9
-sudo sh -c 'echo "deb [arch=amd64] http://packages.usenko.net/ubuntu $(lsb_release -sc) $(lsb_release -sc)/main" > /etc/apt/sources.list.d/basalt.list'
-sudo apt-get update
-sudo apt-get dist-upgrade
-sudo apt-get install basalt
-```
 
-### Source installation for Ubuntu >= 18.04 and MacOS >= 10.14 Mojave
-Clone the source code for the project and build it. For MacOS you should have [Homebrew](https://brew.sh/) installed.
-```
-git clone --recursive https://gitlab.com/VladyslavUsenko/basalt.git
-cd basalt
-./scripts/install_deps.sh
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
-make -j8
+This was tested on both Ubuntu 20.04 and 18.04, be sure to open an issue if the
+steps don't work for you.
+
+### Build and Install Directories
+
+To not clutter your system directories, let's set two environment variables,
+`$bsltdeps` and `$bsltinstall` that point to existing empty build and install
+directories respectively. These directories will contain everything produced in
+this guide besides installed apt dependencies.
+
+```bash
+# Change the paths accordingly
+export bsltinstall=/home/mateo/Documents/apps/bsltinstall
+export bsltdeps=/home/mateo/Documents/apps/bsltdeps
 ```
 
-## Usage
-* [Camera, IMU and Mocap calibration. (TUM-VI, Euroc, UZH-FPV and Kalibr datasets)](doc/Calibration.md)
-* [Visual-inertial odometry and mapping. (TUM-VI and Euroc datasets)](doc/VioMapping.md)
-* [Visual odometry (no IMU). (KITTI dataset)](doc/Vo.md)
-* [Simulation tools to test different components of the system.](doc/Simulation.md)
-* [Batch evaluation tutorial (ICCV'21 experiments)](doc/BatchEvaluation.md)
+Let's extend our system paths with those.
 
-## Device support
-* [Tutorial on Camera-IMU and Motion capture calibration with Realsense T265.](doc/Realsense.md)
+```bash
+export PATH=$bsltinstall/bin:$PATH
+export PKG_CONFIG_PATH=$bsltinstall/lib/pkgconfig:$PKG_CONFIG_PATH # for compile time pkg-config
+export LD_LIBRARY_PATH=$bsltinstall/lib/:$LD_LIBRARY_PATH # for runtime ld
+export LIBRARY_PATH=$bsltinstall/lib/:$LIBRARY_PATH # for compile time gcc
+```
 
-## Development
-* [Development environment setup.](doc/DevSetup.md)
+### Dependencies
 
-## Licence
-The code is provided under a BSD 3-clause license. See the LICENSE file for details.
-Note also the different licenses of thirdparty submodules.
+Most dependencies will be automatically built by basalt, however there are some
+known issues you might need to deal with (click to open the ones that might
+affect you).
 
-Some improvements are ported back from the fork
-[granite](https://github.com/DLR-RM/granite) (MIT license).
+<details>
+  <summary>Issues with GCC 11</summary>
+
+  If you are using GCC 11 you might also get some issues with pangolin as there is now a
+  [name clash with Pagolin `_serialize()` name](https://github.com/stevenlovegrove/Pangolin/issues/657),
+  it [should be fixed](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100438#c12)
+  in newer versions of GCC-11. For fixing it yourself, you can cherry-pick
+  [these commits](https://github.com/stevenlovegrove/Pangolin/pull/658/commits),
+  or use a different GCC version.
+  (see
+  [this discord thread](https://discord.com/channels/556527313823596604/556527314670714901/904339906288050196)
+  in the Monado server for more info).
+</details>
+
+### Build Basalt
+
+```bash
+cd $bsltdeps
+git clone --recursive git@gitlab.freedesktop.org:mateosss/basalt.git
+./basalt/scripts/install_deps.sh
+sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
+cd basalt && mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=off -DBASALT_INSTANTIATIONS_DOUBLE=off
+make install -j12
+```
+
+### Running Basalt
+
+This step is optional but you can try Basalt without Monado with one of the following methods:
+
+- Through an EuRoC dataset (be sure to [download
+  one](http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/)
+  first): `basalt_vio --dataset-path /path/to/euroc/V1_01_easy --cam-calib
+  $bsltdeps/basalt/data/euroc_ds_calib.json --dataset-type euroc --config-path
+  $bsltdeps/basalt/data/euroc_config.json --marg-data ~/Desktop/euroc_marg_data
+  --show-gui 1`
+- With a RealSense T265 (you'll need to get a `t265_calib.json` yourself as
+  detailed [below](#configuring-basalt) but meanwhile you can try with [this
+  file](https://gitlab.com/VladyslavUsenko/basalt/-/issues/52) instead):
+  `basalt_rs_t265_vio --cam-calib $bsltdeps/basalt/data/t265_calib.json
+  --config-path $bsltdeps/basalt/data/euroc_config.json`
+- With a RealSense D455 (and maybe this also works for a D435):
+  `basalt_rs_t265_vio --is-d455 --cam-calib
+  $bsltdeps/basalt/data/d455_calib.json --config-path
+  $bsltdeps/basalt/data/euroc_config.json`
+
+### Monado Specifics
+
+You'll need to compile Monado with the same Eigen used in Basalt, and with the
+same flags. For that, set these with CMake (or equivalent flags for meson):
+`-DEIGEN3_INCLUDE_DIR=$bsltdeps/basalt/thirdparty/basalt-headers/thirdparty/eigen
+-DCMAKE_C_FLAGS="-march=native" -DCMAKE_CXX_FLAGS="-march=native"` otherwise
+Monado will automatically use your system's Eigen, and having mismatched Eigen
+version/flags can cause a lot of headaches.
+
+Run an OpenXR app like `hello_xr` with the following environment variables set
+
+```bash
+export EUROC_PATH=/path/to/euroc/V1_01_easy/ # Set euroc dataset path. You can get a dataset from http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/V1_01_easy/V1_01_easy.zip
+export EUROC_LOG=debug
+export EUROC_HMD=false # if false, a fake controller will be tracked, else a fake HMD
+export SLAM_LOG=debug
+export SLAM_CONFIG=$bsltdeps/basalt/data/monado/euroc.toml # Point to Basalt config file for Euroc
+export OXR_DEBUG_GUI=1 # We will need the debug ui to start streaming the dataset
+```
+
+Finally, run the XR app and press start in the euroc player debug ui and you
+should see a controller being tracked with Basalt from the euroc dataset.
+
+## Notes on Basalt Usage
+
+- Tracking is not perfect, [this](https://youtu.be/mIgRHmxbaC8) and
+  [this](https://youtu.be/gxu3Ve8VCnI) show how it looks, as well as the
+  problems that it has (difficulties with rotation-only movements, wiggliness on
+  fast movements, etc)
+- This fork only works with Stereo-IMU setups, but adapting Basalt to work with
+  other configurations should feasible (see
+  [granite](https://github.com/DLR-RM/granite)).
+- Basalt is _fast_. While the standard sampling rate is stereo 640x480 at 30fps
+  I've been able to make it work at 848x480 at 60fps without problems on a
+  laptop.
+- Some things that might cause crashes:
+  - Using images with bad exposure and gain values, or being in a dark room.
+  - Shaking causes drift that can diverge if maintained for long periods of
+    time.
+  - Continuously making sudden 90 degree rotations in which the new scene does not share
+    features with the previous scene.
+  - Moving too fast and/or making rotation only movements over extended periods
+    of time.
+
+## Using Real Hardware
+
+Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Here is how to set them up:
+
+- [RealSense Driver](doc/monado/Realsense.md)
+- [WMR Driver](doc/monado/WMR.md)

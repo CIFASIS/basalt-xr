@@ -1,0 +1,223 @@
+{
+	"CalibrationInformation":	{
+		"Cameras":	[{
+				"Intrinsics":	{
+					"ModelParameterCount":	15,
+					"ModelParameters":	[0.5067707896232605, 0.51088905334472656, 0.42040637135505676, 0.56076663732528687, 0.6257319450378418, 0.46612036228179932, 0.0041795829311013222, 0.89431935548782349, 0.54253977537155151, 0.06621214747428894, 0.0027008021716028452, -0.00058499001897871494, -4.2882973502855748e-05, -0.00018502399325370789, 2.7941114902496338],
+					"ModelType":	"CALIBRATION_LensDistortionModelRational6KT"
+				},
+				"Location":	"CALIBRATION_CameraLocationHT0",
+				"Purpose":	"CALIBRATION_CameraPurposeHeadTracking",
+				"MetricRadius":	2.7941114902496338,
+				"Rt":	{
+					"Rotation":	[1, 0, 0, 0, 1, 0, 0, 0, 1],
+					"Translation":	[0, 0, 0]
+				},
+				"SensorHeight":	480,
+				"SensorWidth":	640,
+				"Shutter":	"CALIBRATION_ShutterTypeUndefined",
+				"ThermalAdjustmentParams":	{
+					"Params":	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+				}
+			}, {
+				"Intrinsics":	{
+					"ModelParameterCount":	15,
+					"ModelParameters":	[0.50554186105728149, 0.52156180143356323, 0.42205807566642761, 0.56302011013031006, 0.55718272924423218, 0.22437196969985962, 0.0068156048655509949, 0.83317267894744873, 0.26174271106719971, 0.043505862355232239, 0.00676964595913887, -0.0012049071956425905, 0.0001220563062815927, 0.00011782468209275976, 2.7899987697601318],
+					"ModelType":	"CALIBRATION_LensDistortionModelRational6KT"
+				},
+				"Location":	"CALIBRATION_CameraLocationHT1",
+				"Purpose":	"CALIBRATION_CameraPurposeHeadTracking",
+				"MetricRadius":	2.7899987697601318,
+				"Rt":	{
+					"Rotation":	[0.68708890676498413, -0.0066884770058095455, -0.726542592048645, -0.004866383969783783, 0.99989283084869385, -0.013807035051286221, 0.72655707597732544, 0.013022295199334621, 0.68698269128799438],
+					"Translation":	[-0.096558056771755219, -0.00065802858443930745, -0.041434925049543381]
+				},
+				"SensorHeight":	480,
+				"SensorWidth":	640,
+				"Shutter":	"CALIBRATION_ShutterTypeUndefined",
+				"ThermalAdjustmentParams":	{
+					"Params":	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+				}
+			}, {
+				"Intrinsics":	{
+					"ModelParameterCount":	15,
+					"ModelParameters":	[0.50590163469314575, 0.501025915145874, 0.43491056561470032, 0.51977533102035522, 1.3840854167938232, -1.6851117610931396, 6.9683127403259277, 1.4408130645751953, -1.7367498874664307, 6.9408659934997559, 0.015325400047004223, -9.7191208624280989e-05, -0.00023150799097493291, 0.00017367169493809342, 1.3999999761581421],
+					"ModelType":	"CALIBRATION_LensDistortionModelRational6KT"
+				},
+				"Location":	"CALIBRATION_CameraLocationDO0",
+				"Purpose":	"CALIBRATION_CameraPurposeDisplayObserver",
+				"MetricRadius":	1.3999999761581421,
+				"Rt":	{
+					"Rotation":	[1, 0, 0, 0, 1, 0, 0, 0, 1],
+					"Translation":	[0, 0, 0]
+				},
+				"SensorHeight":	2048,
+				"SensorWidth":	2448,
+				"Shutter":	"CALIBRATION_ShutterTypeUndefined",
+				"ThermalAdjustmentParams":	{
+					"Params":	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+				}
+			}, {
+				"Intrinsics":	{
+					"ModelParameterCount":	15,
+					"ModelParameters":	[0.505301833152771, 0.50203627347946167, 0.43675145506858826, 0.52202123403549194, 9.5410280227661133, -19.506465911865234, 31.453699111938477, 9.64380931854248, -19.527170181274414, 31.339166641235352, 0.016977680847048759, 0.0032255123369395733, -0.00076866301242262125, 0.000584927445743233, 1.3999999761581421],
+					"ModelType":	"CALIBRATION_LensDistortionModelRational6KT"
+				},
+				"Location":	"CALIBRATION_CameraLocationDO1",
+				"Purpose":	"CALIBRATION_CameraPurposeDisplayObserver",
+				"MetricRadius":	1.3999999761581421,
+				"Rt":	{
+					"Rotation":	[0.99999630451202393, 0.0025376041885465384, -0.00095876428531482816, -0.0025385897606611252, 0.99999624490737915, -0.0010279536945745349, 0.00095615215832367539, 0.0010303838644176722, 0.99999898672103882],
+					"Translation":	[-0.0659172385931015, 7.41809417377226e-05, -0.00013815540296491235]
+				},
+				"SensorHeight":	2048,
+				"SensorWidth":	2448,
+				"Shutter":	"CALIBRATION_ShutterTypeUndefined",
+				"ThermalAdjustmentParams":	{
+					"Params":	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+				}
+			}],
+		"Displays":	[{
+				"Affine":	[907.99212646484375, -0.55761176347732544, 785.1776123046875, -0, 908.129150390625, 796.96160888671875, 0, 0, 1],
+				"AssignedEye":	"CALIBRATION_DisplayEyeLeft",
+				"DisplayHeight":	1600,
+				"DisplayWidth":	2880,
+				"DistortionRed":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[787.31629583849372, 795.24291853725526, 3.9138434409665894e-07, 2.8758159734654908e-13, 4.9106499642880268e-19],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"DistortionGreen":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[786.6702072553893, 794.69238050015588, 4.2007202329361826e-07, 1.8878438698927907e-13, 7.0250600169383861e-19],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"DistortionBlue":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[785.89252155554175, 797.67656573162583, 5.0202131325863806e-07, -1.2813487061581019e-13, 1.2345214819185544e-18],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"EyePositionCorrectionModel":	{
+					"ModelParameterCount":	0,
+					"ModelParameters":	[],
+					"ModelType":	"CALIBRATION_EyePositionCorrectionModelIpdTranslational"
+				},
+				"HorizontalFieldOfView":	0,
+				"VerticalFieldOfView":	0,
+				"VisibleAreaCenter":	{
+					"X":	785.1776315693005,
+					"Y":	796.96162857569425
+				},
+				"VisibleAreaRadius":	820,
+				"VBlankToPhotonLatency":	0,
+				"Rt":	{
+					"Rotation":	[0.915799617767334, 0.0045000603422522545, -0.40161022543907166, 0.13639208674430847, 0.93702936172485352, 0.32151702046394348, 0.377767413854599, -0.3492216169834137, 0.85751736164093018],
+					"Translation":	[-0.021123100072145462, 0.018961008638143539, 0.079663842916488647]
+				}
+			}, {
+				"Affine":	[907.9639892578125, -0.49046245217323303, 2103.386474609375, -0, 907.97808837890625, 801.86834716796875, 0, 0, 1],
+				"AssignedEye":	"CALIBRATION_DisplayEyeRight",
+				"DisplayHeight":	1600,
+				"DisplayWidth":	2880,
+				"DistortionRed":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[2101.5711896433636, 800.96838064339022, 3.9383231143483177e-07, 2.4224056018878508e-13, 5.8448606879296118e-19],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"DistortionGreen":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[2101.1059339164444, 799.96334797691441, 4.2454822843541872e-07, 1.412440585952293e-13, 7.9387878585863295e-19],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"DistortionBlue":	{
+					"ModelParameterCount":	5,
+					"ModelParameters":	[2100.8534549194974, 802.57825131804134, 5.1161917803099739e-07, -1.9534633908166077e-13, 1.3528407038619122e-18],
+					"ModelType":	"CALIBRATION_DisplayDistortionModelPolynomial3K"
+				},
+				"EyePositionCorrectionModel":	{
+					"ModelParameterCount":	0,
+					"ModelParameters":	[],
+					"ModelType":	"CALIBRATION_EyePositionCorrectionModelIpdTranslational"
+				},
+				"HorizontalFieldOfView":	0,
+				"VerticalFieldOfView":	0,
+				"VisibleAreaCenter":	{
+					"X":	2103.3864389371893,
+					"Y":	801.86837363199038
+				},
+				"VisibleAreaRadius":	820,
+				"VBlankToPhotonLatency":	0,
+				"Rt":	{
+					"Rotation":	[0.9165765643119812, 0.0027716662734746933, -0.39984956383705139, 0.13801105320453644, 0.93633246421813965, 0.322853684425354, 0.37528696656227112, -0.35110378265380859, 0.85783785581588745],
+					"Translation":	[-0.086859606206417084, 0.018304631114006042, 0.080222859978675842]
+				}
+			}],
+		"InertialSensors":	[{
+				"BiasTemperatureModel":	[0.016492774710059166, 0, 0, 0, -0.01642640121281147, 0, 0, 0, -0.0045625129714608192, 0, 0, 0],
+				"BiasUncertainty":	[9.9999997473787516e-05, 9.9999997473787516e-05, 9.9999997473787516e-05],
+				"Id":	"CALIBRATION_InertialSensorId_ICM20602",
+				"MixingMatrixTemperatureModel":	[1.0000957250595093, 0, 0, 0, -0.00082343036774545908, 0, 0, 0, -0.0015050634974613786, 0, 0, 0, -0.00082384591223672032, 0, 0, 0, 0.99958902597427368, 0, 0, 0, -4.7339185584860388e-06, 0, 0, 0, -0.0015064212493598461, 0, 0, 0, -4.7357993935293052e-06, 0, 0, 0, 0.99919366836547852, 0, 0, 0],
+				"ModelTypeMask":	16,
+				"Noise":	[0.00095000001601874828, 0.00095000001601874828, 0.00095000001601874828, 0, 0, 0],
+				"Rt":	{
+					"Rotation":	[0.91831707954406738, 0.0026458536740392447, -0.39583677053451538, 0.13994280993938446, 0.93323278427124023, 0.33089667558670044, 0.3702833354473114, -0.35926258563995361, 0.85663330554962158],
+					"Translation":	[0, 0, 0]
+				},
+				"SecondOrderScaling":	[0, 0, 0, 0, 0, 0, 0, 0, 0],
+				"SensorType":	"CALIBRATION_InertialSensorType_Gyro",
+				"TemperatureBounds":	[5, 60],
+				"TemperatureC":	0
+			}, {
+				"BiasTemperatureModel":	[-0.18563582003116608, 0, 0, 0, 0.057621683925390244, 0, 0, 0, -0.13435612618923187, 0, 0, 0],
+				"BiasUncertainty":	[0.0099999997764825821, 0.0099999997764825821, 0.0099999997764825821],
+				"Id":	"CALIBRATION_InertialSensorId_ICM20602",
+				"MixingMatrixTemperatureModel":	[0.99813401699066162, 0, 0, 0, 0.00030715670436620712, 0, 0, 0, -0.00016754241369199008, 0, 0, 0, 0.00030630044057033956, 0, 0, 0, 1.0009244680404663, 0, 0, 0, 0.00029482797253876925, 0, 0, 0, -0.0001675997773418203, 0, 0, 0, 0.000295753387035802, 0, 0, 0, 0.99779242277145386, 0, 0, 0],
+				"ModelTypeMask":	56,
+				"Noise":	[0.010700000450015068, 0.010700000450015068, 0.010700000450015068, 0, 0, 0],
+				"Rt":	{
+					"Rotation":	[0.918566882610321, 0.0016602915711700916, -0.39526209235191345, 0.13899369537830353, 0.93476790189743042, 0.32693997025489807, 0.37002113461494446, -0.35525518655776978, 0.85841602087020874],
+					"Translation":	[-0.083942756056785583, -0.0025952591095119715, 0.0026445253752171993]
+				},
+				"SecondOrderScaling":	[0, 0, 0, 0, 0, 0, 0, 0, 0],
+				"SensorType":	"CALIBRATION_InertialSensorType_Accelerometer",
+				"TemperatureBounds":	[5, 60],
+				"TemperatureC":	0
+			}, {
+				"BiasTemperatureModel":	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+				"BiasUncertainty":	[0, 0, 0],
+				"Id":	"CALIBRATION_InertialSensorId_AK09916",
+				"MixingMatrixTemperatureModel":	[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+				"ModelTypeMask":	0,
+				"Noise":	[0.699999988079071, 0.699999988079071, 0.699999988079071, 0, 0, 0],
+				"Rt":	{
+					"Rotation":	[0.918566882610321, 0.0016602915711700916, -0.39526209235191345, 0.13899369537830353, 0.93476790189743042, 0.32693997025489807, 0.37002113461494446, -0.35525518655776978, 0.85841602087020874],
+					"Translation":	[0, 0, 0]
+				},
+				"SecondOrderScaling":	[0, 0, 0, 0, 0, 0, 0, 0, 0],
+				"SensorType":	"CALIBRATION_InertialSensorType_Magnetometer",
+				"TemperatureBounds":	[0, 0],
+				"TemperatureC":	0
+			}],
+		"Metadata":	{
+			"SerialId":	"XQ8198CM61077ZA",
+			"FactoryCalDate":	"6/24/2019 6:38:33 AM GMT",
+			"Version":	{
+				"Major":	1,
+				"Minor":	2
+			},
+			"DeviceName":	"GOERTEK-BUILD-MP"
+		},
+		"TemperatureData":	{
+			"ACCEL_0":	{
+				"Average":	36.477929875996843,
+				"Min":	34.54,
+				"Max":	37.92
+			},
+			"GYRO_0":	{
+				"Average":	36.477925294725082,
+				"Min":	34.54,
+				"Max":	37.92
+			}
+		}
+	}
+}
