@@ -103,6 +103,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
+      input_ptr->addTime("opticalflow_received");
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
@@ -172,18 +173,20 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (output_queue && frame_counter % config.optical_flow_skip_frames == 0) {
+      transforms->input_images->addTime("opticalflow_produced");
       output_queue->push(transforms);
     }
 
     frame_counter++;
   }
 
-  void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-                   const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-                   const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
-                       transform_map_1,
-                   Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
-                       transform_map_2) const {
+  void trackPoints(
+      const basalt::ManagedImagePyr<uint16_t>& pyr_1,
+      const basalt::ManagedImagePyr<uint16_t>& pyr_2,
+      const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
+          transform_map_1,
+      Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
+      int64_t view_offset = 0) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -207,23 +210,27 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
+        transform_2.translation()(0) -= view_offset;
 
-        bool valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
+        bool valid = transform_2.translation()(0) >= 0 &&
+                     transform_2.translation()(0) < pyr_2.lvl(0).w;
+        if (!valid) continue;
 
-        if (valid) {
-          Eigen::AffineCompact2f transform_1_recovered = transform_2;
+        valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
+        if (!valid) continue;
 
-          valid = trackPoint(pyr_2, pyr_1, transform_2, transform_1_recovered);
+        Eigen::AffineCompact2f transform_1_recovered = transform_2;
+        transform_1_recovered.translation()(0) += view_offset;
 
-          if (valid) {
-            Scalar dist2 = (transform_1.translation() -
-                            transform_1_recovered.translation())
-                               .squaredNorm();
+        valid = trackPoint(pyr_2, pyr_1, transform_2, transform_1_recovered);
+        if (!valid) continue;
 
-            if (dist2 < config.optical_flow_max_recovered_dist2) {
-              result[id] = transform_2;
-            }
-          }
+        Scalar dist2 =
+            (transform_1.translation() - transform_1_recovered.translation())
+                .squaredNorm();
+
+        if (dist2 < config.optical_flow_max_recovered_dist2) {
+          result[id] = transform_2;
         }
       }
     };
@@ -332,7 +339,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1,
+                  calib.view_offset);
 
       for (const auto& kv : new_poses1) {
         transforms->observations.at(1).emplace(kv);
