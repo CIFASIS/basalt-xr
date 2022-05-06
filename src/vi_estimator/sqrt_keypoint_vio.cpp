@@ -178,6 +178,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
       if (!curr_frame.get()) {
         break;
       }
+      curr_frame->input_images->addTime("vio_start");
 
       // Correct camera time offset
       // curr_frame->t_ns += calib.cam_time_offset_ns;
@@ -255,6 +256,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
           data->t_ns = tmp;
         }
       }
+      curr_frame->input_images->addTime("imu_preintegrated");
 
       measure(curr_frame, meas);
       prev_frame = curr_frame;
@@ -480,8 +482,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
       }
     }
   }
+  opt_flow_meas->input_images->addTime("landmarks_updated");
 
-  optimize_and_marg(num_points_connected, lost_landmaks);
+  optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
+                    lost_landmaks);
 
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
@@ -489,6 +493,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     typename PoseVelBiasState<double>::Ptr data(
         new PoseVelBiasState<double>(p.getState().template cast<double>()));
 
+    data->input_images = opt_flow_meas->input_images;
+    data->input_images->addTime("pose_produced");
     out_state_queue->push(data);
   }
 
@@ -1428,10 +1434,13 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(
+    const OpticalFlowInput::Ptr& input_images,
     const std::map<int64_t, int>& num_points_connected,
     const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
+  input_images->addTime("optimized");
   marginalize(num_points_connected, lost_landmaks);
+  input_images->addTime("marginalized");
 }
 
 template <class Scalar_>

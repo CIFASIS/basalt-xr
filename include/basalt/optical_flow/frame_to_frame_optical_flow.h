@@ -103,7 +103,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
-      input_ptr->addTime("opticalflow_received");
+      input_ptr->addTime("frames_received");
 
       processFrame(input_ptr->t_ns, input_ptr);
     }

@@ -120,7 +120,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase,
   // int64_t propagate();
   // void addNewState(int64_t data_t_ns);
 
-  void optimize_and_marg(const std::map<int64_t, int>& num_points_connected,
+  void optimize_and_marg(const OpticalFlowInput::Ptr& input_images,
+                         const std::map<int64_t, int>& num_points_connected,
                          const std::unordered_set<KeypointId>& lost_landmaks);
 
   void marginalize(const std::map<int64_t, int>& num_points_connected,

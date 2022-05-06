@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include <Eigen/Geometry>
@@ -56,6 +57,22 @@ struct OpticalFlowInput {
 
   int64_t t_ns;
   std::vector<ImageData> img_data;
+
+  // Keep track of internal timestamps for this input
+  bool timing_enabled = false;
+  std::vector<int64_t> tss{};
+  void addTime(const char* /* name */, int64_t custom_ts = INT64_MIN) {
+    if (!timing_enabled) {
+      return;
+    }
+
+    if (custom_ts != INT64_MIN) {
+      tss.push_back(custom_ts);
+    } else {
+      auto ts = std::chrono::steady_clock::now().time_since_epoch().count();
+      tss.push_back(ts);
+    }
+  }
 };
 
 struct OpticalFlowResult {
