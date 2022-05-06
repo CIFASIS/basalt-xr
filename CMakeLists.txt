@@ -104,7 +104,7 @@ set(CMAKE_CXX_FLAGS_CIDEBUG  "-O0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          
 set(CMAKE_CXX_FLAGS_CIRELWITHDEBINFO "-O3 -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # CI version with no debug symbols
 
 # base set of compile flags
-set(BASALT_CXX_FLAGS "-Wall -Wextra -Werror -Wno-error=unused-parameter -ftemplate-backtrace-limit=0")
+set(BASALT_CXX_FLAGS "-Wall -Wextra -Wno-error=unused-parameter -ftemplate-backtrace-limit=0")
 
 # clang-specific compile flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
@@ -468,14 +468,23 @@ file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/*.json")
 install(FILES ${CONFIG_FILES}
   DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
 
+configure_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.pc.in
+  ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc
+  @ONLY
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
+
 
 # Replace install() to do-nothing macro.
 macro(install)
 endmacro()
-# Include subproject (or any other CMake code) with "disabled" install().
-enable_testing()
-add_subdirectory(thirdparty/basalt-headers/test)
-add_subdirectory(test)
+if (BUILD_TESTS)
+  # Include subproject (or any other CMake code) with "disabled" install().
+  enable_testing()
+  add_subdirectory(thirdparty/basalt-headers/test)
+  add_subdirectory(test)
+endif()
 # Restore original install() behavior.
 macro(install)
   _install(${ARGN})

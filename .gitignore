@@ -1,4 +1,6 @@
 cmake-build*
+.cache
+.vscode
 .idea
 CMakeLists.txt.user
 build*
