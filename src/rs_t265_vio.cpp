@@ -125,6 +125,10 @@ int main(int argc, char** argv) {
   int num_threads = 0;
   bool use_double = false;
 
+  double exposure = 0.0;  // 0 means auto, else use something like 10.0 or  33.0
+  bool is_d455 = false;
+  basalt::RsD455Config d455{};
+
   CLI::App app{"RealSense T265 Live Vio"};
 
   app.add_option("--show-gui", show_gui, "Show GUI");
@@ -139,6 +143,16 @@ int main(int argc, char** argv) {
   app.add_option("--num-threads", num_threads, "Number of threads.");
   app.add_option("--step-by-step", step_by_step, "Path to config file.");
   app.add_option("--use-double", use_double, "Use double not float.");
+
+  app.add_option("--exposure", exposure,
+                 "Shutter time in ms, 0 by default to use auto exposure");
+  app.add_flag("--is-d455", is_d455,
+               "If set will work on a D455 (probably on a D435 too)");
+  app.add_option("--d455-video-width", d455.video_width, "Frame width");
+  app.add_option("--d455-video-height", d455.video_height, "Frame height");
+  app.add_option("--d455-video-fps", d455.video_fps, "Video FPS");
+  app.add_option("--d455-accel-fps", d455.accel_fps, "Accelerometer FPS");
+  app.add_option("--d455-gyro-fps", d455.gyro_fps, "Gyroscope FPS");
 
   try {
     app.parse(argc, argv);
@@ -160,8 +174,11 @@ int main(int argc, char** argv) {
   }
 
   // realsense
-  t265_device.reset(
-      new basalt::RsT265Device(false, 1, 90, 10.0));  // TODO: add options?
+  int skip_frames = 1;    // Use only one frame for every `skip_frames` frames
+  int webp_quality = 90;  // This is not being used
+  bool manual_exposure = exposure != 0.0;
+  t265_device.reset(new basalt::RsT265Device(
+      is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
 
   // startup device and load calibration
   t265_device->start();

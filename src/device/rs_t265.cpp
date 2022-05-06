@@ -34,25 +34,42 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <basalt/device/rs_t265.h>
+#include "basalt/utils/assert.h"
 
 std::string get_date();
 
 namespace basalt {
 
-RsT265Device::RsT265Device(bool manual_exposure, int skip_frames,
+RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
+                           bool manual_exposure, int skip_frames,
                            int webp_quality, double exposure_value)
-    : manual_exposure(manual_exposure),
+    : is_d455(is_d455),
+      manual_exposure(manual_exposure),
       skip_frames(skip_frames),
       webp_quality(webp_quality) {
   rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
+  context = rs2::context();
   pipe = rs2::pipeline(context);
 
-  config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
-  config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
-  config.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
-  config.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
-  if (!manual_exposure) {
-    config.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+  config = rs2::config();
+
+  if (is_d455) {
+    BASALT_ASSERT_MSG(d455.accel_fps < d455.gyro_fps,
+                      "Accelerometer frequency must be lower than gyroscope's "
+                      "because of how IMU interpolation is implemented");
+    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F,
+                         d455.accel_fps);
+    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F,
+                         d455.gyro_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 1, d455.video_width,
+                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 2, d455.video_width,
+                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
+  } else {
+    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+    config.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
+    config.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
   }
 
   if (context.query_devices().size() == 0) {
@@ -71,16 +88,33 @@ RsT265Device::RsT265Device(bool manual_exposure, int skip_frames,
   }
 
   auto device = context.query_devices()[0];
-  device.hardware_reset();
 
   std::cout << "Device " << device.get_info(RS2_CAMERA_INFO_NAME)
             << " connected" << std::endl;
   sensor = device.query_sensors()[0];
 
-  if (manual_exposure) {
+  if (!manual_exposure) {
+    if (is_d455) {
+      // Enable autoexposure on stereo sensor
+      sensor.set_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1);
+    } else {
+      // Not sure why this happens here, but it was here from before
+      config.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+    }
+  } else {
     std::cout << "Enabling manual exposure control" << std::endl;
     sensor.set_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0);
     sensor.set_option(rs2_option::RS2_OPTION_EXPOSURE, exposure_value * 1000);
+  }
+}
+
+void RsT265Device::disableLaserEmitters() {
+  std::vector<rs2::sensor> sensors =
+      pipe.get_active_profile().get_device().query_sensors();
+  for (auto&& sensor : sensors) {
+    if (sensor.is<rs2::depth_stereo_sensor>()) {
+      sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 0);
+    }
   }
 }
 
@@ -152,6 +186,7 @@ void RsT265Device::start() {
       for (int i = 0; i < NUM_CAMS; ++i) {
         rs2::video_frame vf = fs[i].as<rs2::video_frame>();
         if (!vf) {
+          BASALT_ASSERT(false && "Weird frame");
           std::cout << "Weird Frame, skipping" << std::endl;
           return;
         }
@@ -231,6 +266,7 @@ void RsT265Device::start() {
   };
 
   profile = pipe.start(config, callback);
+  if (is_d455) disableLaserEmitters();
 }
 
 void RsT265Device::stop() {
@@ -259,8 +295,10 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
 
   auto accel_stream = profile.get_stream(RS2_STREAM_ACCEL);
   auto gyro_stream = profile.get_stream(RS2_STREAM_GYRO);
-  auto cam0_stream = profile.get_stream(RS2_STREAM_FISHEYE, 1);
-  auto cam1_stream = profile.get_stream(RS2_STREAM_FISHEYE, 2);
+  auto cam0_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 1)
+                             : profile.get_stream(RS2_STREAM_FISHEYE, 1);
+  auto cam1_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 2)
+                             : profile.get_stream(RS2_STREAM_FISHEYE, 2);
 
   // get gyro extrinsics
   if (auto gyro = gyro_stream.as<rs2::motion_stream_profile>()) {
@@ -348,16 +386,22 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
 
       // intrinsics
       rs2_intrinsics intrinsics = cam.get_intrinsics();
-      basalt::KannalaBrandtCamera4<Scalar>::VecN params;
-      params << intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy,
-          intrinsics.coeffs[0], intrinsics.coeffs[1], intrinsics.coeffs[2],
-          intrinsics.coeffs[3];
-
       // std::cout << "Camera intrinsics: " << params.transpose() << std::endl;
 
       basalt::GenericCamera<Scalar> camera;
-      basalt::KannalaBrandtCamera4 kannala_brandt(params);
-      camera.variant = kannala_brandt;
+      if (is_d455) {
+        basalt::PinholeCamera<Scalar>::VecN params;
+        params << intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy;
+        basalt::PinholeCamera pinhole(params);
+        camera.variant = pinhole;
+      } else {
+        basalt::KannalaBrandtCamera4<Scalar>::VecN params;
+        params << intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy,
+            intrinsics.coeffs[0], intrinsics.coeffs[1], intrinsics.coeffs[2],
+            intrinsics.coeffs[3];
+        basalt::KannalaBrandtCamera4 kannala_brandt(params);
+        camera.variant = kannala_brandt;
+      }
 
       calib->intrinsics.push_back(camera);
     } else {

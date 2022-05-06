@@ -70,6 +70,15 @@ struct RsPoseData {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+// Struct to pass around D455 config params
+struct RsD455Config {
+  int video_width = 640;
+  int video_height = 360;
+  int video_fps = 30;
+  int accel_fps = 63;
+  int gyro_fps = 200;
+};
+
 class RsT265Device {
  public:
   using Ptr = std::shared_ptr<RsT265Device>;
@@ -77,8 +86,8 @@ class RsT265Device {
   static constexpr int IMU_RATE = 200;
   static constexpr int NUM_CAMS = 2;
 
-  RsT265Device(bool manual_exposure, int skip_frames, int webp_quality,
-               double exposure_value = 10.0);
+  RsT265Device(bool is_d455, RsD455Config d455, bool manual_exposure,
+               int skip_frames, int webp_quality, double exposure_value = 10.0);
 
   void start();
   void stop();
@@ -96,6 +105,9 @@ class RsT265Device {
   tbb::concurrent_bounded_queue<RsPoseData>* pose_data_queue = nullptr;
 
  private:
+  void disableLaserEmitters();
+
+  bool is_d455;  // Just a patch to void doing a proper class hierarchy
   bool manual_exposure;
   int skip_frames;
   int webp_quality;
