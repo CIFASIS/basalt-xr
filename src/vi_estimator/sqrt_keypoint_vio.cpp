@@ -162,12 +162,14 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
     const Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
 
     typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
-    BASALT_ASSERT_MSG(data, "first IMU measurment is nullptr");
 
-    data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
-    data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+    bool run = data != nullptr; // End VIO otherwise
+    if (run) {
+      data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
+      data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+    }
 
-    while (true) {
+    while (run) {
       vision_data_queue.pop(curr_frame);
 
       if (config.vio_enforce_realtime) {
