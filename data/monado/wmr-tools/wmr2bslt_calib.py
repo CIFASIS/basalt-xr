@@ -106,6 +106,7 @@ def intrinsics(j, cam):
             "k4": model_params[7],
             "k5": model_params[8],
             "k6": model_params[9],
+            "rpmax": model_params[14]
         },
     }
 
