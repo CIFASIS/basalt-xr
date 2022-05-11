@@ -200,7 +200,8 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
           transform_map_1,
       const std::map<KeypointId, size_t>& pyramid_levels_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      std::map<KeypointId, size_t>& pyramid_levels_2, int64_t view_offset = 0) const {
+      std::map<KeypointId, size_t>& pyramid_levels_2,
+      Vector2 view_offset = Vector2::Zero()) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -229,17 +230,20 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
-        transform_2.translation()(0) -= view_offset;
+        transform_2.translation() -= view_offset;
 
-        bool valid = transform_2.translation()(0) >= 0 &&
-                     transform_2.translation()(0) < pyr_2.lvl(pyramid_level[r]).w;
+        bool valid =
+            transform_2.translation()(0) >= 0 &&
+            transform_2.translation()(1) >= 0 &&
+            transform_2.translation()(0) < pyr_2.lvl(pyramid_level[r]).w &&
+            transform_2.translation()(1) < pyr_2.lvl(pyramid_level[r]).h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, pyramid_level[r],
-                                transform_2);
+                           transform_2);
         if (valid) {
           Eigen::AffineCompact2f transform_1_recovered = transform_2;
-          transform_1_recovered.translation()(0) += view_offset;
+          transform_1_recovered.translation() += view_offset;
           valid = trackPoint(pyr_2, pyr_1, transform_2, pyramid_level[r],
                              transform_1_recovered);
 

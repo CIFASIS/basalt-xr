@@ -105,7 +105,7 @@
         "mocap_time_offset_ns": 0,
         "mocap_to_imu_offset_ns": 0,
         "cam_time_offset_ns": 0,
-        "view_offset": 0,
+        "view_offset": [0, 0],
         "vignette": [
             {
                 "value0": 0,

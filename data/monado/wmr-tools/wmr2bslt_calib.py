@@ -37,6 +37,37 @@ def rmat2quat(r):
     return np.array([x, y, z, w])
 
 
+def project(intrinsics, x, y, z):
+    fx, fy, cx, cy, k1, k2, k3, k4, k5, k6, p1, p2 = (
+        intrinsics["fx"],
+        intrinsics["fy"],
+        intrinsics["cx"],
+        intrinsics["cy"],
+        intrinsics["k1"],
+        intrinsics["k2"],
+        intrinsics["k3"],
+        intrinsics["k4"],
+        intrinsics["k5"],
+        intrinsics["k6"],
+        intrinsics["p1"],
+        intrinsics["p2"],
+    )
+
+    xp = x / z
+    yp = y / z
+    r2 = xp * xp + yp * yp
+    cdist = (1 + r2 * (k1 + r2 * (k2 + r2 * k3))) / (
+        1 + r2 * (k4 + r2 * (k5 + r2 * k6))
+    )
+    deltaX = 2 * p1 * xp * yp + p2 * (r2 + 2 * xp * xp)
+    deltaY = 2 * p2 * xp * yp + p1 * (r2 + 2 * yp * yp)
+    xpp = xp * cdist + deltaX
+    ypp = yp * cdist + deltaY
+    u = fx * xpp + cx
+    v = fy * ypp + cy
+    return u, v
+
+
 def extrinsics(j, cam):
     # NOTE: The `Rt` field seems to be a transform from the sensor to HT0 (i.e.,
     # from HT0 space to sensor space). For basalt we need the transforms
@@ -106,9 +137,35 @@ def intrinsics(j, cam):
             "k4": model_params[7],
             "k5": model_params[8],
             "k6": model_params[9],
-            "rpmax": model_params[14]
+            "rpmax": model_params[14],
         },
     }
+
+
+def view_offset(j):
+    """
+    This is a very rough offset in pixels between the two cameras. Originally we
+    needed to manually estimate it like explained and shown here
+    https://youtu.be/jyQKjyRVMS4?t=670.
+    With this calculation we get a similar number without the need to open Gimp.
+
+    In reality this offset changes based on distance to the point, nonetheless
+    it helps to get some features tracked in the right camera.
+    """
+
+    # Rough approximation of how far from the cameras features will likely be in your room
+    DISTANCE_TO_WALL = 2  # In meters
+
+    cam1 = get(j, "HT1")
+    width = cam1["SensorWidth"]
+    height = cam1["SensorHeight"]
+    cam1_intrinsics = intrinsics(j, "HT1")["intrinsics"]
+    T_c1_c0 = rt2mat(cam1["Rt"])  # Maps a point in c0 space to c1 space
+    p = np.array([0, 0, DISTANCE_TO_WALL, 1])  # Fron tof c0, in homogeneous coords
+    p_in_c1 = T_c1_c0 @ p  # Point in c1 coordinates
+    u, v = project(cam1_intrinsics, *p_in_c1[0:3])
+    view_offset = [width / 2 - u, height / 2 - v]  # We used a point in the middle of c0
+    return view_offset
 
 
 def calib_accel_bias(j):
@@ -176,13 +233,6 @@ def main():
     # But in monado we just average those 4 samples to reduce the noise. So we have 250hz.
     IMU_UPDATE_RATE = 250
 
-    # This is a very rough offset in pixels between the two cameras. I manually
-    # measured it for some particular point in some particular pair of images
-    # for my Odyssey+. In reality this offset changes based on distance to the
-    # point, nonetheless it helps to get some features tracked in the right
-    # camera.
-    VIEW_OFFSET = 247
-
     out_calib = {
         "value0": {
             "T_imu_cam": [extrinsics(j, "HT0"), extrinsics(j, "HT1")],
@@ -196,7 +246,7 @@ def main():
             "accel_bias_std": bias_std(j, "Accelerometer"),
             "gyro_bias_std": bias_std(j, "Gyro"),
             "cam_time_offset_ns": 0,
-            "view_offset": VIEW_OFFSET,
+            "view_offset": view_offset(j),
             "vignette": [],
         }
     }

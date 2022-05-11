@@ -115,7 +115,7 @@
             0.009999999873689375
         ],
         "cam_time_offset_ns": 0,
-        "view_offset": 247,
+        "view_offset": [247, 0],
         "vignette": []
     }
 }

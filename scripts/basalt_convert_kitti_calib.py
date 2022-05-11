@@ -112,7 +112,7 @@ calib_template = Template('''{
         "accel_bias_std": [0.0, 0.0, 0.0],
         "gyro_bias_std": [0.0, 0.0, 0.0],
         "cam_time_offset_ns": 0,
-        "view_offset": 0
+        "view_offset": [0.0, 0.0]
     }
 }
 ''')
