@@ -27,7 +27,8 @@ in order to get it working in different ones.
 ## Installation
 
 This was tested on both Ubuntu 20.04 and 18.04, be sure to open an issue if the
-steps don't work for you.
+steps don't work for you. The main branch of this fork is
+[`xrtslam`](https://gitlab.freedesktop.org/mateosss/basalt/-/tree/xrtslam).
 
 ### Build and Install Directories
 
@@ -106,7 +107,7 @@ This step is optional but you can try Basalt without Monado with one of the foll
 ### Monado Specifics
 
 You'll need to compile Monado with the same Eigen used in Basalt, and with the
-same flags. For that, set these with CMake (or equivalent flags for meson):
+same flags. For that, set these with CMake:
 `-DEIGEN3_INCLUDE_DIR=$bsltdeps/basalt/thirdparty/basalt-headers/thirdparty/eigen
 -DCMAKE_C_FLAGS="-march=native" -DCMAKE_CXX_FLAGS="-march=native"` otherwise
 Monado will automatically use your system's Eigen, and having mismatched Eigen

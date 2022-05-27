@@ -68,7 +68,7 @@ struct slam_tracker::implementation {
 
  private:
   // Options parsed from unified config file
-  bool show_gui = true;
+  bool show_gui = false;
   string cam_calib_path;
   string config_path;
   string marg_data_path;
@@ -83,6 +83,11 @@ struct slam_tracker::implementation {
   static constexpr int NUM_CAMS = 2;
 
   // VIO members
+  struct {
+    bool imu = false;
+    bool cam0 = false;
+    bool cam1 = false;
+  } calib_data_ready;
   Calibration<double> calib;
   VioConfig vio_config;
   OpticalFlowBase::Ptr opt_flow_ptr;
@@ -116,6 +121,11 @@ struct slam_tracker::implementation {
 
  public:
   implementation(const string &unified_config) {
+    if (unified_config == "DEFAULT") {
+      // For the pipeline to work now, the user will need to use add_cam/imu_calibration
+      return;
+    }
+
     load_unified_config(unified_config);
 
     vio_config.load(config_path);
@@ -156,6 +166,7 @@ struct slam_tracker::implementation {
       cereal::JSONInputArchive archive(os);
       archive(calib);
       cout << "Loaded camera with " << calib.intrinsics.size() << " cameras\n";
+      calib_data_ready.imu = calib_data_ready.cam0 = calib_data_ready.cam1 = true;
     } else {
       std::cerr << "could not load camera calibration " << calib_path << "\n";
       std::abort();
@@ -216,6 +227,13 @@ struct slam_tracker::implementation {
     cout << "Finished queues_printer\n";
   }
 
+  void print_calibration() {
+    std::stringstream ss{};
+    cereal::JSONOutputArchive write_to_stream(ss);
+    write_to_stream(calib);
+    cout << "Calibration: " << ss.str() << "\n";
+  }
+
  public:
   void initialize() {
     // Overwrite camera calibration data
@@ -223,10 +241,21 @@ struct slam_tracker::implementation {
       apply_cam_calibration(c);
     }
 
+    bool calib_from_monado = added_cam_calibs.size() == 2;
+    bool view_offset_unknown = calib.view_offset(0) == 0 && calib.view_offset(1) == 0;
+    if (calib_from_monado || view_offset_unknown) {
+      compute_view_offset();
+      cout << "Computed view_offset = " << calib.view_offset.transpose() << "\n";
+    }
+
     // Overwrite IMU calibration data
     for (const auto &c : added_imu_calibs) {
       apply_imu_calibration(c);
     }
+
+    ASSERT(calib_data_ready.imu, "Missing IMU calibration");
+    ASSERT(calib_data_ready.cam0, "Missing left camera (cam0) calibration");
+    ASSERT(calib_data_ready.cam1, "Missing right camera (cam1) calibration");
 
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
@@ -362,39 +391,68 @@ struct slam_tracker::implementation {
     return true;
   }
 
+  void compute_view_offset() {
+    constexpr double DISTANCE_TO_WALL = 2;  // In meters
+    double width = calib.resolution[0][0];
+    double height = calib.resolution[0][1];
+    Sophus::SE3d T_i_c0 = calib.T_i_c[0];
+    Sophus::SE3d T_i_c1 = calib.T_i_c[1];
+    Sophus::SE3d T_c1_i = T_i_c1.inverse();
+    Sophus::SE3d T_c1_c0 = T_c1_i * T_i_c0;  // Maps a point in c0 space to c1 space
+    Eigen::Vector4d p3d{0, 0, DISTANCE_TO_WALL, 1};
+    Eigen::Vector4d p3d_in_c1 = T_c1_c0 * p3d;
+    Eigen::Vector2d p2d;
+    calib.intrinsics[1].project(p3d_in_c1, p2d);
+    calib.view_offset.x() = (width / 2) - p2d.x();
+    calib.view_offset.y() = (height / 2) - p2d.y();
+  }
+
   void add_cam_calibration(const cam_calibration &cam_calib) { added_cam_calibs.push_back(cam_calib); }
 
   void apply_cam_calibration(const cam_calibration &cam_calib) {
     using Scalar = double;
-    int i = cam_calib.cam_index;
+    size_t i = cam_calib.cam_index;
 
-    const auto &tci = cam_calib.T_cam_imu;
-    Eigen::Matrix3d rci;
-    rci << tci(0, 0), tci(0, 1), tci(0, 2), tci(1, 0), tci(1, 1), tci(1, 2), tci(2, 0), tci(2, 1), tci(2, 2);
-    Eigen::Quaterniond q(rci);
-    Eigen::Vector3d p{tci(0, 3), tci(1, 3), tci(2, 3)};
-    calib.T_i_c[i] = Calibration<Scalar>::SE3(q, p);
+    const auto &tic = cam_calib.t_imu_cam;
+    Eigen::Matrix3d ric;
+    ric << tic(0, 0), tic(0, 1), tic(0, 2), tic(1, 0), tic(1, 1), tic(1, 2), tic(2, 0), tic(2, 1), tic(2, 2);
+    Eigen::Quaterniond q(ric);
+    Eigen::Vector3d p{tic(0, 3), tic(1, 3), tic(2, 3)};
+    ASSERT_(calib.T_i_c.size() == i);
+    calib.T_i_c.push_back(Calibration<Scalar>::SE3(q, p));
 
     GenericCamera<double> model;
-    const vector<Scalar> &cmp = cam_calib.model_params;
-    if (cam_calib.model == cam_calibration::cam_model::pinhole) {
+    const vector<Scalar> &d = cam_calib.distortion;
+    if (cam_calib.distortion_model == "none") {
+      ASSERT_(d.size() == 0);
       PinholeCamera<Scalar>::VecN mp;
       mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy;
       PinholeCamera pinhole(mp);
       model.variant = pinhole;
-    } else if (cam_calib.model == cam_calibration::cam_model::fisheye) {
+    } else if (cam_calib.distortion_model == "kb4") {
+      ASSERT_(d.size() == 4);
       KannalaBrandtCamera4<Scalar>::VecN mp;
-      mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy, cmp[0], cmp[1], cmp[2], cmp[3];
+      mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy, d[0], d[1], d[2], d[3];
       KannalaBrandtCamera4 kannala_brandt(mp);
       model.variant = kannala_brandt;
+    } else if (cam_calib.distortion_model == "rt8") {
+      ASSERT_(d.size() == 9);  // 8 and rpmax
+      PinholeRadtan8Camera<Scalar>::VecN mp;
+      mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7];
+      Scalar rpmax = d[8];
+      PinholeRadtan8Camera pinhole_radtan8(mp, rpmax);
+      model.variant = pinhole_radtan8;
     } else {
-      ASSERT(false, "Unsupported camera model (%d)", static_cast<int>(cam_calib.model));
+      ASSERT(false, "Unsupported camera model (%s)", cam_calib.distortion_model.c_str());
     }
-    calib.intrinsics[i] = model;
+    ASSERT_(calib.intrinsics.size() == i);
+    calib.intrinsics.push_back(model);
 
-    calib.resolution[i] = {cam_calib.width, cam_calib.height};
+    ASSERT_(calib.resolution.size() == i);
+    calib.resolution.push_back({cam_calib.width, cam_calib.height});
 
-    // NOTE: ignoring cam_calib.distortion_model and distortion_params as basalt can't use them
+    calib_data_ready.cam0 |= i == 0;
+    calib_data_ready.cam1 |= i == 1;
   }
 
   void add_imu_calibration(const imu_calibration &imu_calib) { added_imu_calibs.push_back(imu_calib); }
@@ -448,6 +506,8 @@ struct slam_tracker::implementation {
 
     calib.gyro_noise_std = {gyro.noise_std(0), gyro.noise_std(1), gyro.noise_std(2)};
     calib.gyro_bias_std = {gyro.bias_std(0), gyro.bias_std(1), gyro.bias_std(2)};
+
+    calib_data_ready.imu = true;
   }
 
   shared_ptr<vector<string>> enable_pose_ext_timing() {

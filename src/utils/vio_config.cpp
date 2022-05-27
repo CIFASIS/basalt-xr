@@ -48,7 +48,7 @@ VioConfig::VioConfig() {
   // optical_flow_type = "patch";
   optical_flow_type = "frame_to_frame";
   optical_flow_detection_grid_size = 50;
-  optical_flow_max_recovered_dist2 = 0.09f;
+  optical_flow_max_recovered_dist2 = 0.04f;
   optical_flow_pattern = 51;
   optical_flow_max_iterations = 5;
   optical_flow_levels = 3;
@@ -74,12 +74,14 @@ VioConfig::VioConfig() {
 
   vio_enforce_realtime = false;
 
-  vio_use_lm = false;
+  vio_use_lm = true;
   vio_lm_lambda_initial = 1e-4;
   vio_lm_lambda_min = 1e-6;
   vio_lm_lambda_max = 1e2;
+  // vio_lm_landmark_damping_variant = 1;
+  // vio_lm_pose_damping_variant = 1;
 
-  vio_scale_jacobian = true;
+  vio_scale_jacobian = false;
 
   vio_init_pose_weight = 1e8;
   vio_init_ba_weight = 1e1;
@@ -104,9 +106,9 @@ VioConfig::VioConfig() {
   mapper_no_factor_weights = false;
   mapper_use_factors = true;
 
-  mapper_use_lm = false;
+  mapper_use_lm = true;
   mapper_lm_lambda_min = 1e-32;
-  mapper_lm_lambda_max = 1e2;
+  mapper_lm_lambda_max = 1e3;
 }
 
 void VioConfig::save(const std::string& filename) {
