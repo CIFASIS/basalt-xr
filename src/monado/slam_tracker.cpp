@@ -63,6 +63,23 @@ string pose2str(const pose &p) {
   return str;
 }
 
+static const vector<string> timing_titles{
+    "frame_ts",
+    "tracker_received",
+    "tracker_pushed",
+    "frames_received",  // < Basalt computation starts
+    "opticalflow_produced",
+    "vio_start",
+    "imu_preintegrated",
+    "landmarks_updated",
+    "optimized",
+    "marginalized",
+    "pose_produced",  // Basalt computation ends
+    "tracker_consumer_received",
+    "tracker_consumer_pushed",
+    "monado_dequeued",
+};
+
 struct slam_tracker::implementation {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -110,14 +127,20 @@ struct slam_tracker::implementation {
   MargDataSaver::Ptr marg_data_saver;
 
   // slam_tracker features
-  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION, F_ENABLE_POSE_EXT_TIMING};
+  unordered_set<int> supported_features{
+      F_ADD_CAMERA_CALIBRATION,
+      F_ADD_IMU_CALIBRATION,
+      F_ENABLE_POSE_EXT_TIMING,
+      F_ENABLE_POSE_EXT_FEATURES,
+  };
 
   // Additional calibration data
   vector<cam_calibration> added_cam_calibs{};
   vector<imu_calibration> added_imu_calibs{};
 
-  // Pose timing
+  // Enabled pose extensions
   bool pose_timing_enabled = false;
+  bool pose_features_enabled = false;
 
  public:
   implementation(const string &unified_config) {
@@ -186,10 +209,20 @@ struct slam_tracker::implementation {
     p.timestamp = state->t_ns;
     p.next = nullptr;
 
-    if (pose_timing_enabled) {
-      auto pose_timing = make_shared<pose_ext_timing>();
-      pose_timing->timestamps = state->input_images->tss;
-      p.next = pose_timing;
+    auto *next = &p.next;
+
+    if (state->input_images->stats.timing_enabled) {
+      pose_ext_timing_data petd = state->input_images->stats;
+      auto pose_timing = make_shared<pose_ext_timing>(petd);
+      *next = pose_timing;
+      next = &pose_timing->next;
+    }
+
+    if (state->input_images->stats.features_enabled) {
+      pose_ext_features_data pefd = state->input_images->stats;
+      auto pose_features = make_shared<pose_ext_features>(pefd);
+      *next = pose_features;
+      next = &pose_features->next;
     }
 
     return p;
@@ -241,7 +274,7 @@ struct slam_tracker::implementation {
       apply_cam_calibration(c);
     }
 
-    bool calib_from_monado = added_cam_calibs.size() == 2;
+    bool calib_from_monado = added_cam_calibs.size() == NUM_CAMS;
     bool view_offset_unknown = calib.view_offset(0) == 0 && calib.view_offset(1) == 0;
     if (calib_from_monado || view_offset_unknown) {
       compute_view_offset();
@@ -331,11 +364,24 @@ struct slam_tracker::implementation {
     int i = -1;
     if (s.is_left) {
       partial_frame = make_shared<OpticalFlowInput>();
-      partial_frame->timing_enabled = pose_timing_enabled;
-      partial_frame->addTime("frame_ts", s.timestamp);
-      partial_frame->addTime("tracker_received");
+
       partial_frame->img_data.resize(NUM_CAMS);
       partial_frame->t_ns = s.timestamp;
+
+      // Initialize stats
+      partial_frame->stats.ts = s.timestamp;
+      if (pose_timing_enabled) {
+        partial_frame->stats.timing_enabled = true;
+        partial_frame->stats.timing.reserve(timing_titles.size());
+        partial_frame->stats.timing_titles = &timing_titles;
+        partial_frame->addTime("frame_ts", s.timestamp);
+        partial_frame->addTime("tracker_received");
+      }
+      if (pose_features_enabled) {
+        partial_frame->stats.features_enabled = true;
+        partial_frame->stats.features_per_cam.resize(NUM_CAMS);
+      }
+
       i = 0;
     } else {
       ASSERT(partial_frame->t_ns == s.timestamp, "Left and right frame timestamps differ: %ld != %ld",
@@ -384,7 +430,11 @@ struct slam_tracker::implementation {
       shared_ptr<FPARAMS_AIC> casted_params = static_pointer_cast<FPARAMS_AIC>(params);
       add_imu_calibration(*casted_params);
     } else if (feature_id == FID_EPET) {
-      result = enable_pose_ext_timing();
+      shared_ptr<FPARAMS_EPET> casted_params = static_pointer_cast<FPARAMS_EPET>(params);
+      result = enable_pose_ext_timing(*casted_params);
+    } else if (feature_id == FID_EPEF) {
+      shared_ptr<FPARAMS_EPEF> casted_params = static_pointer_cast<FPARAMS_EPEF>(params);
+      enable_pose_ext_features(*casted_params);
     } else {
       return false;
     }
@@ -510,24 +560,12 @@ struct slam_tracker::implementation {
     calib_data_ready.imu = true;
   }
 
-  shared_ptr<vector<string>> enable_pose_ext_timing() {
-    pose_timing_enabled = true;
-    vector<string> titles{"frame_ts",
-                          "tracker_received",
-                          "tracker_pushed",
-                          "frames_received",  // < Basalt computation starts
-                          "opticalflow_produced",
-                          "vio_start",
-                          "imu_preintegrated",
-                          "landmarks_updated",
-                          "optimized",
-                          "marginalized",
-                          "pose_produced",  // Basalt computation ends
-                          "tracker_consumer_received",
-                          "tracker_consumer_pushed",
-                          "monado_dequeued"};
-    return make_shared<vector<string>>(titles);
+  shared_ptr<vector<string>> enable_pose_ext_timing(bool enable) {
+    pose_timing_enabled = enable;
+    return make_shared<vector<string>>(timing_titles);
   }
+
+  void enable_pose_ext_features(bool enable) { pose_features_enabled = enable; }
 };
 
 slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }

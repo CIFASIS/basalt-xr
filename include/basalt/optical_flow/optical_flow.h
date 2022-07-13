@@ -45,12 +45,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
+#include <slam_tracker.hpp>
 
 #include <tbb/concurrent_queue.h>
 
 namespace basalt {
 
 using KeypointId = size_t;
+using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
@@ -58,20 +60,9 @@ struct OpticalFlowInput {
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
-  // Keep track of internal timestamps for this input
-  bool timing_enabled = false;
-  std::vector<int64_t> tss{};
-  void addTime(const char* /* name */, int64_t custom_ts = INT64_MIN) {
-    if (!timing_enabled) {
-      return;
-    }
-
-    if (custom_ts != INT64_MIN) {
-      tss.push_back(custom_ts);
-    } else {
-      auto ts = std::chrono::steady_clock::now().time_since_epoch().count();
-      tss.push_back(ts);
-    }
+  timestats stats;  //!< Keeps track of internal metrics for this t_ns
+  void addTime(const char* name, int64_t custom_ts = INT64_MIN) {
+    stats.addTime(name, custom_ts);
   }
 };
 

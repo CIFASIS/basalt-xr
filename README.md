@@ -119,7 +119,9 @@ Run an OpenXR app like `hello_xr` with the following environment variables set
 export EUROC_PATH=/path/to/euroc/V1_01_easy/ # Set euroc dataset path. You can get a dataset from http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/V1_01_easy/V1_01_easy.zip
 export EUROC_LOG=debug
 export EUROC_HMD=false # if false, a fake controller will be tracked, else a fake HMD
+export EUROC_PLAY_FROM_START=true
 export SLAM_LOG=debug
+export SLAM_SUBMIT_FROM_START=true
 export SLAM_CONFIG=$bsltdeps/basalt/data/monado/euroc.toml # Point to Basalt config file for Euroc
 export OXR_DEBUG_GUI=1 # We will need the debug ui to start streaming the dataset
 ```

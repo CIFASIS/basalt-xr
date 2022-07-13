@@ -53,6 +53,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tbb/parallel_reduce.h>
 
 #include <chrono>
+#include <slam_tracker.hpp>
 
 namespace basalt {
 
@@ -163,7 +164,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 
     typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
 
-    bool run = data != nullptr; // End VIO otherwise
+    bool run = data != nullptr;  // End VIO otherwise
     if (run) {
       data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
       data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
@@ -489,6 +490,14 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
                     lost_landmaks);
 
+  const size_t num_cams = opt_flow_meas->observations.size();
+  const bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
+  std::vector<Eigen::aligned_vector<Eigen::Vector4d>> projections{};
+  if (features_ext || out_vis_queue) {
+    projections.resize(num_cams);
+    computeProjections(projections, last_state_t_ns);
+  }
+
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
 
@@ -497,6 +506,21 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
     data->input_images = opt_flow_meas->input_images;
     data->input_images->addTime("pose_produced");
+
+    if (features_ext) {
+      for (size_t i = 0; i < num_cams; i++) {
+        for (const Eigen::Vector4d& v : projections[i]) {
+          using Feature =
+              xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
+          Feature lm{};
+          lm.id = v.w();
+          lm.u = v.x();
+          lm.v = v.y();
+          lm.depth = v.z();
+          data->input_images->stats.addFeature(i, lm);
+        }
+      }
+    }
     out_state_queue->push(data);
   }
 
@@ -516,8 +540,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
     get_current_points(data->points, data->point_ids);
 
-    data->projections.resize(opt_flow_meas->observations.size());
-    computeProjections(data->projections, last_state_t_ns);
+    data->projections = projections;
 
     data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
 

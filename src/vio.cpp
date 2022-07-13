@@ -143,7 +143,7 @@ size_t last_frame_processed = 0;
 tbb::concurrent_unordered_map<int64_t, int, std::hash<int64_t>> timestamp_to_id;
 
 std::mutex m;
-std::condition_variable cv;
+std::condition_variable cvar;
 bool step_by_step = false;
 size_t max_frames = 0;
 
@@ -169,7 +169,7 @@ void feed_images() {
 
     if (step_by_step) {
       std::unique_lock<std::mutex> lk(m);
-      cv.wait(lk);
+      cvar.wait(lk);
     }
 
     basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput);
@@ -829,7 +829,7 @@ bool next_step() {
   if (show_frame < int(vio_dataset->get_image_timestamps().size()) - 1) {
     show_frame = show_frame + 1;
     show_frame.Meta().gui_changed = true;
-    cv.notify_one();
+    cvar.notify_one();
     return true;
   } else {
     return false;
