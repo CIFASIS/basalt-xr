@@ -156,3 +156,4 @@ Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Here 
 
 - [RealSense Driver](doc/monado/Realsense.md)
 - [WMR Driver](doc/monado/WMR.md)
+- [Vive Driver (Valve Index)](doc/monado/Vive.md)
