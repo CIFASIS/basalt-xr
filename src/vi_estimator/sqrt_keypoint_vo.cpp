@@ -52,6 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fmt/format.h>
 
 #include <chrono>
+#include <slam_tracker.hpp>
 
 namespace basalt {
 
@@ -139,6 +140,8 @@ void SqrtKeypointVoEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg,
       if (!curr_frame.get()) {
         break;
       }
+      curr_frame->input_images->addTime("vio_start");
+      curr_frame->input_images->addTime("imu_preintegrated");
 
       // Correct camera time offset (relevant for VIO)
       // curr_frame->t_ns += calib.cam_time_offset_ns;
@@ -408,8 +411,23 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
       }
     }
   }
+  opt_flow_meas->input_images->addTime("landmarks_updated");
 
-  optimize_and_marg(num_points_connected, lost_landmaks);
+  optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
+                    lost_landmaks);
+
+  size_t num_cams = opt_flow_meas->observations.size();
+  bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
+  bool avg_depth_needed =
+      opt_flow_depth_guess_queue && config.optical_flow_matching_guess_type ==
+                                        MatchingGuessType::REPROJ_AVG_DEPTH;
+
+  using Projections = std::vector<Eigen::aligned_vector<Eigen::Vector4d>>;
+  std::shared_ptr<Projections> projections = nullptr;
+  if (features_ext || out_vis_queue || avg_depth_needed) {
+    projections = std::make_shared<Projections>(num_cams);
+    computeProjections(*projections, last_state_t_ns);
+  }
 
   if (out_state_queue) {
     const PoseStateWithLin<Scalar>& p = frame_poses.at(last_state_t_ns);
@@ -419,6 +437,38 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
         Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
         Eigen::Vector3d::Zero()));
 
+    data->input_images = opt_flow_meas->input_images;
+    data->input_images->addTime("pose_produced");
+
+    if (avg_depth_needed) {
+      double avg_invdepth = 0;
+      double num_features = 0;
+      for (const auto& cam_projs : *projections) {
+        for (const Eigen::Vector4d& v : cam_projs) avg_invdepth += v.z();
+        num_features += cam_projs.size();
+      }
+
+      bool valid = avg_invdepth > 0 && num_features > 0;
+      float default_depth = config.optical_flow_matching_default_depth;
+      double avg_depth = valid ? num_features / avg_invdepth : default_depth;
+
+      opt_flow_depth_guess_queue->push(avg_depth);
+    }
+
+    if (features_ext) {
+      for (size_t i = 0; i < num_cams; i++) {
+        for (const Eigen::Vector4d& v : projections->at(i)) {
+          using Feature =
+              xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
+          Feature lm{};
+          lm.id = v.w();
+          lm.u = v.x();
+          lm.v = v.y();
+          lm.depth = v.z();
+          data->input_images->stats.addFeature(i, lm);
+        }
+      }
+    }
     out_state_queue->push(data);
   }
 
@@ -435,8 +485,7 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
 
     get_current_points(data->points, data->point_ids);
 
-    data->projections.resize(opt_flow_meas->observations.size());
-    computeProjections(data->projections, last_state_t_ns);
+    data->projections = projections;
 
     data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
 
@@ -1309,10 +1358,13 @@ void SqrtKeypointVoEstimator<Scalar_>::optimize() {
 
 template <class Scalar_>
 void SqrtKeypointVoEstimator<Scalar_>::optimize_and_marg(
+    const OpticalFlowInput::Ptr& input_images,
     const std::map<int64_t, int>& num_points_connected,
     const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
+  input_images->addTime("optimized");
   marginalize(num_points_connected, lost_landmaks);
+  input_images->addTime("marginalized");
 }
 
 template <class Scalar_>

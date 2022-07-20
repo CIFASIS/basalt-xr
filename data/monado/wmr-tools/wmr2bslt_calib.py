@@ -246,7 +246,7 @@ def main():
             "accel_bias_std": bias_std(j, "Accelerometer"),
             "gyro_bias_std": bias_std(j, "Gyro"),
             "cam_time_offset_ns": 0,
-            "view_offset": view_offset(j),
+            # "view_offset": view_offset(j),
             "vignette": [],
         }
     }

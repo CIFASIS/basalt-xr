@@ -81,6 +81,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     this->calib = calib.cast<Scalar>();
 
     patch_coord = PatchT::pattern2.template cast<float>();
+    depth_guess = config.optical_flow_matching_default_depth;
 
     if (calib.intrinsics.size() > 1) {
       Eigen::Matrix4d Ed;
@@ -99,12 +100,15 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     OpticalFlowInput::Ptr input_ptr;
 
     while (true) {
+      while (input_depth_queue.try_pop(depth_guess)) continue;
+
       input_queue.pop(input_ptr);
 
       if (!input_ptr.get()) {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
+      input_ptr->addTime("frames_received");
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
@@ -182,6 +186,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (frame_counter % config.optical_flow_skip_frames == 0) {
+      transforms->input_images->addTime("opticalflow_produced");
       try {
         output_queue->push(transforms);
       } catch (const tbb::user_abort&) {
@@ -201,7 +206,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
       const std::map<KeypointId, size_t>& pyramid_levels_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
       std::map<KeypointId, size_t>& pyramid_levels_2,
-      Vector2 view_offset = Vector2::Zero()) const {
+      bool matching = false) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -230,34 +235,42 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
-        transform_2.translation() -= view_offset;
 
-        bool valid =
-            transform_2.translation()(0) >= 0 &&
-            transform_2.translation()(1) >= 0 &&
-            transform_2.translation()(0) < pyr_2.lvl(pyramid_level[r]).w &&
-            transform_2.translation()(1) < pyr_2.lvl(pyramid_level[r]).h;
+        auto t1 = transform_1.translation();
+        auto t2 = transform_2.translation();
+
+        Eigen::Vector2f off{0, 0};
+        MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+        if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
+          off = calib.viewOffset(t1, depth_guess).template cast<float>();
+          transforms->input_images->depth_guess = depth_guess;  // For UI
+        }
+
+        t2 -= off;  // This modifies transform_2
+
+        bool valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
+                     t2(1) < pyr_2.lvl(0).h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, pyramid_level[r],
                            transform_2);
-        if (valid) {
-          Eigen::AffineCompact2f transform_1_recovered = transform_2;
-          transform_1_recovered.translation() += view_offset;
-          valid = trackPoint(pyr_2, pyr_1, transform_2, pyramid_level[r],
-                             transform_1_recovered);
+        if (!valid) continue;
 
-          if (valid) {
-            const Scalar scale = 1 << pyramid_level[r];
-            Scalar dist2 = (transform_1.translation() / scale -
-                            transform_1_recovered.translation() / scale)
-                               .squaredNorm();
+        Eigen::AffineCompact2f transform_1_recovered = transform_2;
+        auto t1_recovered = transform_1_recovered.translation();
 
-            if (dist2 < config.optical_flow_max_recovered_dist2) {
-              result_transforms[id] = transform_2;
-              result_pyramid_level[id] = pyramid_level[r];
-            }
-          }
+        t1_recovered += off;
+
+        valid = trackPoint(pyr_2, pyr_1, transform_2, pyramid_level[r],
+                           transform_1_recovered);
+        if (!valid) continue;
+
+        const Scalar scale = 1 << pyramid_level[r];
+        Scalar dist2 = ((t1 - t1_recovered) / scale).squaredNorm();
+
+        if (dist2 < config.optical_flow_max_recovered_dist2) {
+          result_transforms[id] = transform_2;
+          result_pyramid_level[id] = pyramid_level[r];
         }
       }
     };
@@ -400,7 +413,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
       trackPoints(pyramid->at(0), pyramid->at(1), new_poses_main,
                   new_pyramid_levels_main, new_poses_stereo,
-                  new_pyramid_levels_stereo, calib.view_offset);
+                  new_pyramid_levels_stereo, true);
 
       for (const auto& kv : new_poses_stereo) {
         transforms->observations.at(1).emplace(kv);

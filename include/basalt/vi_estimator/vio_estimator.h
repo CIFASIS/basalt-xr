@@ -54,7 +54,8 @@ struct VioVisualizationData {
 
   OpticalFlowResult::Ptr opt_flow_res;
 
-  std::vector<Eigen::aligned_vector<Eigen::Vector4d>> projections;
+  std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>>
+      projections;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -84,6 +85,8 @@ class VioEstimatorBase {
   tbb::concurrent_bounded_queue<MargData::Ptr>* out_marg_queue = nullptr;
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr>* out_vis_queue =
       nullptr;
+
+  tbb::concurrent_queue<double>* opt_flow_depth_guess_queue = nullptr;
 
   virtual void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i,
                           const Eigen::Vector3d& vel_w_i,

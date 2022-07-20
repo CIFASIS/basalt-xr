@@ -60,6 +60,8 @@ struct OpticalFlowInput {
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
+  double depth_guess = -1;
+
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) {
     stats.addTime(name, custom_ts);
@@ -83,9 +85,11 @@ class OpticalFlowBase {
   using Ptr = std::shared_ptr<OpticalFlowBase>;
 
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
+  tbb::concurrent_queue<double> input_depth_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 
   Eigen::MatrixXf patch_coord;
+  double depth_guess = -1;
 };
 
 class OpticalFlowFactory {

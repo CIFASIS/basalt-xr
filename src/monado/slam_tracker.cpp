@@ -252,6 +252,7 @@ struct slam_tracker::implementation {
     while (running) {
       cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \t"
            << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \t"
+           << "[in] depth: " << opt_flow_ptr->input_depth_queue.unsafe_size() << "/-- \t"
            << "[mid] keypoints: " << opt_flow_ptr->output_queue->size() << "/" << opt_flow_ptr->output_queue->capacity()
            << " \t"
            << "[out] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n";
@@ -272,13 +273,6 @@ struct slam_tracker::implementation {
     // Overwrite camera calibration data
     for (const auto &c : added_cam_calibs) {
       apply_cam_calibration(c);
-    }
-
-    bool calib_from_monado = added_cam_calibs.size() == NUM_CAMS;
-    bool view_offset_unknown = calib.view_offset(0) == 0 && calib.view_offset(1) == 0;
-    if (calib_from_monado || view_offset_unknown) {
-      compute_view_offset();
-      cout << "Computed view_offset = " << calib.view_offset.transpose() << "\n";
     }
 
     // Overwrite IMU calibration data
@@ -305,6 +299,7 @@ struct slam_tracker::implementation {
       vio->out_vis_queue = &ui.out_vis_queue;
     };
     vio->out_state_queue = &out_state_queue;
+    vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
 
     if (!marg_data_path.empty()) {
       marg_data_saver.reset(new MargDataSaver(marg_data_path));
@@ -316,7 +311,7 @@ struct slam_tracker::implementation {
     running = true;
     vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
-    if (show_gui) ui.start(vio->getT_w_i_init(), calib);
+    if (show_gui) ui.start(vio->getT_w_i_init(), calib, vio_config, &opt_flow_ptr->input_depth_queue, opt_flow_ptr);
     state_consumer_thread = thread(&slam_tracker::implementation::state_consumer, this);
     if (print_queue) queues_printer_thread = thread(&slam_tracker::implementation::queues_printer, this);
   }
@@ -439,22 +434,6 @@ struct slam_tracker::implementation {
       return false;
     }
     return true;
-  }
-
-  void compute_view_offset() {
-    constexpr double DISTANCE_TO_WALL = 2;  // In meters
-    double width = calib.resolution[0][0];
-    double height = calib.resolution[0][1];
-    Sophus::SE3d T_i_c0 = calib.T_i_c[0];
-    Sophus::SE3d T_i_c1 = calib.T_i_c[1];
-    Sophus::SE3d T_c1_i = T_i_c1.inverse();
-    Sophus::SE3d T_c1_c0 = T_c1_i * T_i_c0;  // Maps a point in c0 space to c1 space
-    Eigen::Vector4d p3d{0, 0, DISTANCE_TO_WALL, 1};
-    Eigen::Vector4d p3d_in_c1 = T_c1_c0 * p3d;
-    Eigen::Vector2d p2d;
-    calib.intrinsics[1].project(p3d_in_c1, p2d);
-    calib.view_offset.x() = (width / 2) - p2d.x();
-    calib.view_offset.y() = (height / 2) - p2d.y();
   }
 
   void add_cam_calibration(const cam_calibration &cam_calib) { added_cam_calibs.push_back(cam_calib); }

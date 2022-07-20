@@ -95,6 +95,12 @@ pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
+pangolin::Var<bool> show_same_pixel_guess("ui.show_same_pixel_guess", false,
+                                          false, true);
+pangolin::Var<bool> show_active_guess("ui.show_active_guess", false, false,
+                                      true);
+pangolin::Var<double> depth_guess{"ui.depth_guess", 2,
+                                  pangolin::META_FLAG_READONLY};
 
 pangolin::Var<bool> show_est_pos("ui.show_est_pos", true, false, true);
 pangolin::Var<bool> show_est_vel("ui.show_est_vel", false, false, true);
@@ -310,6 +316,7 @@ int main(int argc, char** argv) {
     opt_flow_ptr->output_queue = &vio->vision_data_queue;
     if (show_gui) vio->out_vis_queue = &out_vis_queue;
     vio->out_state_queue = &out_state_queue;
+    vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
   }
 
   basalt::MargDataSaver::Ptr marg_data_saver;
@@ -442,6 +449,7 @@ int main(int argc, char** argv) {
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
       std::shared_ptr<pangolin::ImageView> iv(new pangolin::ImageView);
+      iv->UseNN() = true;  // Disable antialiasing, can be toggled with N key
 
       size_t idx = img_view.size();
       img_view.push_back(iv);
@@ -693,13 +701,13 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (it != vis_map.end() && cam_id < it->second->projections.size()) {
-      const auto& points = it->second->projections[cam_id];
+    if (it != vis_map.end() && cam_id < it->second->projections->size()) {
+      const auto& points = it->second->projections->at(cam_id);
 
       if (points.size() > 0) {
         double min_id = points[0][2], max_id = points[0][2];
 
-        for (const auto& points2 : it->second->projections)
+        for (const auto& points2 : *it->second->projections)
           for (const auto& p : points2) {
             min_id = std::min(min_id, p[2]);
             max_id = std::max(max_id, p[2]);
@@ -723,6 +731,58 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
       pangolin::GlFont::I()
           .Text("Tracked %d points", points.size())
           .Draw(5, 20);
+    }
+  }
+
+  depth_guess = it->second->opt_flow_res->input_images->depth_guess;
+  bool show_guesses = (show_active_guess || show_same_pixel_guess) &&
+                      cam_id == 1 && it != vis_map.end() &&
+                      it->second->projections->size() >= 2;
+  if (show_guesses) {
+    const auto keypoints0 = it->second->projections->at(0);
+    const auto keypoints1 = it->second->projections->at(1);
+
+    for (const Eigen::Vector4d& kp1 : keypoints1) {
+      double u1 = kp1.x();
+      double v1 = kp1.y();
+      double id1 = kp1.w();
+
+      // Find match in keypoints0
+      double u0 = 0;
+      double v0 = 0;
+      bool found = false;
+      for (const Eigen::Vector4d& kp0 : keypoints0) {
+        double id0 = kp0.w();
+
+        if (id1 != id0) continue;
+        u0 = kp0.x();
+        v0 = kp0.y();
+        found = true;
+        break;
+      }
+
+      // Display guess error if this is a stereo feature
+      // NOTE: keep in mind that these guesses are not really the guesses
+      // used to detect the feature, but the guess we would use if we were
+      // to detect the feature right now.
+      if (found) {
+        // Guess if we were using SAME_PIXEL
+        if (show_same_pixel_guess) {
+          glColor3f(0, 1, 1);  // Cyan
+          pangolin::glDrawLine(u1, v1, u0, v0);
+        }
+
+        // Guess with the current guess type
+        if (show_active_guess) {
+          glColor3f(1, 0, 1);  // Magenta
+          Eigen::Vector2d off{0, 0};
+          if (vio_config.optical_flow_matching_guess_type !=
+              basalt::MatchingGuessType::SAME_PIXEL) {
+            off = calib.viewOffset({u0, v0}, depth_guess);
+          }
+          pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
+        }
+      }
     }
   }
 

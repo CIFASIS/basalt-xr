@@ -79,6 +79,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     this->calib = calib.cast<Scalar>();
 
     patch_coord = PatchT::pattern2.template cast<float>();
+    depth_guess = config.optical_flow_matching_default_depth;
 
     if (calib.intrinsics.size() > 1) {
       Eigen::Matrix4d Ed;
@@ -97,6 +98,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     OpticalFlowInput::Ptr input_ptr;
 
     while (true) {
+      while (input_depth_queue.try_pop(depth_guess)) continue;
+
       input_queue.pop(input_ptr);
 
       if (!input_ptr.get()) {
@@ -186,7 +189,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
           transform_map_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      Vector2 view_offset = Vector2::Zero()) const {
+      bool matching = false) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -210,26 +213,35 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
-        transform_2.translation() -= view_offset;
 
-        bool valid = transform_2.translation()(0) >= 0 &&
-                     transform_2.translation()(1) &&
-                     transform_2.translation()(0) < pyr_2.lvl(0).w &&
-                     transform_2.translation()(1) < pyr_2.lvl(0).h;
+        auto t1 = transform_1.translation();
+        auto t2 = transform_2.translation();
+
+        Eigen::Vector2f off{0, 0};
+        MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+        if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
+          off = calib.viewOffset(t1, depth_guess).template cast<float>();
+          transforms->input_images->depth_guess = depth_guess;  // For UI
+        }
+
+        t2 -= off;  // This modifies transform_2
+
+        bool valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
+                     t2(1) < pyr_2.lvl(0).h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
         if (!valid) continue;
 
         Eigen::AffineCompact2f transform_1_recovered = transform_2;
-        transform_1_recovered.translation() += view_offset;
+        auto t1_recovered = transform_1_recovered.translation();
+
+        t1_recovered += off;
 
         valid = trackPoint(pyr_2, pyr_1, transform_2, transform_1_recovered);
         if (!valid) continue;
 
-        Scalar dist2 =
-            (transform_1.translation() - transform_1_recovered.translation())
-                .squaredNorm();
+        Scalar dist2 = (t1 - t1_recovered).squaredNorm();
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
           result[id] = transform_2;
@@ -341,8 +353,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1,
-                  calib.view_offset);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, true);
 
       for (const auto& kv : new_poses1) {
         transforms->observations.at(1).emplace(kv);

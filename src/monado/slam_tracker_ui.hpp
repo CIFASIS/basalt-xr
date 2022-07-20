@@ -5,10 +5,13 @@
 
 #include <CLI/CLI.hpp>
 
+#include <cstddef>
 #include <cstdio>
 #include <memory>
 #include <string>
 #include <thread>
+#include "basalt/optical_flow/optical_flow.h"
+#include "basalt/utils/vio_config.h"
 #include "sophus/se3.hpp"
 
 #include <basalt/io/marg_data_io.h>
@@ -51,6 +54,8 @@ class slam_tracker_ui {
 
  public:
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
+  tbb::concurrent_queue<double> *opt_flow_depth_queue = nullptr;
+  OpticalFlowBase::Ptr opt_flow;
 
   void initialize(int ncams) {
     vio_data_log.Clear();
@@ -58,10 +63,13 @@ class slam_tracker_ui {
     num_cams = ncams;
   }
 
-  void start(const Sophus::SE3d &T_w_i_init, const basalt::Calibration<double> &calib) {
+  void start(const Sophus::SE3d &T_w_i_init, const Calibration<double> &calib, const VioConfig &config,
+             tbb::concurrent_queue<double> *ofq_depth, OpticalFlowBase::Ptr of) {
+    opt_flow_depth_queue = ofq_depth;
+    opt_flow = of;
     running = true;
     start_visualization_thread();
-    start_ui(T_w_i_init, calib);
+    start_ui(T_w_i_init, calib, config);
   }
 
   void stop() {
@@ -74,6 +82,7 @@ class slam_tracker_ui {
     vis_thread = thread([&]() {
       while (true) {
         out_vis_queue.pop(curr_vis_data);
+        show_frame = show_frame + 1;
         if (curr_vis_data.get() == nullptr) break;
       }
       cout << "Finished vis_thread\n";
@@ -109,9 +118,10 @@ class slam_tracker_ui {
 
   pangolin::Plotter *plotter;
   pangolin::DataLog imu_data_log{};
-  basalt::Calibration<double> calib;
-  void start_ui(const Sophus::SE3d &T_w_i_init, const basalt::Calibration<double> &c) {
-    ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, c);
+  Calibration<double> calib;
+  VioConfig config;
+  void start_ui(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
+    ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
   }
 
   pangolin::Var<bool> follow{"ui.follow", true, false, true};
@@ -120,11 +130,12 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_est_bg{"ui.show_est_bg", false, false, true};
   pangolin::Var<bool> show_est_ba{"ui.show_est_ba", false, false, true};
 
-  void ui_runner(const Sophus::SE3d &T_w_i_init, const basalt::Calibration<double> &c) {
+  void ui_runner(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
     constexpr int UI_WIDTH = 200;
 
-    calib = c;
-    string window_name = "Basalt SLAM Tracker for Monado";
+    calib = cal;
+    config = conf;
+    string window_name = "Basalt 6DoF Tracker for Monado";
     pangolin::CreateWindowAndBind(window_name, 1800, 1000);
 
     glEnable(GL_DEPTH_TEST);
@@ -143,6 +154,7 @@ class slam_tracker_ui {
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
       std::shared_ptr<pangolin::ImageView> iv(new pangolin::ImageView);
+      iv->UseNN() = true;  // Disable antialiasing (toggle it back with the N key)
 
       size_t idx = img_view.size();
       img_view.push_back(iv);
@@ -185,6 +197,11 @@ class slam_tracker_ui {
 
       img_view_display.Activate();
 
+      if (fixed_depth.GuiChanged() && opt_flow_depth_queue != nullptr) {
+        opt_flow_depth_queue->push(fixed_depth);
+      }
+      depth_guess = opt_flow->depth_guess;
+
       {
         pangolin::GlPixFormat fmt;
         fmt.glformat = GL_LUMINANCE;
@@ -217,8 +234,19 @@ class slam_tracker_ui {
     cout << "Finished ui_runner\n";
   }
 
+  pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
+  pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
+
+  pangolin::Var<bool> show_guesses{"ui.Show matching guesses", false, false, true};
+  pangolin::Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, false, true};
+  pangolin::Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, false, true};
+  pangolin::Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, false, true};
+  pangolin::Var<double> fixed_depth{"ui.FIX_DEPTH", 2, 0, 10};
+  pangolin::Var<bool> show_active_guess{"ui.Active Guess", true, false, true};
+
+  pangolin::Var<double> depth_guess{"ui.depth_guess", 2, pangolin::META_FLAG_READONLY};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
@@ -229,14 +257,14 @@ class slam_tracker_ui {
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-      if (curr_vis_data && cam_id < curr_vis_data->projections.size()) {
-        const auto &points = curr_vis_data->projections[cam_id];
+      if (curr_vis_data && cam_id < curr_vis_data->projections->size()) {
+        const auto &points = curr_vis_data->projections->at(cam_id);
 
         if (!points.empty()) {
           double min_id = points[0][2];
           double max_id = points[0][2];
 
-          for (const auto &points2 : curr_vis_data->projections) {
+          for (const auto &points2 : *curr_vis_data->projections) {
             for (const auto &p : points2) {
               min_id = std::min(min_id, p[2]);
               max_id = std::max(max_id, p[2]);
@@ -255,6 +283,70 @@ class slam_tracker_ui {
             pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
 
             if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
+            if (show_invdist) pangolin::GlFont::I().Text("%.3lf", c[2]).Draw(c[0], c[1] + 5);
+          }
+        }
+
+        if (show_guesses && cam_id == 1) {
+          using namespace Eigen;
+          const auto keypoints0 = curr_vis_data->projections->at(0);
+          const auto keypoints1 = curr_vis_data->projections->at(1);
+
+          double avg_invdepth = 0;
+          double num_features = 0;
+          for (const auto &cam_projs : *curr_vis_data->projections) {
+            for (const Vector4d &v : cam_projs) avg_invdepth += v.z();
+            num_features += cam_projs.size();
+          }
+          bool valid = avg_invdepth > 0 && num_features > 0;
+          float default_depth = config.optical_flow_matching_default_depth;
+          double avg_depth = valid ? num_features / avg_invdepth : default_depth;
+
+          for (const Vector4d kp1 : keypoints1) {
+            double u1 = kp1.x();
+            double v1 = kp1.y();
+            // double invdist1 = kp1.z();
+            double id1 = kp1.w();
+
+            double u0 = 0;
+            double v0 = 0;
+            bool found = false;
+            for (const Vector4d &kp0 : keypoints0) {
+              double id0 = kp0.w();
+              if (id1 != id0) continue;
+              u0 = kp0.x();
+              v0 = kp0.y();
+              found = true;
+              break;
+            }
+
+            if (found) {
+              if (show_same_pixel_guess) {
+                glColor3f(0, 1, 1);  // Cyan
+                pangolin::glDrawLine(u1, v1, u0, v0);
+              }
+
+              if (show_reproj_fix_depth_guess) {
+                glColor3f(1, 1, 0);  // Yellow
+                auto off = calib.viewOffset({u0, v0}, fixed_depth);
+                pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
+              }
+
+              if (show_reproj_avg_depth_guess) {
+                glColor3f(1, 0, 1);  // Magenta
+                auto off = calib.viewOffset({u0, v0}, avg_depth);
+                pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
+              }
+
+              if (show_active_guess) {
+                glColor3f(1, 0, 0);  // Red
+                Vector2d off{0, 0};
+                if (config.optical_flow_matching_guess_type != MatchingGuessType::SAME_PIXEL) {
+                  off = calib.viewOffset({u0, v0}, opt_flow->depth_guess);
+                }
+                pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
+              }
+            }
           }
         }
 

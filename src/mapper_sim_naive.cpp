@@ -439,8 +439,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
     auto it = vis_map.find(gt_frame_t_ns[frame_id]);
 
-    if (it != vis_map.end() && cam_id < it->second->projections.size()) {
-      const auto& points = it->second->projections[cam_id];
+    if (it != vis_map.end() && cam_id < it->second->projections->size()) {
+      const auto& points = it->second->projections->at(cam_id);
 
       if (points.size() > 0) {
         double min_id = points[0][2], max_id = points[0][2];

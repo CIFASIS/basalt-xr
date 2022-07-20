@@ -15,6 +15,8 @@
 "config.optical_flow_epipolar_error" = 0.005
 "config.optical_flow_levels" = 3
 "config.optical_flow_skip_frames" = 1
+"config.optical_flow_matching_guess_type" = "SAME_PIXEL"
+"config.optical_flow_matching_default_depth" = 2.0
 
 "config.vio_linearization_type" = "ABS_QR"
 "config.vio_sqrt_marg" = true

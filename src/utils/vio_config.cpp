@@ -54,6 +54,8 @@ VioConfig::VioConfig() {
   optical_flow_levels = 3;
   optical_flow_epipolar_error = 0.005;
   optical_flow_skip_frames = 1;
+  optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
+  optical_flow_matching_default_depth = 2.0;
 
   vio_linearization_type = LinearizationType::ABS_QR;
   vio_sqrt_marg = true;
@@ -136,6 +138,30 @@ namespace cereal {
 
 template <class Archive>
 std::string save_minimal(const Archive& ar,
+                         const basalt::MatchingGuessType& guess_type) {
+  UNUSED(ar);
+  auto name = magic_enum::enum_name(guess_type);
+  return std::string(name);
+}
+
+template <class Archive>
+void load_minimal(const Archive& ar, basalt::MatchingGuessType& guess_type,
+                  const std::string& name) {
+  UNUSED(ar);
+
+  auto guess_enum = magic_enum::enum_cast<basalt::MatchingGuessType>(name);
+
+  if (guess_enum.has_value()) {
+    guess_type = guess_enum.value();
+  } else {
+    std::cerr << "Could not find the MatchingGuessType for " << name
+              << std::endl;
+    std::abort();
+  }
+}
+
+template <class Archive>
+std::string save_minimal(const Archive& ar,
                          const basalt::LinearizationType& linearization_type) {
   UNUSED(ar);
   auto name = magic_enum::enum_name(linearization_type);
@@ -169,6 +195,8 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_epipolar_error));
   ar(CEREAL_NVP(config.optical_flow_levels));
   ar(CEREAL_NVP(config.optical_flow_skip_frames));
+  ar(CEREAL_NVP(config.optical_flow_matching_guess_type));
+  ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
 
   ar(CEREAL_NVP(config.vio_linearization_type));
   ar(CEREAL_NVP(config.vio_sqrt_marg));

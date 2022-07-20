@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/vi_estimator/marg_helper.h>
 #include <basalt/vi_estimator/sqrt_keypoint_vio.h>
 
+#include <basalt/optical_flow/optical_flow.h>
 #include <basalt/optimization/accumulator.h>
 #include <basalt/utils/assert.h>
 #include <basalt/utils/system_utils.h>
@@ -490,12 +491,17 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
                     lost_landmaks);
 
-  const size_t num_cams = opt_flow_meas->observations.size();
-  const bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
-  std::vector<Eigen::aligned_vector<Eigen::Vector4d>> projections{};
-  if (features_ext || out_vis_queue) {
-    projections.resize(num_cams);
-    computeProjections(projections, last_state_t_ns);
+  size_t num_cams = opt_flow_meas->observations.size();
+  bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
+  bool avg_depth_needed =
+      opt_flow_depth_guess_queue && config.optical_flow_matching_guess_type ==
+                                        MatchingGuessType::REPROJ_AVG_DEPTH;
+
+  using Projections = std::vector<Eigen::aligned_vector<Eigen::Vector4d>>;
+  std::shared_ptr<Projections> projections = nullptr;
+  if (features_ext || out_vis_queue || avg_depth_needed) {
+    projections = std::make_shared<Projections>(num_cams);
+    computeProjections(*projections, last_state_t_ns);
   }
 
   if (out_state_queue) {
@@ -507,9 +513,24 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     data->input_images = opt_flow_meas->input_images;
     data->input_images->addTime("pose_produced");
 
+    if (avg_depth_needed) {
+      double avg_invdepth = 0;
+      double num_features = 0;
+      for (const auto& cam_projs : *projections) {
+        for (const Eigen::Vector4d& v : cam_projs) avg_invdepth += v.z();
+        num_features += cam_projs.size();
+      }
+
+      bool valid = avg_invdepth > 0 && num_features > 0;
+      float default_depth = config.optical_flow_matching_default_depth;
+      double avg_depth = valid ? num_features / avg_invdepth : default_depth;
+
+      opt_flow_depth_guess_queue->push(avg_depth);
+    }
+
     if (features_ext) {
       for (size_t i = 0; i < num_cams; i++) {
-        for (const Eigen::Vector4d& v : projections[i]) {
+        for (const Eigen::Vector4d& v : projections->at(i)) {
           using Feature =
               xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
           Feature lm{};
