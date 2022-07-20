@@ -4,7 +4,7 @@
 show-gui=1
 
 # Ground-truth camera calibration used for simulation.
-cam-calib="/home/mateo/Documents/apps/bsltdeps/basalt/data/index_calib_oxrimu.json"
+cam-calib="/home/mateo/Documents/apps/bsltdeps/basalt/data/index_calib.json"
 
 # Path to config file.
 config-path="/home/mateo/Documents/apps/bsltdeps/basalt/data/euroc_config.json"
