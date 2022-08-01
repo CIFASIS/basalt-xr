@@ -391,13 +391,13 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (curr_vis_data.get() && cam_id < curr_vis_data->projections.size()) {
-      const auto& points = curr_vis_data->projections[cam_id];
+    if (curr_vis_data.get() && cam_id < curr_vis_data->projections->size()) {
+      const auto& points = curr_vis_data->projections->at(cam_id);
 
       if (!points.empty()) {
         double min_id = points[0][2], max_id = points[0][2];
 
-        for (const auto& points2 : curr_vis_data->projections)
+        for (const auto& points2 : *curr_vis_data->projections)
           for (const auto& p : points2) {
             min_id = std::min(min_id, p[2]);
             max_id = std::max(max_id, p[2]);
