@@ -51,7 +51,6 @@ set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME_LOWERCASE}_${CPACK_PACKAGE_VERSION_M
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 include(CPack)
 
-
 # Configure CCache if available
 if (NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
   find_program(CCACHE_PROGRAM ccache)
@@ -297,12 +296,12 @@ add_library(basalt::magic_enum INTERFACE IMPORTED)
 set_property(TARGET basalt::magic_enum PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/magic_enum/include)
 
 # main library
-add_library(basalt SHARED)
+add_library(basalt_internal STATIC)
 
 # List all header and source files with target_sources.
 # This ensures, e.g., that QtCreator >= 6.0 properly recognize these headers to belong to the project.
 # To support cmake < 3.13, use absolute paths (see: https://crascit.com/2016/01/31/enhanced-source-file-handling-with-target_sources/)
-target_sources(basalt
+target_sources(basalt_internal
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/aprilgrid.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/calibration_helper.h
@@ -373,7 +372,6 @@ target_sources(basalt
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_abs_sc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_rel_sc.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/monado/slam_tracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/optical_flow/optical_flow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/keypoints.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/system_utils.cpp
@@ -390,45 +388,48 @@ target_sources(basalt
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/vio_estimator.cpp
 )
 
-target_link_libraries(basalt
+target_link_libraries(basalt_internal
   PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado
   PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt)
-target_include_directories(basalt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_definitions(basalt PUBLIC ${BASALT_COMPILE_DEFINITIONS})
-#target_compile_definitions(basalt PUBLIC BASALT_DISABLE_ASSERTS)
+target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
+#target_compile_definitions(basalt_internal PUBLIC BASALT_DISABLE_ASSERTS)
 
+add_library(basalt SHARED)
+target_sources(basalt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/monado/slam_tracker.cpp)
+target_link_libraries(basalt basalt_internal)
 
 add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
-target_link_libraries(basalt_calibrate basalt pangolin basalt::cli11)
+target_link_libraries(basalt_calibrate basalt_internal pangolin basalt::cli11)
 
 add_executable(basalt_calibrate_imu src/calibrate_imu.cpp src/calibration/cam_imu_calib.cpp)
-target_link_libraries(basalt_calibrate_imu basalt pangolin basalt::cli11)
+target_link_libraries(basalt_calibrate_imu basalt_internal pangolin basalt::cli11)
 
 
 add_executable(basalt_vio_sim src/vio_sim.cpp)
-target_link_libraries(basalt_vio_sim basalt pangolin basalt::cli11)
+target_link_libraries(basalt_vio_sim basalt_internal pangolin basalt::cli11)
 
 add_executable(basalt_mapper_sim src/mapper_sim.cpp)
-target_link_libraries(basalt_mapper_sim basalt pangolin basalt::cli11)
+target_link_libraries(basalt_mapper_sim basalt_internal pangolin basalt::cli11)
 
 # mapper sim native doesn't use template free interface
 if(BASALT_INSTANTIATIONS_DOUBLE)
   add_executable(basalt_mapper_sim_naive src/mapper_sim_naive.cpp)
-  target_link_libraries(basalt_mapper_sim_naive basalt pangolin basalt::cli11)
+  target_link_libraries(basalt_mapper_sim_naive basalt_internal pangolin basalt::cli11)
 endif()
 
 add_executable(basalt_mapper src/mapper.cpp)
-target_link_libraries(basalt_mapper basalt pangolin basalt::cli11)
+target_link_libraries(basalt_mapper basalt_internal pangolin basalt::cli11)
 
 
 add_executable(basalt_opt_flow src/opt_flow.cpp)
-target_link_libraries(basalt_opt_flow basalt pangolin basalt::cli11)
+target_link_libraries(basalt_opt_flow basalt_internal pangolin basalt::cli11)
 
 add_executable(basalt_vio src/vio.cpp)
-target_link_libraries(basalt_vio basalt pangolin basalt::cli11)
+target_link_libraries(basalt_vio basalt_internal pangolin basalt::cli11)
 
 add_executable(basalt_time_alignment src/time_alignment.cpp)
-target_link_libraries(basalt_time_alignment basalt pangolin basalt::cli11)
+target_link_libraries(basalt_time_alignment basalt_internal pangolin basalt::cli11)
 
 add_executable(basalt_kitti_eval src/kitti_eval.cpp)
 target_link_libraries(basalt_kitti_eval basalt::basalt-headers basalt::cli11)
@@ -436,15 +437,24 @@ target_link_libraries(basalt_kitti_eval basalt::basalt-headers basalt::cli11)
 find_package(realsense2 QUIET)
 if(realsense2_FOUND)
   add_executable(basalt_rs_t265_record src/rs_t265_record.cpp src/device/rs_t265.cpp)
-  target_link_libraries(basalt_rs_t265_record basalt realsense2::realsense2 pangolin basalt::cli11)
+  target_link_libraries(basalt_rs_t265_record basalt_internal realsense2::realsense2 pangolin basalt::cli11)
 
   add_executable(basalt_rs_t265_vio src/rs_t265_vio.cpp src/device/rs_t265.cpp)
-  target_link_libraries(basalt_rs_t265_vio basalt realsense2::realsense2 pangolin basalt::cli11)
+  target_link_libraries(basalt_rs_t265_vio basalt_internal realsense2::realsense2 pangolin basalt::cli11)
 endif()
 
+# Let's export only the slam_tracker.hpp functions for libORB_SLAM3.so,
+# But will let a libORB_SLAM3_EXAMPLES.so for the regular ORB-SLAM3 examples to use
+# if the user builds with -DBUILD_EXAMPLES=On
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  C_VISIBILITY_PRESET hidden
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN YES
+  LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map
+  LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map"
+)
 
-
-install(TARGETS basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment basalt
+install(TARGETS basalt basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment
   EXPORT BasaltTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib

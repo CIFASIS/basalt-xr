@@ -106,12 +106,8 @@ This step is optional but you can try Basalt without Monado with one of the foll
 
 ### Monado Specifics
 
-You'll need to compile Monado with the same Eigen used in Basalt, and with the
-same flags. For that, set these with CMake:
-`-DEIGEN3_INCLUDE_DIR=$bsltdeps/basalt/thirdparty/basalt-headers/thirdparty/eigen
--DCMAKE_C_FLAGS="-march=native" -DCMAKE_CXX_FLAGS="-march=native"` otherwise
-Monado will automatically use your system's Eigen, and having mismatched Eigen
-version/flags can cause a lot of headaches.
+Note: be careful when manually enabling ASan when building Monado as some
+crashes have been reported. I'm still trying to figure out why those happen.
 
 Run an OpenXR app like `hello_xr` with the following environment variables set
 

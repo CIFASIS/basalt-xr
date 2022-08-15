@@ -1,0 +1,25 @@
+LIBXRTSLAM_BASALT_4.0.0 {
+  global:
+    extern "C++" {
+      xrt::auxiliary::tracking::slam::slam_tracker::slam_tracker*;
+      xrt::auxiliary::tracking::slam::slam_tracker::*slam_tracker*;
+
+      xrt::auxiliary::tracking::slam::slam_tracker::initialize*;
+      xrt::auxiliary::tracking::slam::slam_tracker::start*;
+      xrt::auxiliary::tracking::slam::slam_tracker::is_running*;
+      xrt::auxiliary::tracking::slam::slam_tracker::stop*;
+      xrt::auxiliary::tracking::slam::slam_tracker::finalize*;
+
+      xrt::auxiliary::tracking::slam::slam_tracker::push_imu_sample*;
+      xrt::auxiliary::tracking::slam::slam_tracker::push_frame*;
+      xrt::auxiliary::tracking::slam::slam_tracker::try_dequeue_pose*;
+
+      xrt::auxiliary::tracking::slam::slam_tracker::supports_feature*;
+      xrt::auxiliary::tracking::slam::slam_tracker::use_feature*;
+
+      xrt::auxiliary::tracking::slam::IMPLEMENTATION_VERSION_MAJOR*;
+      xrt::auxiliary::tracking::slam::IMPLEMENTATION_VERSION_MINOR*;
+      xrt::auxiliary::tracking::slam::IMPLEMENTATION_VERSION_PATCH*
+    };
+  local: *;
+};

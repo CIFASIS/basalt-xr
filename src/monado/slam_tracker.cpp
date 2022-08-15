@@ -22,11 +22,17 @@
 #include <basalt/vi_estimator/vio_estimator.h>
 #include "basalt/utils/vis_utils.h"
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT __attribute__((visibility("default")))
+#endif
+
 namespace xrt::auxiliary::tracking::slam {
 
-const int IMPLEMENTATION_VERSION_MAJOR = HEADER_VERSION_MAJOR;
-const int IMPLEMENTATION_VERSION_MINOR = HEADER_VERSION_MINOR;
-const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
+EXPORT extern const int IMPLEMENTATION_VERSION_MAJOR = HEADER_VERSION_MAJOR;
+EXPORT extern const int IMPLEMENTATION_VERSION_MINOR = HEADER_VERSION_MINOR;
+EXPORT extern const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
 
 using std::cout;
 using std::make_shared;
@@ -40,28 +46,6 @@ using std::to_string;
 using std::unordered_set;
 using std::vector;
 using namespace basalt;
-
-string imu2str(const imu_sample &s) {
-  string str = "imu_sample ";
-  str += "t=" + to_string(s.timestamp) + " ";
-  str += "a=[" + to_string(s.ax) + ", " + to_string(s.ay) + ", " + to_string(s.az) + "] ";
-  str += "w=[" + to_string(s.wx) + ", " + to_string(s.wy) + ", " + to_string(s.wz) + "]";
-  return str;
-}
-
-string img2str(const img_sample &s) {
-  string str = "img_sample ";
-  str += s.is_left ? "left " : "right ";
-  str += "t=" + to_string(s.timestamp);
-  return str;
-}
-
-string pose2str(const pose &p) {
-  string str = "pose ";
-  str += "p=[" + to_string(p.px) + ", " + to_string(p.py) + ", " + to_string(p.pz) + "] ";
-  str += "r=[" + to_string(p.rx) + ", " + to_string(p.ry) + ", " + to_string(p.rz) + ", " + to_string(p.rw) + "]";
-  return str;
-}
 
 static const vector<string> timing_titles{
     "frame_ts",
@@ -547,29 +531,29 @@ struct slam_tracker::implementation {
   void enable_pose_ext_features(bool enable) { pose_features_enabled = enable; }
 };
 
-slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }
+EXPORT slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }
 
-slam_tracker::~slam_tracker() = default;
+EXPORT slam_tracker::~slam_tracker() = default;
 
-void slam_tracker::initialize() { impl->initialize(); }
+EXPORT void slam_tracker::initialize() { impl->initialize(); }
 
-void slam_tracker::start() { impl->start(); }
+EXPORT void slam_tracker::start() { impl->start(); }
 
-void slam_tracker::stop() { impl->stop(); }
+EXPORT void slam_tracker::stop() { impl->stop(); }
 
-void slam_tracker::finalize() { impl->finalize(); }
+EXPORT void slam_tracker::finalize() { impl->finalize(); }
 
-bool slam_tracker::is_running() { return impl->is_running(); }
+EXPORT bool slam_tracker::is_running() { return impl->is_running(); }
 
-void slam_tracker::push_imu_sample(const imu_sample &s) { impl->push_imu_sample(s); }
+EXPORT void slam_tracker::push_imu_sample(const imu_sample &s) { impl->push_imu_sample(s); }
 
-void slam_tracker::push_frame(const img_sample &sample) { impl->push_frame(sample); }
+EXPORT void slam_tracker::push_frame(const img_sample &sample) { impl->push_frame(sample); }
 
-bool slam_tracker::try_dequeue_pose(pose &pose) { return impl->try_dequeue_pose(pose); }
+EXPORT bool slam_tracker::try_dequeue_pose(pose &pose) { return impl->try_dequeue_pose(pose); }
 
-bool slam_tracker::supports_feature(int feature_id) { return impl->supports_feature(feature_id); }
+EXPORT bool slam_tracker::supports_feature(int feature_id) { return impl->supports_feature(feature_id); }
 
-bool slam_tracker::use_feature(int feature_id, const shared_ptr<void> &params, shared_ptr<void> &result) {
+EXPORT bool slam_tracker::use_feature(int feature_id, const shared_ptr<void> &params, shared_ptr<void> &result) {
   return impl->use_feature(feature_id, params, result);
 }
 

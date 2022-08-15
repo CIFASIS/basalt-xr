@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pangolin/display/display.h"
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
 
@@ -230,7 +231,7 @@ class slam_tracker_ui {
       pangolin::FinishFrame();
     }
 
-    pangolin::DestroyWindow(window_name);
+    pangolin::QuitAll();
     cout << "Finished ui_runner\n";
   }
 
