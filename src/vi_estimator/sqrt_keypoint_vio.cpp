@@ -233,9 +233,13 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
             prev_frame->t_ns, last_state.getState().bias_gyro,
             last_state.getState().bias_accel));
 
-        BASALT_ASSERT_MSG(prev_frame->t_ns < curr_frame->t_ns,
+        BASALT_ASSERT_MSG(prev_frame->t_ns != curr_frame->t_ns,
                           "duplicate frame timestamps?! zero time delta leads "
                           "to invalid IMU integration.");
+
+        BASALT_ASSERT_MSG(prev_frame->t_ns < curr_frame->t_ns,
+                          "frame timestamps not monotonically increasing?! "
+                          "are we going 88mph and inside a delorean?");
 
         while (data->t_ns <= prev_frame->t_ns) {
           data = popFromImuDataQueue();
