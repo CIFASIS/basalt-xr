@@ -1,4 +1,4 @@
-LIBXRTSLAM_BASALT_4.0.0 {
+LIBXRTSLAM_BASALT_5.0.0 {
   global:
     extern "C++" {
       xrt::auxiliary::tracking::slam::slam_tracker::slam_tracker*;

@@ -127,13 +127,15 @@ struct slam_tracker::implementation {
   bool pose_features_enabled = false;
 
  public:
-  implementation(const string &unified_config) {
-    if (unified_config == "DEFAULT") {
+  implementation(const slam_config &config) {
+    show_gui = config.show_ui;
+
+    if (!config.config_file) {
       // For the pipeline to work now, the user will need to use add_cam/imu_calibration
       return;
     }
 
-    load_unified_config(unified_config);
+    load_unified_config(*config.config_file);
 
     vio_config.load(config_path);
     load_calibration_data(cam_calib_path);
@@ -531,7 +533,9 @@ struct slam_tracker::implementation {
   void enable_pose_ext_features(bool enable) { pose_features_enabled = enable; }
 };
 
-EXPORT slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }
+EXPORT slam_tracker::slam_tracker(const slam_config &slam_config) {
+  impl = make_unique<slam_tracker::implementation>(slam_config);
+}
 
 EXPORT slam_tracker::~slam_tracker() = default;
 
