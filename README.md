@@ -84,18 +84,6 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -
 make install -j12
 ```
 
-## FMT issues
-On some systems, you'll get a compile error like this:
-```
-/usr/include/fmt/core.h:1757:7: error: static assertion failed: Cannot format an argument. To make type T formattable provide a formatter<T> specialization: https://fmt.dev/latest/api.html#udt
-```
-If you do, add `CXXFLAGS="-DFMT_DEPRECATED_OSTREAM=1"` to your CMake build command like this:
-
-```
-CXXFLAGS="-DFMT_DEPRECATED_OSTREAM=1 cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=off -DBASALT_INSTANTIATIONS_DOUBLE=off
-
-```
-
 ### Running Basalt
 
 This step is optional but you can try Basalt without Monado with one of the following methods:
