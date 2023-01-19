@@ -161,7 +161,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         trackPoints(old_pyramid->at(i), pyramid->at(i),
                     transforms->observations[i],
-                    new_transforms->observations[i]);
+                    new_transforms->observations[i], i, i);
       }
 
       transforms = new_transforms;
@@ -178,13 +178,10 @@ class PatchOpticalFlow : public OpticalFlowBase {
     frame_counter++;
   }
 
-  void trackPoints(
-      const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-      const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-      const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
-          transform_map_1,
-      Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      bool matching = false) const {
+  void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
+                   const basalt::ManagedImagePyr<uint16_t>& pyr_2,
+                   const Keypoints& transform_map_1, Keypoints& transform_map_2,
+                   size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -214,8 +211,10 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
         Eigen::Vector2f off{0, 0};
         MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+        bool matching = cam1 != cam2;
         if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
-          off = calib.viewOffset(t1, depth_guess).template cast<float>();
+          off = calib.viewOffset(t1, depth_guess, cam1, cam2)
+                    .template cast<float>();
           transforms->input_images->depth_guess = depth_guess;  // For UI
         }
 
@@ -328,10 +327,13 @@ class PatchOpticalFlow : public OpticalFlowBase {
     KeypointsData kd;
 
     detectKeypoints(pyramid->at(0).lvl(0), kd,
-                    config.optical_flow_detection_grid_size, 1, pts0);
+                    config.optical_flow_detection_grid_size,
+                    config.optical_flow_detection_num_points_cell,
+                    config.optical_flow_detection_min_threshold,
+                    config.optical_flow_detection_max_threshold,
+                    transforms->input_images->masks.at(0), pts0);
 
-    Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f> new_poses0,
-        new_poses1;
+    Keypoints new_poses0, new_poses1;
 
     for (size_t i = 0; i < kd.corners.size(); i++) {
       Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
@@ -355,7 +357,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, true);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, 0, 1);
 
       for (const auto& kv : new_poses1) {
         transforms->observations.at(1).emplace(kv);

@@ -171,7 +171,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
         trackPoints(old_pyramid->at(i), pyramid->at(i),
                     transforms->observations[i], transforms->pyramid_levels[i],
                     new_transforms->observations[i],
-                    new_transforms->pyramid_levels[i]);
+                    new_transforms->pyramid_levels[i], i, i);
       }
 
       // std::cout << t_ns << ": Could track "
@@ -198,15 +198,13 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     return true;
   }
 
-  void trackPoints(
-      const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-      const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-      const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
-          transform_map_1,
-      const std::map<KeypointId, size_t>& pyramid_levels_1,
-      Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      std::map<KeypointId, size_t>& pyramid_levels_2,
-      bool matching = false) const {
+  void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
+                   const basalt::ManagedImagePyr<uint16_t>& pyr_2,
+                   const Keypoints& transform_map_1,
+                   const std::map<KeypointId, size_t>& pyramid_levels_1,
+                   Keypoints& transform_map_2,
+                   std::map<KeypointId, size_t>& pyramid_levels_2,  //
+                   size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -241,8 +239,10 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
         Eigen::Vector2f off{0, 0};
         MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+        bool matching = cam1 != cam2;
         if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
-          off = calib.viewOffset(t1, depth_guess).template cast<float>();
+          off = calib.viewOffset(t1, depth_guess, cam1, cam2)
+                    .template cast<float>();
           transforms->input_images->depth_guess = depth_guess;  // For UI
         }
 
@@ -369,8 +369,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
   void addPoints() {
     KeypointsData kd;
 
-    Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f> new_poses_main,
-        new_poses_stereo;
+    Keypoints new_poses_main, new_poses_stereo;
     std::map<KeypointId, size_t> new_pyramid_levels_main,
         new_pyramid_levels_stereo;
 
@@ -393,7 +392,11 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
       }
 
       detectKeypoints(pyramid->at(0).lvl(level), kd,
-                      config.optical_flow_detection_grid_size, 1, pts);
+                      config.optical_flow_detection_grid_size,
+                      config.optical_flow_detection_num_points_cell,
+                      config.optical_flow_detection_min_threshold,
+                      config.optical_flow_detection_max_threshold,
+                      transforms->input_images->masks.at(0), pts);
 
       const Scalar scale = 1 << level;
 
@@ -413,7 +416,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
       trackPoints(pyramid->at(0), pyramid->at(1), new_poses_main,
                   new_pyramid_levels_main, new_poses_stereo,
-                  new_pyramid_levels_stereo, true);
+                  new_pyramid_levels_stereo, 0, 1);
 
       for (const auto& kv : new_poses_stereo) {
         transforms->observations.at(1).emplace(kv);

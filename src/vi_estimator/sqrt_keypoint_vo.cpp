@@ -254,13 +254,13 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
   // marginalization to remove the host frames with a low number of landmarks
   // connected with the latest frame. For new tracks, remember their ids for
   // possible later landmark creation.
-  int connected0 = 0;                           // num tracked landmarks cam0
+  int NUM_CAMS = opt_flow_meas->observations.size();
+  std::vector<int> connected(NUM_CAMS, 0);      // num tracked landmarks
   std::map<int64_t, int> num_points_connected;  // num tracked landmarks by host
-  std::unordered_set<int> unconnected_obs0;     // new tracks cam0
-  std::vector<std::vector<int>> connected_obs0(
-      opt_flow_meas->observations.size());
+  std::vector<std::unordered_set<int>> unconnected_obs(NUM_CAMS);  // new tracks
+  std::vector<std::vector<int>> connected_obs(NUM_CAMS);
 
-  for (size_t i = 0; i < opt_flow_meas->observations.size(); i++) {
+  for (int i = 0; i < NUM_CAMS; i++) {
     TimeCamId tcid_target(opt_flow_meas->t_ns, i);
 
     for (const auto& kv_obs : opt_flow_meas->observations[i]) {
@@ -277,29 +277,30 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
         // obs[tcid_host][tcid_target].push_back(kobs);
 
         num_points_connected[tcid_host.frame_id]++;
-        connected_obs0[i].emplace_back(kpt_id);
+        connected_obs[i].emplace_back(kpt_id);
 
-        if (i == 0) connected0++;
+        connected[i]++;
       } else {
-        if (i == 0) {
-          unconnected_obs0.emplace(kpt_id);
-        }
+        unconnected_obs[i].emplace(kpt_id);
       }
     }
   }
 
-  if (Scalar(connected0) / (connected0 + unconnected_obs0.size()) <
+  if (Scalar(connected[0]) / (connected[0] + unconnected_obs[0].size()) <
           Scalar(config.vio_new_kf_keypoints_thresh) &&
       frames_after_kf > config.vio_min_frames_after_kf)
     take_kf = true;
 
   if (config.vio_debug) {
-    std::cout << "connected0 " << connected0 << " unconnected0 "
-              << unconnected_obs0.size() << std::endl;
+    for (int i = 0; i < NUM_CAMS; i++) {
+      std::cout << "connected[" << i << "] = " << connected[i] << ", "
+                << "unconnected[" << i << "] =" << unconnected_obs[i].size()
+                << std::endl;
+    }
   }
 
   BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
-      frame_poses[last_state_t_ns], connected_obs0);
+      frame_poses[last_state_t_ns], connected_obs);
 
   if (take_kf) {
     // For keyframes, we don't only add pose state and observations to existing
@@ -307,89 +308,95 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(
     // landmarks.
 
     // Triangulate new points from one of the observations (with sufficient
-    // baseline) and make keyframe for camera 0
+    // baseline) and make keyframe
     take_kf = false;
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
 
-    TimeCamId tcidl(opt_flow_meas->t_ns, 0);
-
     int num_points_added = 0;
-    for (int lm_id : unconnected_obs0) {
-      // Find all observations
-      std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
 
-      for (const auto& kv : prev_opt_flow_res) {
-        for (size_t k = 0; k < kv.second->observations.size(); k++) {
-          auto it = kv.second->observations[k].find(lm_id);
-          if (it != kv.second->observations[k].end()) {
-            TimeCamId tcido(kv.first, k);
+    for (int i = 0; i < NUM_CAMS; i++) {
+      TimeCamId tcidl(opt_flow_meas->t_ns, i);
 
-            KeypointObservation<Scalar> kobs;
-            kobs.kpt_id = lm_id;
-            kobs.pos = it->second.translation().template cast<Scalar>();
+      for (int lm_id : unconnected_obs[i]) {
+        if (lmdb.landmarkExists(lm_id)) continue;
+        // Find all observations
+        std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
 
-            // obs[tcidl][tcido].push_back(kobs);
-            kp_obs[tcido] = kobs;
+        for (const auto& kv : prev_opt_flow_res) {
+          for (size_t k = 0; k < kv.second->observations.size(); k++) {
+            auto it = kv.second->observations[k].find(lm_id);
+            if (it != kv.second->observations[k].end()) {
+              TimeCamId tcido(kv.first, k);
+
+              KeypointObservation<Scalar> kobs;
+              kobs.kpt_id = lm_id;
+              kobs.pos = it->second.translation().template cast<Scalar>();
+
+              // obs[tcidl][tcido].push_back(kobs);
+              kp_obs[tcido] = kobs;
+            }
           }
         }
-      }
 
-      // triangulate
-      bool valid_kp = false;
-      const Scalar min_triang_distance2 =
-          Scalar(config.vio_min_triangulation_dist *
-                 config.vio_min_triangulation_dist);
-      for (const auto& kv_obs : kp_obs) {
-        if (valid_kp) break;
-        TimeCamId tcido = kv_obs.first;
-
-        const Vec2 p0 = opt_flow_meas->observations.at(0)
-                            .at(lm_id)
-                            .translation()
-                            .cast<Scalar>();
-        const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]
-                            ->observations[tcido.cam_id]
-                            .at(lm_id)
-                            .translation()
-                            .template cast<Scalar>();
-
-        Vec4 p0_3d, p1_3d;
-        bool valid1 = calib.intrinsics[0].unproject(p0, p0_3d);
-        bool valid2 = calib.intrinsics[tcido.cam_id].unproject(p1, p1_3d);
-        if (!valid1 || !valid2) continue;
-
-        SE3 T_i0_i1 = getPoseStateWithLin(tcidl.frame_id).getPose().inverse() *
-                      getPoseStateWithLin(tcido.frame_id).getPose();
-        SE3 T_0_1 =
-            calib.T_i_c[0].inverse() * T_i0_i1 * calib.T_i_c[tcido.cam_id];
-
-        if (T_0_1.translation().squaredNorm() < min_triang_distance2) continue;
-
-        Vec4 p0_triangulated = triangulate(p0_3d.template head<3>(),
-                                           p1_3d.template head<3>(), T_0_1);
-
-        if (p0_triangulated.array().isFinite().all() &&
-            p0_triangulated[3] > 0 && p0_triangulated[3] < Scalar(3.0)) {
-          Keypoint<Scalar> kpt_pos;
-          kpt_pos.host_kf_id = tcidl;
-          kpt_pos.direction =
-              StereographicParam<Scalar>::project(p0_triangulated);
-          kpt_pos.inv_dist = p0_triangulated[3];
-          lmdb.addLandmark(lm_id, kpt_pos);
-
-          num_points_added++;
-          valid_kp = true;
-        }
-      }
-
-      if (valid_kp) {
+        // triangulate
+        bool valid_kp = false;
+        const Scalar min_triang_distance2 =
+            Scalar(config.vio_min_triangulation_dist *
+                   config.vio_min_triangulation_dist);
         for (const auto& kv_obs : kp_obs) {
-          lmdb.addObservation(kv_obs.first, kv_obs.second);
+          if (valid_kp) break;
+          TimeCamId tcido = kv_obs.first;
+
+          const Vec2 p0 = opt_flow_meas->observations.at(i)
+                              .at(lm_id)
+                              .translation()
+                              .cast<Scalar>();
+          const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]
+                              ->observations[tcido.cam_id]
+                              .at(lm_id)
+                              .translation()
+                              .template cast<Scalar>();
+
+          Vec4 p0_3d, p1_3d;
+          bool valid1 = calib.intrinsics[i].unproject(p0, p0_3d);
+          bool valid2 = calib.intrinsics[tcido.cam_id].unproject(p1, p1_3d);
+          if (!valid1 || !valid2) continue;
+
+          SE3 T_i0_i1 =
+              getPoseStateWithLin(tcidl.frame_id).getPose().inverse() *
+              getPoseStateWithLin(tcido.frame_id).getPose();
+          SE3 T_0_1 =
+              calib.T_i_c[i].inverse() * T_i0_i1 * calib.T_i_c[tcido.cam_id];
+
+          if (T_0_1.translation().squaredNorm() < min_triang_distance2)
+            continue;
+
+          Vec4 p0_triangulated = triangulate(p0_3d.template head<3>(),
+                                             p1_3d.template head<3>(), T_0_1);
+
+          if (p0_triangulated.array().isFinite().all() &&
+              p0_triangulated[3] > 0 && p0_triangulated[3] < Scalar(3.0)) {
+            Keypoint<Scalar> kpt_pos;
+            kpt_pos.host_kf_id = tcidl;
+            kpt_pos.direction =
+                StereographicParam<Scalar>::project(p0_triangulated);
+            kpt_pos.inv_dist = p0_triangulated[3];
+            lmdb.addLandmark(lm_id, kpt_pos);
+
+            num_points_added++;
+            valid_kp = true;
+          }
         }
 
-        // TODO: non-linear refinement of landmark position from all
-        // observations; may speed up later joint optimization
+        if (valid_kp) {
+          for (const auto& kv_obs : kp_obs) {
+            lmdb.addObservation(kv_obs.first, kv_obs.second);
+          }
+
+          // TODO: non-linear refinement of landmark position from all
+          // observations; may speed up later joint optimization
+        }
       }
     }
 

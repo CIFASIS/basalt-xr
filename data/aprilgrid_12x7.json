@@ -1,0 +1,7 @@
+{
+  "//comment": "Used for Hilti calibration dataset",
+  "tagCols": 12,
+  "tagRows": 7,
+  "tagSize": 0.15,
+  "tagSpacing": 0.25
+}

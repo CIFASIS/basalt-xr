@@ -2,6 +2,10 @@
     "value0": {
         "config.optical_flow_type": "frame_to_frame",
         "config.optical_flow_detection_grid_size": 30,
+        "config.optical_flow_detection_num_points_cell": 1,
+        "config.optical_flow_detection_min_threshold": 5,
+        "config.optical_flow_detection_max_threshold": 40,
+        "config.optical_flow_detection_nonoverlap": false,
         "config.optical_flow_max_recovered_dist2": 0.04,
         "config.optical_flow_pattern": 51,
         "config.optical_flow_max_iterations": 5,

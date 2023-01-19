@@ -95,8 +95,9 @@ std::unordered_map<basalt::KeypointId, int> keypoint_stats;
 void feed_images() {
   std::cout << "Started input_data thread " << std::endl;
 
+  int NUM_CAMS = calib.intrinsics.size();
   for (size_t i = 0; i < vio_dataset->get_image_timestamps().size(); i++) {
-    basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput);
+    basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput(NUM_CAMS));
 
     data->t_ns = vio_dataset->get_image_timestamps()[i];
     data->img_data = vio_dataset->get_image_data(data->t_ns);

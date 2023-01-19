@@ -208,8 +208,7 @@ void RsT265Device::start() {
         return;
       }
 
-      OpticalFlowInput::Ptr data(new OpticalFlowInput);
-      data->img_data.resize(NUM_CAMS);
+      OpticalFlowInput::Ptr data(new OpticalFlowInput(NUM_CAMS));
 
       //      std::cout << "Reading frame " << frame_counter << std::endl;
 

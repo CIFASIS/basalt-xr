@@ -42,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vio_config.h>
 
 #include <basalt/io/dataset_io.h>
+#include <basalt/utils/keypoints.h>
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
@@ -52,15 +53,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 using KeypointId = size_t;
+using Keypoints = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
 using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
 
+  OpticalFlowInput(int NUM_CAMS) {
+    img_data.resize(NUM_CAMS);
+    masks.resize(NUM_CAMS);
+  }
+
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
   double depth_guess = -1;
+  std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) {
@@ -72,8 +80,7 @@ struct OpticalFlowResult {
   using Ptr = std::shared_ptr<OpticalFlowResult>;
 
   int64_t t_ns;
-  std::vector<Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>>
-      observations;
+  std::vector<Keypoints> observations;
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 

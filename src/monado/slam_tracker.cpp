@@ -344,9 +344,8 @@ struct slam_tracker::implementation {
 
     int i = -1;
     if (s.is_left) {
-      partial_frame = make_shared<OpticalFlowInput>();
+      partial_frame = make_shared<OpticalFlowInput>(NUM_CAMS);
 
-      partial_frame->img_data.resize(NUM_CAMS);
       partial_frame->t_ns = s.timestamp;
 
       // Initialize stats

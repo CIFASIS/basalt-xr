@@ -48,6 +48,10 @@ VioConfig::VioConfig() {
   // optical_flow_type = "patch";
   optical_flow_type = "frame_to_frame";
   optical_flow_detection_grid_size = 50;
+  optical_flow_detection_num_points_cell = 1;
+  optical_flow_detection_min_threshold = 5;
+  optical_flow_detection_max_threshold = 40;
+  optical_flow_detection_nonoverlap = true;
   optical_flow_max_recovered_dist2 = 0.04f;
   optical_flow_pattern = 51;
   optical_flow_max_iterations = 5;
@@ -189,6 +193,10 @@ template <class Archive>
 void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_type));
   ar(CEREAL_NVP(config.optical_flow_detection_grid_size));
+  ar(CEREAL_NVP(config.optical_flow_detection_num_points_cell));
+  ar(CEREAL_NVP(config.optical_flow_detection_min_threshold));
+  ar(CEREAL_NVP(config.optical_flow_detection_max_threshold));
+  ar(CEREAL_NVP(config.optical_flow_detection_nonoverlap));
   ar(CEREAL_NVP(config.optical_flow_max_recovered_dist2));
   ar(CEREAL_NVP(config.optical_flow_pattern));
   ar(CEREAL_NVP(config.optical_flow_max_iterations));
