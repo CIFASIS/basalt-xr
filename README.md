@@ -76,7 +76,7 @@ affect you).
 
 ```bash
 cd $bsltdeps
-git clone --recursive git@gitlab.freedesktop.org:mateosss/basalt.git
+git clone --recursive https://gitlab.freedesktop.org/mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
 sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
