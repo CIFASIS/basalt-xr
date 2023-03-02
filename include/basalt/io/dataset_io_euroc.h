@@ -91,11 +91,9 @@ class EurocVioDataset : public VioDataset {
   std::vector<ImageData> get_image_data(int64_t t_ns) {
     std::vector<ImageData> res(num_cams);
 
-    const std::vector<std::string> folder = {"/mav0/cam0/", "/mav0/cam1/"};
-
     for (size_t i = 0; i < num_cams; i++) {
       std::string full_image_path =
-          path + folder[i] + "data/" + image_path[t_ns];
+          path + "/mav0/cam" + std::to_string(i) + "/data/" + image_path[t_ns];
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
@@ -159,7 +157,13 @@ class EurocIO : public DatasetIoInterface {
 
     data.reset(new EurocVioDataset);
 
-    data->num_cams = 2;
+    // Detect camera count
+    int i = 0;
+    while (fs::exists(path + "/mav0/cam" + std::to_string(i))) {
+      i++;
+    }
+
+    data->num_cams = i;
     data->path = path;
 
     read_image_timestamps(path + "/mav0/cam0/");
@@ -176,13 +180,12 @@ class EurocIO : public DatasetIoInterface {
     }
 
     data->exposure_times.resize(data->num_cams);
-    if (fs::exists(path + "/mav0/cam0/exposure.csv")) {
-      std::cout << "Loading exposure times for cam0" << std::endl;
-      read_exposure(path + "/mav0/cam0/", data->exposure_times[0]);
-    }
-    if (fs::exists(path + "/mav0/cam1/exposure.csv")) {
-      std::cout << "Loading exposure times for cam1" << std::endl;
-      read_exposure(path + "/mav0/cam1/", data->exposure_times[1]);
+    for (size_t i = 0; i < data->num_cams; i++) {
+      std::string istr = std::to_string(i);
+      if (fs::exists(path + "/mav0/cam" + istr + "/exposure.csv")) {
+        std::cout << "Loading exposure times for cam" << istr << std::endl;
+        read_exposure(path + "/mav0/cam" + istr + "/", data->exposure_times[i]);
+      }
     }
   }
 

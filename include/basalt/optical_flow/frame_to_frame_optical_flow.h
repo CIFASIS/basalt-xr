@@ -207,6 +207,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                                   std::hash<KeypointId>>
         result;
 
+    double depth = depth_guess;
+    transforms->input_images->depth_guess = depth;  // Store guess for UI
+
+    bool matching = cam1 != cam2;
+    MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+    bool guess_requires_depth = guess_type != MatchingGuessType::SAME_PIXEL;
+    const bool use_depth = matching && guess_requires_depth;
+
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
@@ -220,12 +228,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         if (masks1.inBounds(t1.x(), t1.y())) continue;
 
         Eigen::Vector2f off{0, 0};
-        MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
-        bool matching = cam1 != cam2;
-        if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
-          off = calib.viewOffset(t1, depth_guess, cam1, cam2)
-                    .template cast<float>();
-          transforms->input_images->depth_guess = depth_guess;  // For UI
+        if (use_depth) {
+          off = calib.viewOffset(t1, depth, cam1, cam2);
         }
 
         t2 -= off;  // This modifies transform_2
@@ -419,7 +423,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
   }
 
-  void filterPoints() {
+  void filterPointsForCam(int cam_id) {
     if (calib.intrinsics.size() < 2) return;
 
     std::set<KeypointId> lm_to_remove;
@@ -427,7 +431,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     std::vector<KeypointId> kpid;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& kv : transforms->observations.at(1)) {
+    for (const auto& kv : transforms->observations.at(cam_id)) {
       auto it = transforms->observations.at(0).find(kv.first);
 
       if (it != transforms->observations.at(0).end()) {
@@ -441,7 +445,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     std::vector<bool> p3d0_success, p3d1_success;
 
     calib.intrinsics[0].unproject(proj0, p3d0, p3d0_success);
-    calib.intrinsics[1].unproject(proj1, p3d1, p3d1_success);
+    calib.intrinsics[cam_id].unproject(proj1, p3d1, p3d1_success);
 
     for (size_t i = 0; i < p3d0_success.size(); i++) {
       if (p3d0_success[i] && p3d1_success[i]) {
@@ -457,7 +461,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     for (int id : lm_to_remove) {
-      transforms->observations.at(1).erase(id);
+      transforms->observations.at(cam_id).erase(id);
+    }
+  }
+
+  void filterPoints() {
+    const int NUM_CAMS = calib.intrinsics.size();
+    for (int i = 1; i < NUM_CAMS; i++) {
+      filterPointsForCam(i);
     }
   }
 

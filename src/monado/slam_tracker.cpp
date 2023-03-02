@@ -76,24 +76,17 @@ struct slam_tracker::implementation {
   bool print_queue = false;
   bool use_double = false;
 
-  // Basalt in its current state does not support monocular cameras, although it
-  // should be possible to adapt it to do so, see:
-  // https://gitlab.com/VladyslavUsenko/basalt/-/issues/2#note_201965760
-  // https://gitlab.com/VladyslavUsenko/basalt/-/issues/25#note_362741510
-  // https://github.com/DLR-RM/granite
-  static constexpr int NUM_CAMS = 2;
-
   // VIO members
   struct {
     bool imu = false;
-    bool cam0 = false;
-    bool cam1 = false;
+    vector<bool> cam;
   } calib_data_ready;
+  int cam_count;
   Calibration<double> calib;
   VioConfig vio_config;
   OpticalFlowBase::Ptr opt_flow_ptr;
   VioEstimatorBase::Ptr vio;
-  bool expecting_left_frame = true;
+  int expecting_frame = 0;
 
   // Queues
   std::atomic<bool> running = false;
@@ -128,7 +121,17 @@ struct slam_tracker::implementation {
 
  public:
   implementation(const slam_config &config) {
+    cam_count = config.cam_count;
     show_gui = config.show_ui;
+    cout << "Basalt with cam_count=" << cam_count << ", show_gui=" << show_gui << "\n";
+
+    // Basalt in its current state does not support monocular cameras, although it
+    // should be possible to adapt it to do so, see:
+    // https://gitlab.com/VladyslavUsenko/basalt/-/issues/2#note_201965760
+    // https://gitlab.com/VladyslavUsenko/basalt/-/issues/25#note_362741510
+    // https://github.com/DLR-RM/granite
+    ASSERT(cam_count > 1, "Basalt doesn't support running with %d cameras", cam_count);
+    calib_data_ready.cam.resize(cam_count, false);
 
     if (!config.config_file) {
       // For the pipeline to work now, the user will need to use add_cam/imu_calibration
@@ -174,8 +177,13 @@ struct slam_tracker::implementation {
     if (os.is_open()) {
       cereal::JSONInputArchive archive(os);
       archive(calib);
-      cout << "Loaded camera with " << calib.intrinsics.size() << " cameras\n";
-      calib_data_ready.imu = calib_data_ready.cam0 = calib_data_ready.cam1 = true;
+      int calib_cam_count = calib.intrinsics.size();
+      cout << "Loaded camera with " << calib_cam_count << " cameras\n";
+      ASSERT_(calib_cam_count == cam_count);
+      calib_data_ready.imu = true;
+      for (int i = 0; i < calib_cam_count; i++) {
+        calib_data_ready.cam.at(i) = true;
+      }
     } else {
       std::cerr << "could not load camera calibration " << calib_path << "\n";
       std::abort();
@@ -267,8 +275,9 @@ struct slam_tracker::implementation {
     }
 
     ASSERT(calib_data_ready.imu, "Missing IMU calibration");
-    ASSERT(calib_data_ready.cam0, "Missing left camera (cam0) calibration");
-    ASSERT(calib_data_ready.cam1, "Missing right camera (cam1) calibration");
+    for (size_t i = 0; i < calib_data_ready.cam.size(); i++) {
+      ASSERT(calib_data_ready.cam.at(i), "Missing cam%zu calibration", i);
+    }
 
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
@@ -281,7 +290,7 @@ struct slam_tracker::implementation {
 
     opt_flow_ptr->output_queue = &vio->vision_data_queue;
     if (show_gui) {
-      ui.initialize(NUM_CAMS);
+      ui.initialize(cam_count);
       vio->out_vis_queue = &ui.out_vis_queue;
     };
     vio->out_state_queue = &out_state_queue;
@@ -339,12 +348,13 @@ struct slam_tracker::implementation {
 
  public:
   void push_frame(const img_sample &s) {
-    ASSERT(expecting_left_frame == s.is_left, "Unexpected %s frame", s.is_left ? "left" : "right");
-    expecting_left_frame = !expecting_left_frame;
+    int i = s.cam_index;
+    ASSERT(expecting_frame == i, "Expected cam%d frame, received cam%d", expecting_frame, i);
 
-    int i = -1;
-    if (s.is_left) {
-      partial_frame = make_shared<OpticalFlowInput>(NUM_CAMS);
+    expecting_frame = (expecting_frame + 1) % cam_count;
+
+    if (i == 0) {
+      partial_frame = make_shared<OpticalFlowInput>(cam_count);
 
       partial_frame->t_ns = s.timestamp;
 
@@ -359,14 +369,12 @@ struct slam_tracker::implementation {
       }
       if (pose_features_enabled) {
         partial_frame->stats.features_enabled = true;
-        partial_frame->stats.features_per_cam.resize(NUM_CAMS);
+        partial_frame->stats.features_per_cam.resize(cam_count);
       }
 
-      i = 0;
     } else {
-      ASSERT(partial_frame->t_ns == s.timestamp, "Left and right frame timestamps differ: %ld != %ld",
+      ASSERT(partial_frame->t_ns == s.timestamp, "cam0 and cam%d frame timestamps differ: %ld != %ld", i,
              partial_frame->t_ns, s.timestamp);
-      i = 1;
     }
 
     int width = s.img.cols;
@@ -382,7 +390,7 @@ struct slam_tracker::implementation {
       mimg->ptr[j] = s.img.at<uchar>(j) << 8;
     }
 
-    if (!s.is_left) {
+    if (i == cam_count - 1) {
       partial_frame->addTime("tracker_pushed");
       image_data_queue->push(partial_frame);
       if (show_gui) ui.update_last_image(partial_frame);
@@ -465,8 +473,7 @@ struct slam_tracker::implementation {
     ASSERT_(calib.resolution.size() == i);
     calib.resolution.push_back({cam_calib.width, cam_calib.height});
 
-    calib_data_ready.cam0 |= i == 0;
-    calib_data_ready.cam1 |= i == 1;
+    calib_data_ready.cam.at(i) = true;
   }
 
   void add_imu_calibration(const imu_calibration &imu_calib) { added_imu_calibs.push_back(imu_calib); }

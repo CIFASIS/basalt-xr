@@ -721,6 +721,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
   auto it = vis_map.find(vio_dataset->get_image_timestamps()[frame_id]);
   if (it == vis_map.end()) return;
   basalt::VioVisualizationData::Ptr curr_vis_data = it->second;
+  size_t NUM_CAMS = curr_vis_data->projections->size();
 
   if (show_obs) {
     glLineWidth(1.0);
@@ -728,7 +729,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (cam_id < curr_vis_data->projections->size()) {
+    if (cam_id < NUM_CAMS) {
       const auto& points = curr_vis_data->projections->at(cam_id);
 
       if (points.size() > 0) {
@@ -756,9 +757,9 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
         }
       }
 
-      if (show_guesses && cam_id == 1) {
+      if (show_guesses && cam_id != 0) {
         const auto keypoints0 = curr_vis_data->projections->at(0);
-        const auto keypoints1 = curr_vis_data->projections->at(1);
+        const auto keypoints1 = curr_vis_data->projections->at(cam_id);
 
         double avg_invdepth = 0;
         double num_features = 0;
@@ -802,14 +803,14 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
             // Guess if we were using REPROJ_FIX_DEPTH
             if (show_reproj_fix_depth_guess) {
               glColor3f(1, 1, 0);  // Yellow
-              auto off = calib.viewOffset({u0, v0}, fixed_depth, 0, 1);
+              auto off = calib.viewOffset({u0, v0}, fixed_depth, 0, cam_id);
               pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
             }
 
             // Guess if we were using REPROJ_AVG_DEPTH
             if (show_reproj_avg_depth_guess) {
               glColor3f(1, 0, 1);  // Magenta
-              auto off = calib.viewOffset({u0, v0}, avg_depth, 0, 1);
+              auto off = calib.viewOffset({u0, v0}, avg_depth, 0, cam_id);
               pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
             }
 
@@ -822,7 +823,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
                 off = calib.viewOffset(
                     {u0, v0},
                     curr_vis_data->opt_flow_res->input_images->depth_guess, 0,
-                    1);
+                    cam_id);
               }
               pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
             }
@@ -940,30 +941,30 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     };
 
     if (cam_id == 0) {
-      BASALT_ASSERT_MSG(
-          curr_vis_data->opt_flow_res->input_images->img_data.size() == 2,
-          "TODO: UI input for target_cam");
-      int target_cam = 1;  // Hardcoded to cam1, select in UI instead if more
-                           // cams are eventually supported
+      for (size_t target_cam = 1; target_cam < NUM_CAMS; target_cam++) {
+        points.clear();
 
 #if 1  // Draw perimeter of projected-to-cam0 grid
-      int x = x_first;
-      int y = y_first;
-      for (; x <= x_last; x += C) drawPoint(x, y, target_cam, true);
-      for (x = x_last; y <= y_last; y += C) drawPoint(x, y, target_cam, true);
-      for (y = y_last; x >= x_first; x -= C) drawPoint(x, y, target_cam, true);
-      for (x = x_first; y >= y_first; y -= C) drawPoint(x, y, target_cam, true);
+        int x = x_first;
+        int y = y_first;
+        for (; x <= x_last; x += C) drawPoint(x, y, target_cam, true);
+        for (x = x_last; y <= y_last; y += C) drawPoint(x, y, target_cam, true);
+        for (y = y_last; x >= x_first; x -= C)
+          drawPoint(x, y, target_cam, true);
+        for (x = x_first; y >= y_first; y -= C)
+          drawPoint(x, y, target_cam, true);
 
 #else  // Draw full projected-to-cam0 grid
-      for (int y = x_first; y <= y_last; y += C) {
-        for (int x = y_first; x <= x_last; x += C) {
-          drawPoint(x, y, target_cam, true);
+        for (int y = x_first; y <= y_last; y += C) {
+          for (int x = y_first; x <= x_last; x += C) {
+            drawPoint(x, y, target_cam, true);
+          }
         }
-      }
 #endif
 
-      glColor4f(0.0, 1.0, 0.0, 0.5);
-      pangolin::glDrawLineLoop(points);
+        glColor4f(0.0, 1.0, 0.0, 0.5);
+        pangolin::glDrawLineLoop(points);
+      }
     } else {
       for (int y = y_first; y < h; y += C) {
         for (int x = x_first; x < w; x += C) {

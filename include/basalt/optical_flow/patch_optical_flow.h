@@ -199,6 +199,14 @@ class PatchOpticalFlow : public OpticalFlowBase {
                                   std::hash<KeypointId>>
         result;
 
+    double depth = depth_guess;
+    transforms->input_images->depth_guess = depth;  // Store guess for UI
+
+    bool matching = cam1 != cam2;
+    MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
+    bool guess_requires_depth = guess_type != MatchingGuessType::SAME_PIXEL;
+    const bool use_depth = matching && guess_requires_depth;
+
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
@@ -210,12 +218,8 @@ class PatchOpticalFlow : public OpticalFlowBase {
         auto t2 = transform_2.translation();
 
         Eigen::Vector2f off{0, 0};
-        MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
-        bool matching = cam1 != cam2;
-        if (matching && guess_type != MatchingGuessType::SAME_PIXEL) {
-          off = calib.viewOffset(t1, depth_guess, cam1, cam2)
-                    .template cast<float>();
-          transforms->input_images->depth_guess = depth_guess;  // For UI
+        if (use_depth) {
+          off = calib.viewOffset(t1, depth, cam1, cam2);
         }
 
         t2 -= off;  // This modifies transform_2
