@@ -119,7 +119,7 @@ export EUROC_PLAY_FROM_START=true
 export SLAM_LOG=debug
 export SLAM_SUBMIT_FROM_START=true
 export SLAM_CONFIG=$bsltdeps/basalt/data/monado/euroc.toml # Point to Basalt config file for Euroc
-export OXR_DEBUG_GUI=1 # We will need the debug ui to start streaming the dataset
+export XRT_DEBUG_GUI=1 # We will need the debug ui to start streaming the dataset
 ```
 
 Finally, run the XR app and press start in the euroc player debug ui and you

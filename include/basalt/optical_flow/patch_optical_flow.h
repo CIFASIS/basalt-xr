@@ -59,6 +59,9 @@ namespace basalt {
 /// initially created. Should result in more consistent tracks (less drift over
 /// time) than frame-to-frame tracking, but it results in shorter tracks in
 /// practice.
+/// UPDATE: It was likely due to the pixel distance increasing between the
+/// original patch and the new point. Applying the same `latest_state` idea we
+/// used in frame_to_frame_optical_flow should improve things.
 template <typename Scalar, template <typename> typename Pattern>
 class PatchOpticalFlow : public OpticalFlowBase {
  public:

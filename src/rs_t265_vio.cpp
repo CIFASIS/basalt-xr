@@ -200,6 +200,7 @@ int main(int argc, char** argv) {
   if (show_gui) vio->out_vis_queue = &out_vis_queue;
   vio->out_state_queue = &out_state_queue;
   vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
+  vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
 
   basalt::MargDataSaver::Ptr marg_data_saver;
 

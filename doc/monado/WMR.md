@@ -54,7 +54,7 @@ SLAM pipeline.
   visualizer when opening Monado. Furthermore the `config-path` key points to a
   Basalt specific config file for tweaking the VIO pipeline.
 
-- `OXR_DEBUG_GUI=on`: Enable Monado's own debug GUI.
+- `XRT_DEBUG_GUI=on`: Enable Monado's own debug GUI.
 
 - `SLAM_SUBMIT_FROM_START=off`: Do not send frames to Basalt from the start,
   rather wait until we check the checkbox in the Monado GUI box called "SLAM

@@ -224,11 +224,12 @@ struct slam_tracker::implementation {
 
   void state_consumer() {
     PoseVelBiasState<double>::Ptr data;
+    PoseVelBiasState<double>::Ptr _;
 
     while (true) {
       out_state_queue.pop(data);
       if (data.get() == nullptr) {
-        monado_out_state_queue.push(nullptr);
+        while (!monado_out_state_queue.try_push(nullptr)) monado_out_state_queue.pop(_);
         break;
       }
       data->input_images->addTime("tracker_consumer_received");
@@ -236,7 +237,7 @@ struct slam_tracker::implementation {
       if (show_gui) ui.log_vio_data(data);
 
       data->input_images->addTime("tracker_consumer_pushed");
-      monado_out_state_queue.push(data);
+      while (!monado_out_state_queue.try_push(data)) monado_out_state_queue.pop(_);
     }
 
     cout << "Finished state_consumer\n";
@@ -244,12 +245,15 @@ struct slam_tracker::implementation {
 
   void queues_printer() {
     while (running) {
-      cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \t"
-           << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \t"
-           << "[in] depth: " << opt_flow_ptr->input_depth_queue.unsafe_size() << "/-- \t"
+      cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \n"
+           << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \n"
+           << "[in] depth: " << opt_flow_ptr->input_depth_queue.unsafe_size() << "/-- \n"
            << "[mid] keypoints: " << opt_flow_ptr->output_queue->size() << "/" << opt_flow_ptr->output_queue->capacity()
-           << " \t"
-           << "[out] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n";
+           << " \n"
+           << "[mid] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n"
+           << "[out] monado queue: " << monado_out_state_queue.size() << "/" << monado_out_state_queue.capacity()
+           << "\n"
+           << "[out] ui: " << vio->out_vis_queue->size() << "/" << vio->out_vis_queue->capacity() << "\n";
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     cout << "Finished queues_printer\n";
@@ -279,6 +283,8 @@ struct slam_tracker::implementation {
       ASSERT(calib_data_ready.cam.at(i), "Missing cam%zu calibration", i);
     }
 
+    monado_out_state_queue.set_capacity(32);
+
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
     image_data_queue = &opt_flow_ptr->input_queue;
@@ -289,12 +295,14 @@ struct slam_tracker::implementation {
     ASSERT_(imu_data_queue != nullptr);
 
     opt_flow_ptr->output_queue = &vio->vision_data_queue;
+    opt_flow_ptr->show_gui = show_gui;
     if (show_gui) {
       ui.initialize(cam_count);
       vio->out_vis_queue = &ui.out_vis_queue;
     };
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
+    vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
 
     if (!marg_data_path.empty()) {
       marg_data_saver.reset(new MargDataSaver(marg_data_path));
@@ -315,6 +323,7 @@ struct slam_tracker::implementation {
     running = false;
     image_data_queue->push(nullptr);
     imu_data_queue->push(nullptr);
+    opt_flow_ptr->input_imu_queue.push(nullptr);
 
     if (print_queue) queues_printer_thread.join();
     state_consumer_thread.join();
@@ -341,6 +350,7 @@ struct slam_tracker::implementation {
     data->accel = {s.ax, s.ay, s.az};
     data->gyro = {s.wx, s.wy, s.wz};
     imu_data_queue->push(data);
+    opt_flow_ptr->input_imu_queue.push(data);
   }
 
  private:

@@ -39,11 +39,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pangolin/gl/gldraw.h>
 
 #include <basalt/utils/sophus_utils.hpp>
+#include <tuple>
 
 const uint8_t cam_color[3]{250, 0, 26};
 const uint8_t state_color[3]{250, 0, 26};
 const uint8_t pose_color[3]{0, 50, 255};
 const uint8_t gt_color[3]{0, 171, 47};
+const float MIN_DEPTH_COLOR[3] = {0.27, 0.79, 1};  // blue
+const float MAX_DEPTH_COLOR[3] = {1, 0.1, 0.42};   // pink
 
 inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth,
                           const uint8_t* color, float sizeFactor) {
@@ -103,4 +106,24 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
     b = x - 2;
   else if (5 <= x && x <= 6)
     b = 1.0f - (x - 5);
+}
+
+inline std::tuple<float, float, float> color_lerp(
+    float t,                               //
+    const float min[3] = MIN_DEPTH_COLOR,  //
+    const float max[3] = MAX_DEPTH_COLOR   //
+) {
+  return {min[0] + t * (max[0] - min[0]),  //
+          min[1] + t * (max[1] - min[1]),  //
+          min[2] + t * (max[2] - min[2])};
+}
+
+template <typename P, int N, class Allocator>
+void glDrawCirclePerimeters(
+    const std::vector<Eigen::Matrix<P, N, 1>, Allocator>& points,
+    float radius = 5.0) {
+  for (auto& p : points) {
+    pangolin::glDrawCirclePerimeter((GLfloat)p(0), (GLfloat)p(1),
+                                    (GLfloat)radius);
+  }
 }

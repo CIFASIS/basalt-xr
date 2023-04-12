@@ -41,12 +41,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/vio_config.h>
 
+#include <basalt/imu/imu_types.h>
 #include <basalt/io/dataset_io.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
 #include <slam_tracker.hpp>
+#include <utility>
+#include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
 
@@ -58,6 +61,7 @@ using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
+  using Vec3 = Eigen::Matrix<double, 3, 1>;
 
   OpticalFlowInput(int NUM_CAMS) {
     img_data.resize(NUM_CAMS);
@@ -67,7 +71,9 @@ struct OpticalFlowInput {
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
+  // Recorded internal pipeline values for UI playback
   double depth_guess = -1;
+
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
@@ -81,6 +87,8 @@ struct OpticalFlowResult {
 
   int64_t t_ns;
   std::vector<Keypoints> observations;
+  std::vector<Keypoints> tracking_guesses;
+  std::vector<Keypoints> matching_guesses;
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 
@@ -92,11 +100,18 @@ class OpticalFlowBase {
   using Ptr = std::shared_ptr<OpticalFlowBase>;
 
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
+  tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
+  tbb::concurrent_queue<PoseVelBiasState<double>::Ptr> input_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 
   Eigen::MatrixXf patch_coord;
   double depth_guess = -1;
+  PoseVelBiasState<double>::Ptr latest_state = nullptr;
+  PoseVelBiasState<double>::Ptr predicted_state = nullptr;
+
+  bool first_state_arrived = false;
+  bool show_gui;  //!< Whether we need to store additional info for the UI
 };
 
 class OpticalFlowFactory {
