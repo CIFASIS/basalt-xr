@@ -1,8 +1,23 @@
 # Valve Index, HTC Vive, and other lighthouse-tracked headsets
 
-The integration with Basalt for the `vive` driver in Monado is on early stages.
+When running Monado set the environment variable `XRT_DEBUG_GUI=1`. You will
+need to manually press the "Submit to SLAM" checkbox in the "SLAM Tracker" box.
+It's not enabled by default due to some timestamps initialization problem I've
+not managed to fix.
 
-Many things do not work very well yet.
+The camera orientation provided by the Index factory calibration seems to be a
+bit off (or we just can't get to parse it correctly). So you'll need to manually
+calibrate the headset if you want a better experience. Right now there are some
+placeholder values (that come from a calibration I did on a specific headset)
+that should work, but they will likely be subpar for your setup.
+
+Also, remember we have community-made drivers, we are not sure whether the
+timestamps we are using are correct, so that might be another source of
+inaccuracy.
+
+All in all, it is still usable. Try it out, it should work out of the box, and
+only if you want a better experience, proceed with the calibration procedure
+explained below.
 
 # Calibration
 

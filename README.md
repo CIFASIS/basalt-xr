@@ -5,29 +5,12 @@ modifications so that it can be used from Monado for SLAM tracking. Many thanks
 to the Basalt authors.
 
 Follow this file for instructions on how to get Basalt up and running with
-Monado. This README tries to be as concise as possible, but there are many
-details that need to be addressed on it, so please do not skip any section,
-otherwise it is likely that it won't work. Having said that, this guide has
-been tested in limited setups, so please report any changes you had to make
-in order to get it working in different ones.
-
-## Index
-
-- [Basalt for Monado](#basalt-for-monado)
-  - [Index](#index)
-  - [Installation](#installation)
-    - [Build and Install Directories](#build-and-install-directories)
-    - [Dependencies](#dependencies)
-    - [Build Basalt](#build-basalt)
-    - [Running Basalt](#running-basalt)
-    - [Monado Specifics](#monado-specifics)
-  - [Notes on Basalt Usage](#notes-on-basalt-usage)
-  - [Using Real Hardware](#using-real-hardware)
+Monado. **Read the instructions carefully**.
 
 ## Installation
 
-This was tested on both Ubuntu 20.04 and 18.04, be sure to open an issue if the
-steps don't work for you. The main branch of this fork is
+This was tested on Ubuntu LTS derivatives from 18.04 and on, be sure to open an
+issue if the steps don't work for you. The main branch of this fork is
 [`xrtslam`](https://gitlab.freedesktop.org/mateosss/basalt/-/tree/xrtslam).
 
 ### Build and Install Directories
@@ -84,7 +67,30 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -
 make install -j12
 ```
 
-### Running Basalt
+### After building Basalt
+
+You can now rebuild Monado so that it finds Basalt and then run any OpenXR app.
+
+You might want to set the environment variables `XRT_DEBUG_GUI=1` and
+`SLAM_UI=1` in Monado to see the debug GUIs of Monado and Basalt respectively.
+
+For most drivers, you don't need to do much. See the next section for optional
+info for your driver.
+
+### Drivers
+
+Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Most
+of them should work without any user input.
+
+- WMR ([troubleshoot](doc/monado/WMR.md))
+- Rift S (might need to press "Submit to SLAM", like the Vive Driver).
+- Northstar / DepthAI.
+- Vive Driver (Valve Index) ([read before using](doc/monado/Vive.md))
+- RealSense Driver ([setup](doc/monado/Realsense.md))
+
+## Developing Basalt
+
+### Trying Basalt without Monado
 
 This step is optional but you can try Basalt without Monado with one of the following methods:
 
@@ -104,10 +110,7 @@ This step is optional but you can try Basalt without Monado with one of the foll
   $bsltdeps/basalt/data/d455_calib.json --config-path
   $bsltdeps/basalt/data/euroc_config.json`
 
-### Monado Specifics
-
-Note: be careful when manually enabling ASan when building Monado as some
-crashes have been reported. I'm still trying to figure out why those happen.
+### Running an EuRoC dataset through Monado
 
 Run an OpenXR app like `hello_xr` with the following environment variables set
 
@@ -125,31 +128,5 @@ export XRT_DEBUG_GUI=1 # We will need the debug ui to start streaming the datase
 Finally, run the XR app and press start in the euroc player debug ui and you
 should see a controller being tracked with Basalt from the euroc dataset.
 
-## Notes on Basalt Usage
-
-- Tracking is not perfect, [this](https://youtu.be/mIgRHmxbaC8) and
-  [this](https://youtu.be/gxu3Ve8VCnI) show how it looks, as well as the
-  problems that it has (difficulties with rotation-only movements, wiggliness on
-  fast movements, etc)
-- This fork only works with Stereo-IMU setups, but adapting Basalt to work with
-  other configurations should feasible (see
-  [granite](https://github.com/DLR-RM/granite)).
-- Basalt is _fast_. While the standard sampling rate is stereo 640x480 at 30fps
-  I've been able to make it work at 848x480 at 60fps without problems on a
-  laptop.
-- Some things that might cause crashes:
-  - Using images with bad exposure and gain values, or being in a dark room.
-  - Shaking causes drift that can diverge if maintained for long periods of
-    time.
-  - Continuously making sudden 90 degree rotations in which the new scene does not share
-    features with the previous scene.
-  - Moving too fast and/or making rotation only movements over extended periods
-    of time.
-
-## Using Real Hardware
-
-Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Here is how to set them up:
-
-- [RealSense Driver](doc/monado/Realsense.md)
-- [WMR Driver](doc/monado/WMR.md)
-- [Vive Driver (Valve Index)](doc/monado/Vive.md)
+There's also the monado-gui slambatch utility for running euroc datasets in
+batch.
