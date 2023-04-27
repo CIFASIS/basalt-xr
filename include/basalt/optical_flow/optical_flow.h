@@ -63,6 +63,8 @@ struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
   using Vec3 = Eigen::Matrix<double, 3, 1>;
 
+  OpticalFlowInput() = default;
+
   OpticalFlowInput(int NUM_CAMS) {
     img_data.resize(NUM_CAMS);
     masks.resize(NUM_CAMS);

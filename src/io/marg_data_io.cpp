@@ -213,19 +213,6 @@ void serialize(Archive& ar, basalt::OpticalFlowInput& m) {
   ar(m.img_data);
 }
 
-template <>
-struct LoadAndConstruct<basalt::OpticalFlowInput> {
-  template <class Archive>
-  static void load_and_construct(
-      Archive& ar, cereal::construct<basalt::OpticalFlowInput>& construct) {
-    int t_ns;
-    std::vector<basalt::ImageData> img_data;
-    ar(t_ns);
-    ar(img_data);
-    construct(img_data.size());
-  }
-};
-
 template <class Archive>
 void serialize(Archive& ar, basalt::ImageData& m) {
   ar(m.exposure);
