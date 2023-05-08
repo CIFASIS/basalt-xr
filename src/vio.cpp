@@ -112,6 +112,7 @@ pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 
 pangolin::Var<bool> show_guesses{"ui.Show matching guesses", false, false,
                                  true};
+pangolin::Var<bool> show_map{"ui.Show Map", false, false, true};
 pangolin::Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, false, true};
 pangolin::Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true,
                                                 false, true};
@@ -1186,7 +1187,10 @@ void draw_scene(pangolin::View& view) {
         render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
 
     glColor3ubv(pose_color);
-    pangolin::glDrawPoints(it->second->points);
+    if (show_map)
+      for (const auto& [_, data] : vis_map) pangolin::glDrawPoints(data->points);
+    else
+      pangolin::glDrawPoints(it->second->points);
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
