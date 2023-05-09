@@ -80,6 +80,7 @@ using namespace Eigen;
 void draw_image_overlay(pangolin::View& v, size_t cam_id);
 void draw_scene(pangolin::View& view);
 void load_data(const std::string& calib_path);
+void match_points();
 bool next_step();
 bool prev_step();
 void draw_plots();
@@ -184,6 +185,12 @@ basalt::VioDatasetPtr vio_dataset;
 basalt::VioConfig vio_config;
 basalt::OpticalFlowBase::Ptr opt_flow_ptr;
 basalt::VioEstimatorBase::Ptr vio;
+
+// Matching Points variables
+// vision data queues to match points of the map
+tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
+tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_matching_queue;
+std::shared_ptr<std::thread> matching_thread;
 
 // Feed functions
 void feed_images() {
@@ -338,7 +345,6 @@ int main(int argc, char** argv) {
         vio_config, calib, basalt::constants::g, use_imu, use_double);
     vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
-    opt_flow_ptr->output_queue = &vio->vision_data_queue;
     opt_flow_ptr->show_gui = show_gui;
     if (show_gui) vio->out_vis_queue = &out_vis_queue;
     vio->out_state_queue = &out_state_queue;
@@ -370,6 +376,14 @@ int main(int argc, char** argv) {
 
   std::thread t1(&feed_images);
   std::thread t2(&feed_imu);
+
+  // Start matching process
+  // Why this has to be here and not before t1 and t2 threads are started?
+  match_points();
+  // Match OpticalFlowResult with ORB input queue
+  opt_flow_ptr->output_queue = &input_matching_queue;
+  // The output of ORB process is the new input of the VIO
+  output_matching_queue = &vio->vision_data_queue;
 
   std::shared_ptr<std::thread> t3;
 
@@ -624,6 +638,9 @@ int main(int argc, char** argv) {
 
   // wait first for vio to complete processing
   vio->maybe_join();
+
+  // if the vio is finished then the matching has to be finished too
+  matching_thread->join();
 
   // input threads will abort when vio is finished, but might be stuck in full
   // push to full queue, so drain queue now
@@ -1210,6 +1227,25 @@ void load_data(const std::string& calib_path) {
               << std::endl;
     std::abort();
   }
+}
+
+// This functions matches the points not detected by the Optical Flow that has already been stored in the map database
+void match_points() {
+  auto proc_func = [&] {
+    std::cout << "Matching points..." << std::endl;
+    OpticalFlowResult::Ptr curr_frame;
+    while (true) {
+      input_matching_queue.pop(curr_frame);
+      if (curr_frame == nullptr) {
+          output_matching_queue->push(nullptr);
+          break;
+        }
+      // TODO: Implement the matching here
+      output_matching_queue->push(curr_frame);
+    }
+    std::cout << "Finished matching points" << std::endl;
+  };
+  matching_thread.reset(new std::thread(proc_func));
 }
 
 bool next_step() {
