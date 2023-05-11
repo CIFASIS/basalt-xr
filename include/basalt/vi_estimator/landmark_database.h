@@ -88,6 +88,10 @@ class LandmarkDatabase {
  public:
   using Scalar = Scalar_;
 
+  static LandmarkDatabase<Scalar>& getInstance() {
+      static LandmarkDatabase<Scalar> lmdb;
+      return lmdb;
+  }
   // Non-const
   void addLandmark(KeypointId lm_id, const Keypoint<Scalar>& pos);
 
@@ -138,6 +142,12 @@ class LandmarkDatabase {
   }
 
  private:
+  // The constructor is private to prevent external instantiation of the class.
+  LandmarkDatabase() {}
+  // The copy constructor and copy assignment operator are deleted to prevent copying of the class.
+  LandmarkDatabase(const LandmarkDatabase&) = delete;
+  LandmarkDatabase& operator=(const LandmarkDatabase&) = delete;
+
   using MapIter =
       typename Eigen::aligned_unordered_map<KeypointId,
                                             Keypoint<Scalar>>::iterator;

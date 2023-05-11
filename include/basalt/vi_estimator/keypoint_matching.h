@@ -3,29 +3,32 @@
 */
 #pragma once
 
-// #include <thread>
 #include <basalt/optical_flow/optical_flow.h>
+#include <basalt/vi_estimator/landmark_database.h>
 
 
 namespace basalt {
 
-// we need a template here?
-// template <class Scalar_>
-// class KeypointMatching : public BundleAdjustmentBase<Scalar> {
+
 class KeypointMatching {
  public:
 
   typedef std::shared_ptr<KeypointMatching> Ptr;
 
-  KeypointMatching()
+  KeypointMatching(LandmarkDatabase<float>* lmdb)
       : output_matching_queue(nullptr) {
     input_matching_queue.set_capacity(10);
-  }
+    this->lmdb = lmdb;
+}
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_matching_queue;
 
   void initialize();
+
+  void match_keypoints(OpticalFlowResult::Ptr frame);
+
+  bool is_observed(KeypointId kp, OpticalFlowResult::Ptr frame);
 
   virtual ~KeypointMatching() { maybe_join(); }
 
@@ -41,7 +44,8 @@ class KeypointMatching {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
-  // using BundleAdjustmentBase<Scalar>::lmdb;
+  // TODO: how to define lmdb for doubles without template this class?
+  LandmarkDatabase<float>* lmdb;
 
  private:
 
@@ -54,6 +58,6 @@ class KeypointMatching {
 
 class KeypointMatchingFactory {
  public:
-  static typename KeypointMatching::Ptr getKeypointMatching();
+  static typename KeypointMatching::Ptr getKeypointMatching(bool use_double);
 };
 }  // namespace basalt
