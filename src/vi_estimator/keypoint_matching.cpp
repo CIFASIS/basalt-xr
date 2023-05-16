@@ -37,7 +37,7 @@ void KeypointMatching::initialize() {
 void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
 
   // TODO: parallel loop
-  for (auto &[kp_id, kp] : lmdb->getLandmarks()) {
+  for (auto &[kp_id, kp] : lmdb.getLandmarks()) {
     bool observed = is_observed(kp_id, curr_frame);
     if (!observed) {
       // This keypoint wasn't observed by optical flow
@@ -74,13 +74,13 @@ KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(bool use_doub
     if (use_double) {
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
     // Get the Map instance
-    res.reset(new KeypointMatching(&LandmarkDatabase<double>::getInstance()));
+    res.reset(new KeypointMatching());
 #else
     BASALT_LOG_FATAL("Compiled without double support.");
 #endif
   } else {
 #ifdef BASALT_INSTANTIATIONS_FLOAT
-    res.reset(new KeypointMatching(&LandmarkDatabase<float>::getInstance()));
+    res.reset(new KeypointMatching());
 #else
     BASALT_LOG_FATAL("Compiled without float support.");
 #endif
