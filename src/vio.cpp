@@ -336,7 +336,7 @@ int main(int argc, char** argv) {
 
   // Initialize matching keypoints process
   {
-    match_kpts = basalt::KeypointMatchingFactory::getKeypointMatching(use_double);
+    match_kpts = basalt::KeypointMatchingFactory::getKeypointMatching(vio_config, use_double);
     match_kpts->initialize();
 
     // Match OpticalFlowResult with matching keypoints input queue

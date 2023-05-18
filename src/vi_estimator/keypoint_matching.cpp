@@ -7,7 +7,12 @@
 
 namespace basalt {
 
-// This functions matches the points not detected by the Optical Flow that has already been stored in the map database
+/**
+ * Initialize the keypoint matching process by creating a processing thread.
+ * The processing thread continuously retrieves frames from the Optical Flow output queue,
+ * matches keypoints in each frame, and pushes the processed frames into the output matching queue.
+ *
+ */
 void KeypointMatching::initialize() {
   auto proc_func = [&] {
     std::cout << "Matching points..." << std::endl;
@@ -22,65 +27,76 @@ void KeypointMatching::initialize() {
       match_keypoints(curr_frame);
       output_matching_queue->push(curr_frame);
     }
-    std::cout << "Finished matching points" << std::endl;
+    std::cout << "Finished matching points. Total matches: " << num_matches << std::endl;
   };
   processing_thread.reset(new std::thread(proc_func));
 }
 
 /**
- * For each keypoint in the landmark database that is not observed by optical flow in the
- * current frame, project it onto the frame and try to find it.
- * If a match is found, add it to the current frame's observations.
+ * Match keypoints in the current frame with keypoints in the landmark database.
  *
- * @param curr_frame a shared pointer to the current frame's OpticalFlowResult
+ * @param curr_frame A pointer to the current frame containing observations and descriptors.
  */
 void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
 
-  // TODO: parallel loop
-  for (auto &[kp_id, kp] : lmdb.getLandmarks()) {
-    bool observed = is_observed(kp_id, curr_frame);
-    if (!observed) {
-      // This keypoint wasn't observed by optical flow
-      // Project it onto the frame and try to find it.
+  int NUM_CAMS = curr_frame->observations.size();
+  for (int i=0; i < NUM_CAMS; i++) {
+    std::vector<Descriptor> descr1;
+    std::vector<KeypointId> kp1;
+    std::vector<Descriptor> descr2;
+    std::vector<KeypointId> kp2;
+
+    // TODO: filter points already matched by optical flow
+    for (const auto& ds : curr_frame->descriptors.at(i)) {
+      kp1.push_back(ds.first);
+      descr1.push_back(ds.second);
+    }
+
+    // TODO: filter points already matched by optical flow
+    for (const auto& kv : lmdb.getLandmarks()) {
+      kp2.push_back(kv.first);
+      descr2.push_back(kv.second.descriptor);
+    }
+
+    std::vector<std::pair<int, int>> matches;
+
+    matchDescriptors(descr1, descr2, matches,
+                      config.mapper_max_hamming_distance,
+                      config.mapper_second_best_test_ratio);
+
+    for (const auto& match: matches) {
+      // If match: keypoint kp1[i] is the same as kp2[j] so change the kp_id
+      KeypointId kp_id = kp1[match.first];
+      KeypointId new_kp_id = kp2[match.second];
+      // TODO: if we filter the klf matches this shouldn't be necessary
+      if (new_kp_id != kp_id) {
+        // TODO: check if this is necessary
+        if (curr_frame->observations.at(i).count(kp_id) == 0 || curr_frame->observations.at(i).count(new_kp_id) > 0) {
+          continue;
+        }
+        curr_frame->observations.at(i)[new_kp_id] = curr_frame->observations.at(i).at(kp_id);
+        curr_frame->descriptors.at(i)[new_kp_id] = curr_frame->descriptors.at(i).at(kp_id);
+        curr_frame->observations.at(i).erase(kp_id);
+        curr_frame->descriptors.at(i).erase(kp_id);
+        num_matches++;
+      }
     }
   }
 }
 
-/**
- * Check if a keypoint is observed in a given frame.
- *
- * @param kp_id The ID of the keypoint to search for.
- * @param frame A shared pointer to an OpticalFlowResult object representing the frame to search in.
- * @return True if the keypoint is observed in the frame, false otherwise.
- */
-bool KeypointMatching::is_observed(KeypointId kp_id, OpticalFlowResult::Ptr frame) {
-  bool found = false;
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, frame->observations.size()),
-    [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        const auto& observation = frame->observations[i];
-        if (observation.find(kp_id) != observation.end()) {
-          found = true;
-          return;
-        }
-      }
-    });
-  return found;
-}
 
-
-KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(bool use_double) {
+KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(const VioConfig& config, bool use_double) {
   KeypointMatching::Ptr res;
     if (use_double) {
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
     // Get the Map instance
-    res.reset(new KeypointMatching());
+    res.reset(new KeypointMatching(config));
 #else
     BASALT_LOG_FATAL("Compiled without double support.");
 #endif
   } else {
 #ifdef BASALT_INSTANTIATIONS_FLOAT
-    res.reset(new KeypointMatching());
+    res.reset(new KeypointMatching(config));
 #else
     BASALT_LOG_FATAL("Compiled without float support.");
 #endif

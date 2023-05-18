@@ -464,7 +464,13 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
             kpt_pos.direction =
                 StereographicParam<Scalar>::project(p0_triangulated);
             kpt_pos.inv_dist = p0_triangulated[3];
-            kpt_pos.descriptor = opt_flow_meas->descriptors.at(i).at(lm_id);
+            // TODO: check, this shouldn't be necessary
+            if (opt_flow_meas->descriptors.at(i).count(lm_id) == 0) {
+              std::cout << "WARNING: Descriptor not found for keypoint " << std::endl;
+            }
+            else {
+              kpt_pos.descriptor = opt_flow_meas->descriptors.at(i).at(lm_id);
+            }
             lmdb.addLandmark(lm_id, kpt_pos);
 
             num_points_added++;

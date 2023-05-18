@@ -16,9 +16,10 @@ class KeypointMatching : public BundleAdjustmentBase<float> {
 
   typedef std::shared_ptr<KeypointMatching> Ptr;
 
-  KeypointMatching()
+  KeypointMatching(const VioConfig& config)
       : output_matching_queue(nullptr) {
     input_matching_queue.set_capacity(10);
+    this->config = config;
 }
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
@@ -42,6 +43,8 @@ class KeypointMatching : public BundleAdjustmentBase<float> {
  private:
 
   std::shared_ptr<std::thread> processing_thread;
+  VioConfig config;
+  int num_matches = 0;
 
   // timing and stats
   // ExecutionStats stats_all_;
@@ -50,6 +53,6 @@ class KeypointMatching : public BundleAdjustmentBase<float> {
 
 class KeypointMatchingFactory {
  public:
-  static typename KeypointMatching::Ptr getKeypointMatching(bool use_double);
+  static typename KeypointMatching::Ptr getKeypointMatching(const VioConfig& config, bool use_double);
 };
 }  // namespace basalt

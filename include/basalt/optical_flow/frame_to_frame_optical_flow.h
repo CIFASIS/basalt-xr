@@ -361,7 +361,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
           result[id] = transform_2;
-          desc_result[id] = descriptors_1.at(id);;
+          // TODO: check, this shouldn't be necessary
+          if (descriptors_1.count(id) > 0) {
+            desc_result[id] = descriptors_1.at(id);
+          }
         }
       }
     };
