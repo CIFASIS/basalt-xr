@@ -58,6 +58,8 @@ struct Keypoint {
   using ObsMap = Eigen::aligned_map<TimeCamId, Vec2>;
   using MapIter = typename ObsMap::iterator;
 
+  using Descriptor = std::bitset<256>;
+
   // 3D position parameters
   Vec2 direction;
   Scalar inv_dist;
@@ -65,6 +67,8 @@ struct Keypoint {
   // Observations
   TimeCamId host_kf_id;
   ObsMap obs;
+
+  Descriptor descriptor;
 
   inline void backup() {
     backup_direction = direction;

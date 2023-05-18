@@ -46,6 +46,7 @@ void LandmarkDatabase<Scalar_>::addLandmark(KeypointId lm_id,
   kpt.direction = pos.direction;
   kpt.inv_dist = pos.inv_dist;
   kpt.host_kf_id = pos.host_kf_id;
+  kpt.descriptor = pos.descriptor;
 }
 
 template <class Scalar_>
