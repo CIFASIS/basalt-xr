@@ -56,7 +56,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 using KeypointId = size_t;
+// TODO: Unify Keypoints + Descriptors
 using Keypoints = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
+using Descriptor = std::bitset<256>;
+using Descriptors = Eigen::aligned_map<KeypointId, Descriptor>;
 using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
@@ -88,7 +91,9 @@ struct OpticalFlowResult {
   using Ptr = std::shared_ptr<OpticalFlowResult>;
 
   int64_t t_ns;
+  // TODO: Unify obs + desc in same struct
   std::vector<Keypoints> observations;
+  std::vector<Descriptors> descriptors;
   std::vector<Keypoints> tracking_guesses;
   std::vector<Keypoints> matching_guesses;
 

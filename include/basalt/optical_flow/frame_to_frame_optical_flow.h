@@ -207,6 +207,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       transforms->observations.resize(NUM_CAMS);
       transforms->tracking_guesses.resize(NUM_CAMS);
       transforms->matching_guesses.resize(NUM_CAMS);
+      transforms->descriptors.resize(NUM_CAMS);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
@@ -246,6 +247,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       new_transforms->observations.resize(NUM_CAMS);
       new_transforms->tracking_guesses.resize(NUM_CAMS);
       new_transforms->matching_guesses.resize(NUM_CAMS);
+      new_transforms->descriptors.resize(NUM_CAMS);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
@@ -257,6 +259,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         trackPoints(
             old_pyramid->at(i), pyramid->at(i),  //
             transforms->observations[i], new_transforms->observations[i],
+            transforms->descriptors[i],  new_transforms->descriptors[i],
             new_transforms->tracking_guesses[i],  //
             new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
@@ -279,6 +282,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
                    const basalt::ManagedImagePyr<uint16_t>& pyr_2,
                    const Keypoints& transform_map_1, Keypoints& transform_map_2,
+                   const Descriptors& descriptors_1, Descriptors& descriptors_2,
                    Keypoints& guesses, const Masks& masks1, const Masks& masks2,
                    const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
@@ -297,6 +301,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
                                   std::hash<KeypointId>>
         result, guesses_tbb;
+    tbb::concurrent_unordered_map<KeypointId, Descriptor>
+        desc_result;
 
     bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
@@ -355,6 +361,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
           result[id] = transform_2;
+          desc_result[id] = descriptors_1.at(id);;
         }
       }
     };
@@ -366,6 +373,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     transform_map_2.insert(result.begin(), result.end());
     guesses.clear();
     guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
+    descriptors_2.clear();
+    descriptors_2.insert(desc_result.begin(), desc_result.end());
   }
 
   inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
@@ -449,14 +458,18 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                     config.optical_flow_detection_min_threshold,
                     config.optical_flow_detection_max_threshold,
                     transforms->input_images->masks.at(cam_id), pts);
-
+    computeAngles(pyramid->at(cam_id).lvl(0), kd, true);
+    computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
+    // std::vector<bool> success;
+    // calib.intrinsics[cam_id].unproject(kd.corners, kd.corners_3d, success);
     Keypoints new_poses;
-    for (auto& corner : kd.corners) {  // Set new points as keypoints
+    for (size_t i = 0; i < kd.corners.size(); i++) {  // Set new points as keypoints
       Eigen::AffineCompact2f transform;
       transform.setIdentity();
-      transform.translation() = corner.cast<Scalar>();
+      transform.translation() = kd.corners[i].cast<Scalar>();
 
       transforms->observations.at(cam_id)[last_keypoint_id] = transform;
+      transforms->descriptors.at(cam_id)[last_keypoint_id] = kd.corner_descriptors[i];
       new_poses[last_keypoint_id] = transform;
 
       last_keypoint_id++;
@@ -516,9 +529,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       auto& pyr0 = pyramid->at(0);
       auto& pyri = pyramid->at(i);
       Keypoints kps;
+      Descriptors descr0 = transforms->descriptors.at(0);
+      Descriptors descr;
       SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
-      trackPoints(pyr0, pyri, kps0, kps, mgs, ms0, ms, T_c0_ci, 0, i);
+      trackPoints(pyr0, pyri, kps0, kps, descr0, descr, mgs, ms0, ms, T_c0_ci, 0, i);
       transforms->observations.at(i).insert(kps.begin(), kps.end());
+      transforms->descriptors.at(i).insert(descr.begin(), descr.end());
 
       // Update masks and detect features on area not overlapping with cam0
       if (!config.optical_flow_detection_nonoverlap) continue;
@@ -566,6 +582,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     for (int id : lm_to_remove) {
       transforms->observations.at(cam_id).erase(id);
+      transforms->descriptors.at(cam_id).erase(id);
     }
   }
 
