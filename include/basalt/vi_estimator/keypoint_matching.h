@@ -9,25 +9,34 @@
 
 namespace basalt {
 
+struct MatchingVisualizationData {
+  typedef std::shared_ptr<MatchingVisualizationData> Ptr;
 
-class KeypointMatching : public BundleAdjustmentBase<float> {
+  int64_t t_ns;
+  Eigen::aligned_vector<Eigen::Vector3d> points;
+};
+
+class KeypointMatching : public BundleAdjustmentBase<double> {
  public:
-  using Scalar = float;
+  using Scalar = double;
 
   typedef std::shared_ptr<KeypointMatching> Ptr;
 
-  KeypointMatching(const VioConfig& config)
-      : output_matching_queue(nullptr) {
+  KeypointMatching(const Calibration<Scalar>& calib, const VioConfig& config)
+      : output_matching_queue(nullptr),
+        output_visual_queue(nullptr),
+        config(config) {
     input_matching_queue.set_capacity(10);
-    this->config = config;
+    this->calib = calib;
 }
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_matching_queue;
+  tbb::concurrent_bounded_queue<MatchingVisualizationData::Ptr>* output_visual_queue = nullptr;
 
   void initialize();
 
-  void match_keypoints(OpticalFlowResult::Ptr frame);
+  Eigen::aligned_vector<Eigen::Vector3d> match_keypoints(OpticalFlowResult::Ptr frame);
 
   bool is_observed(KeypointId kp, OpticalFlowResult::Ptr frame);
 
@@ -53,6 +62,6 @@ class KeypointMatching : public BundleAdjustmentBase<float> {
 
 class KeypointMatchingFactory {
  public:
-  static typename KeypointMatching::Ptr getKeypointMatching(const VioConfig& config, bool use_double);
+  static typename KeypointMatching::Ptr getKeypointMatching(const Calibration<double>& calib, const VioConfig& config, bool use_double);
 };
 }  // namespace basalt

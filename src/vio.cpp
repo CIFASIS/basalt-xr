@@ -154,10 +154,14 @@ pangolin::OpenGlRenderState camera;
 
 // Visualization variables
 std::unordered_map<int64_t, basalt::VioVisualizationData::Ptr> vis_map;
+std::unordered_map<int64_t, basalt::MatchingVisualizationData::Ptr> matched_points;
 
 tbb::concurrent_bounded_queue<basalt::VioVisualizationData::Ptr> out_vis_queue;
 tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr>
     out_state_queue;
+
+// Visualization Matching queue
+tbb::concurrent_bounded_queue<basalt::MatchingVisualizationData::Ptr> output_visual_queue;
 
 std::vector<int64_t> vio_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
@@ -336,9 +340,10 @@ int main(int argc, char** argv) {
 
   // Initialize matching keypoints process
   {
-    match_kpts = basalt::KeypointMatchingFactory::getKeypointMatching(vio_config, use_double);
+    match_kpts = basalt::KeypointMatchingFactory::getKeypointMatching(calib, vio_config, use_double);
     match_kpts->initialize();
 
+    if (show_gui) match_kpts->output_visual_queue = &output_visual_queue;
     // Match OpticalFlowResult with matching keypoints input queue
     opt_flow_ptr->output_queue = &match_kpts->input_matching_queue;
   }
@@ -383,8 +388,9 @@ int main(int argc, char** argv) {
   std::thread t2(&feed_imu);
 
   std::shared_ptr<std::thread> t3;
+  std::shared_ptr<std::thread> t6;
 
-  if (show_gui)
+  if (show_gui) {
     t3.reset(new std::thread([&]() {
       basalt::VioVisualizationData::Ptr data;
 
@@ -400,6 +406,23 @@ int main(int argc, char** argv) {
 
       std::cout << "Finished t3" << std::endl;
     }));
+    // Matching output
+    t6.reset(new std::thread([&]() {
+      basalt::MatchingVisualizationData::Ptr data;
+
+      while (true) {
+        output_visual_queue.pop(data);
+
+        if (data.get()) {
+          matched_points[data->t_ns] = data;
+        } else {
+          break;
+        }
+      }
+
+      std::cout << "Finished t6" << std::endl;
+    }));
+  }
 
   std::thread t4([&]() {
     basalt::PoseVelBiasState<double>::Ptr data;
@@ -652,6 +675,7 @@ int main(int argc, char** argv) {
 
   // join other threads
   if (t3) t3->join();
+  if (t6) t6->join();
   t4.join();
   if (t5) t5->join();
 
@@ -1205,6 +1229,16 @@ void draw_scene(pangolin::View& view) {
       for (const auto& [_, data] : vis_map) pangolin::glDrawPoints(data->points);
     else
       pangolin::glDrawPoints(it->second->points);
+  }
+
+  auto it2 = matched_points.find(t_ns);
+
+  if (it2 != matched_points.end()) {
+    glColor3ubv(state_color);
+    if (show_map)
+      for (const auto& [_, data] : matched_points) pangolin::glDrawPoints(data->points);
+    else
+      pangolin::glDrawPoints(it2->second->points);
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);

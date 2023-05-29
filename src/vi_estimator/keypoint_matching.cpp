@@ -20,11 +20,20 @@ void KeypointMatching::initialize() {
     while (true) {
       input_matching_queue.pop(curr_frame);
       if (curr_frame == nullptr) {
+          if (output_visual_queue) output_visual_queue->push(nullptr);
           output_matching_queue->push(nullptr);
           break;
         }
       // TODO: Implement the matching here
-      match_keypoints(curr_frame);
+      MatchingVisualizationData::Ptr data(new MatchingVisualizationData);
+      Eigen::aligned_vector<Eigen::Vector3d> matched_points;
+
+      matched_points = match_keypoints(curr_frame);
+
+      data->t_ns = curr_frame->t_ns;
+      data->points = matched_points;
+
+      if (output_visual_queue) output_visual_queue->push(data);
       output_matching_queue->push(curr_frame);
     }
     std::cout << "Finished matching points. Total matches: " << num_matches << std::endl;
@@ -37,8 +46,8 @@ void KeypointMatching::initialize() {
  *
  * @param curr_frame A pointer to the current frame containing observations and descriptors.
  */
-void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
-
+Eigen::aligned_vector<Eigen::Vector3d> KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
+  Eigen::aligned_vector<Eigen::Vector3d> points;
   int NUM_CAMS = curr_frame->observations.size();
   for (int i=0; i < NUM_CAMS; i++) {
     std::vector<Descriptor> descr1;
@@ -79,24 +88,43 @@ void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
         curr_frame->observations.at(i).erase(kp_id);
         curr_frame->descriptors.at(i).erase(kp_id);
         num_matches++;
+
+        // TODO: with concurrent landmark DB this shouldn't be necessary
+        Keypoint<Scalar> kpt_pos;
+        try {
+          kpt_pos = lmdb.getLandmark(new_kp_id);
+        } catch (const std::out_of_range& e) {
+          std::cout << "WARNING: Landmark " <<  new_kp_id << " out of range" << std::endl;
+          continue;
+        }
+        Vec4 pt_cam = StereographicParam<Scalar>::unproject(kpt_pos.direction);
+        pt_cam[3] = kpt_pos.inv_dist;
+
+        const Sophus::SE3<Scalar>& T_i_c = calib.T_i_c.at(i);
+        const auto& T_w_i = curr_frame->predicted_state->T_w_i;
+        Mat4 T_w_c = (T_w_i * T_i_c).matrix();
+        Vec4 pt_w = T_w_c * pt_cam;
+
+        points.emplace_back((pt_w.head<3>() / pt_w[3]).cast<Scalar>());
       }
     }
   }
+  return points;
 }
 
 
-KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(const VioConfig& config, bool use_double) {
+KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(const Calibration<double>& calib, const VioConfig& config, bool use_double) {
   KeypointMatching::Ptr res;
     if (use_double) {
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
     // Get the Map instance
-    res.reset(new KeypointMatching(config));
+    res.reset(new KeypointMatching(calib, config));
 #else
     BASALT_LOG_FATAL("Compiled without double support.");
 #endif
   } else {
 #ifdef BASALT_INSTANTIATIONS_FLOAT
-    res.reset(new KeypointMatching(config));
+    res.reset(new KeypointMatching(calib, config));
 #else
     BASALT_LOG_FATAL("Compiled without float support.");
 #endif

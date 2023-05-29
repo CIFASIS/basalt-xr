@@ -99,6 +99,8 @@ struct OpticalFlowResult {
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 
+  PoseVelBiasState<double>::Ptr predicted_state;
+
   OpticalFlowInput::Ptr input_images;
 };
 

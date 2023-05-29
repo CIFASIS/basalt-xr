@@ -209,6 +209,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       transforms->matching_guesses.resize(NUM_CAMS);
       transforms->descriptors.resize(NUM_CAMS);
       transforms->t_ns = t_ns;
+      transforms->predicted_state = predicted_state;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
       pyramid->resize(NUM_CAMS);
@@ -249,6 +250,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       new_transforms->matching_guesses.resize(NUM_CAMS);
       new_transforms->descriptors.resize(NUM_CAMS);
       new_transforms->t_ns = t_ns;
+      new_transforms->predicted_state = predicted_state;
 
       SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
       SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
