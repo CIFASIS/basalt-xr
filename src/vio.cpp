@@ -1187,6 +1187,11 @@ void draw_scene(pangolin::View& view) {
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(it->second->points);
+    int total_points = 0;
+    for (const auto& [_, data] : vis_map) {
+      total_points += data->points.size();
+    }
+    std::cout << "Total Points: " << total_points << std::endl;
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
