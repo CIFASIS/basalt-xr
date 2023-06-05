@@ -13,13 +13,14 @@ namespace basalt {
 class KeypointMatching {
  public:
 
+  using Scalar = float;
+
   typedef std::shared_ptr<KeypointMatching> Ptr;
 
-  KeypointMatching(const VioConfig& config, LandmarkDatabase<float>* lmdb)
+  KeypointMatching(const VioConfig& config)
       : output_matching_queue(nullptr) {
     input_matching_queue.set_capacity(10);
     this->config = config;
-    this->lmdb = lmdb;
 }
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
@@ -46,7 +47,7 @@ class KeypointMatching {
 
  private:
   // TODO: how to define lmdb for doubles without template this class?
-  LandmarkDatabase<float>* lmdb;
+  LandmarkDatabase<Scalar>& lmdb = LandmarkDatabase<Scalar>::getInstance();
 
  private:
 
@@ -57,10 +58,5 @@ class KeypointMatching {
   // timing and stats
   // ExecutionStats stats_all_;
   // ExecutionStats stats_sums_;
-};
-
-class KeypointMatchingFactory {
- public:
-  static typename KeypointMatching::Ptr getKeypointMatching(const VioConfig& config, bool use_double);
 };
 }  // namespace basalt
