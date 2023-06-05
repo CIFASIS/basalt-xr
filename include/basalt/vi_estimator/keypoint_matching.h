@@ -4,22 +4,22 @@
 #pragma once
 
 #include <basalt/optical_flow/optical_flow.h>
-#include <basalt/vi_estimator/sc_ba_base.h>
+#include <basalt/vi_estimator/landmark_database.h>
 
 
 namespace basalt {
 
 
-class KeypointMatching : public BundleAdjustmentBase<float> {
+class KeypointMatching {
  public:
-  using Scalar = float;
 
   typedef std::shared_ptr<KeypointMatching> Ptr;
 
-  KeypointMatching(const VioConfig& config)
+  KeypointMatching(const VioConfig& config, LandmarkDatabase<float>* lmdb)
       : output_matching_queue(nullptr) {
     input_matching_queue.set_capacity(10);
     this->config = config;
+    this->lmdb = lmdb;
 }
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> input_matching_queue;
@@ -39,6 +39,14 @@ class KeypointMatching : public BundleAdjustmentBase<float> {
       processing_thread.reset();
     }
   }
+
+  // Macro defined in the Eigen library, which is a C++ library for linear algebra.
+  // This macro is used to enable memory alignment for instances of a class that contain Eigen types, such as matrices or vectors.
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+ private:
+  // TODO: how to define lmdb for doubles without template this class?
+  LandmarkDatabase<float>* lmdb;
 
  private:
 

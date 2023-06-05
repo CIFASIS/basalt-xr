@@ -53,7 +53,7 @@ void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
     }
 
     // TODO: filter points already matched by optical flow
-    for (const auto& kv : lmdb.getLandmarks()) {
+    for (const auto& kv : lmdb->getLandmarks()) {
       kp2.push_back(kv.first);
       descr2.push_back(kv.second.descriptor);
     }
@@ -90,13 +90,14 @@ KeypointMatching::Ptr KeypointMatchingFactory::getKeypointMatching(const VioConf
     if (use_double) {
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
     // Get the Map instance
-    res.reset(new KeypointMatching(config));
+    res.reset(new KeypointMatching(config, lmdb));
 #else
     BASALT_LOG_FATAL("Compiled without double support.");
 #endif
   } else {
 #ifdef BASALT_INSTANTIATIONS_FLOAT
-    res.reset(new KeypointMatching(config));
+    LandmarkDatabase<Scalar>& lmdb = LandmarkDatabase<float>::getInstance();
+    res.reset(new KeypointMatching(config, lmdb));
 #else
     BASALT_LOG_FATAL("Compiled without float support.");
 #endif
