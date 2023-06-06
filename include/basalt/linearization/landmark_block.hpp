@@ -69,7 +69,7 @@ class LandmarkBlock {
 
   virtual bool isNumericalFailure() const = 0;
   virtual void allocateLandmark(
-      Keypoint<Scalar>& lm,
+      Landmark<Scalar>& lm,
       const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>,
                                          RelPoseLin<Scalar>>& relative_pose_lin,
       const Calibration<Scalar>& calib, const AbsOrderMap& aom,

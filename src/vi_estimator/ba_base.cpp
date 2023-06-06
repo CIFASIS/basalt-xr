@@ -70,7 +70,7 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
     for (size_t cam_id = 0; cam_id < connected_obs.size(); cam_id++) {
       TimeCamId tcid_t(state_t.getT_ns(), cam_id);
       for (const auto& lm_id : connected_obs[cam_id]) {
-        const Keypoint<Scalar>& kpt_pos = lmdb.getLandmark(lm_id);
+        const Landmark<Scalar>& kpt_pos = lmdb.getLandmark(lm_id);
         std::pair<TimeCamId, TimeCamId> map_key(kpt_pos.host_kf_id, tcid_t);
 
         if (abs_lin_data.count(map_key) == 0) {
@@ -95,7 +95,7 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
             for (const auto& lm_id : connected_obs[cam_id]) {
               TimeCamId tcid_t(state_t.getT_ns(), cam_id);
 
-              const Keypoint<Scalar>& kpt_pos = lmdb.getLandmark(lm_id);
+              const Landmark<Scalar>& kpt_pos = lmdb.getLandmark(lm_id);
               const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
               const AbsLinData& ald =
                   abs_lin_data.at(std::make_pair(kpt_pos.host_kf_id, tcid_t));
@@ -174,8 +174,8 @@ void BundleAdjustmentBase<Scalar_>::computeError(
 
         std::visit(
             [&](const auto& cam) {
-              for (KeypointId kpt_id : obs_kv.second) {
-                const Keypoint<Scalar>& kpt_pos = lmdb.getLandmark(kpt_id);
+              for (LandmarkId kpt_id : obs_kv.second) {
+                const Landmark<Scalar>& kpt_pos = lmdb.getLandmark(kpt_id);
                 const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
 
                 Vec2 res;
@@ -252,7 +252,7 @@ void BundleAdjustmentBase<Scalar_>::get_current_points(
     const Sophus::SE3<Scalar>& T_i_c = calib.T_i_c[tcid_host.cam_id];
     Mat4 T_w_c = (T_w_i * T_i_c).matrix();
 
-    for (const Keypoint<Scalar>* kpt_pos :
+    for (const Landmark<Scalar>* kpt_pos :
          lmdb.getLandmarksForHost(tcid_host)) {
       Vec4 pt_cam = StereographicParam<Scalar>::unproject(kpt_pos->direction);
       pt_cam[3] = kpt_pos->inv_dist;
@@ -385,8 +385,8 @@ void BundleAdjustmentBase<Scalar_>::computeProjections(
 
       std::visit(
           [&](const auto& cam) {
-            for (KeypointId kpt_id : obs_kv.second) {
-              const Keypoint<Scalar>& kpt_pos = lmdb.getLandmark(kpt_id);
+            for (LandmarkId kpt_id : obs_kv.second) {
+              const Landmark<Scalar>& kpt_pos = lmdb.getLandmark(kpt_id);
 
               Vec2 res;
               Vec4 proj;

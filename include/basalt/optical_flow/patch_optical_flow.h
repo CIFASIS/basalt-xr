@@ -129,7 +129,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(calib.intrinsics.size());
+      transforms->keypoints.resize(calib.intrinsics.size());
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
@@ -158,13 +158,13 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(new_img_vec->img_data.size());
+      new_transforms->keypoints.resize(new_img_vec->img_data.size());
       new_transforms->t_ns = t_ns;
 
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         trackPoints(old_pyramid->at(i), pyramid->at(i),
-                    transforms->observations[i],
-                    new_transforms->observations[i], i, i);
+                    transforms->keypoints[i],
+                    new_transforms->keypoints[i], i, i);
       }
 
       transforms = new_transforms;
@@ -183,24 +183,22 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
   void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
                    const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-                   const Keypoints& transform_map_1, Keypoints& transform_map_2,
+                   const Keypoints& keypoint_map_1, Keypoints& keypoint_map_2,
                    size_t cam1, size_t cam2) const {
-    size_t num_points = transform_map_1.size();
+    size_t num_points = keypoint_map_1.size();
 
     std::vector<KeypointId> ids;
-    Eigen::aligned_vector<Eigen::AffineCompact2f> init_vec;
+    Eigen::aligned_vector<Keypoint> init_vec;
 
     ids.reserve(num_points);
     init_vec.reserve(num_points);
 
-    for (const auto& kv : transform_map_1) {
+    for (const auto& kv : keypoint_map_1) {
       ids.push_back(kv.first);
       init_vec.push_back(kv.second);
     }
 
-    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
-                                  std::hash<KeypointId>>
-        result;
+    tbb::concurrent_unordered_map<KeypointId, Keypoint, std::hash<KeypointId>> result;
 
     double depth = depth_guess;
     transforms->input_images->depth_guess = depth;  // Store guess for UI
@@ -214,7 +212,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
 
-        const Eigen::AffineCompact2f& transform_1 = init_vec[r];
+        const Eigen::AffineCompact2f& transform_1 = init_vec[r].pose;
         Eigen::AffineCompact2f transform_2 = transform_1;
 
         auto t1 = transform_1.translation();
@@ -247,7 +245,9 @@ class PatchOpticalFlow : public OpticalFlowBase {
         Scalar dist2 = (t1 - t1_recovered).squaredNorm();
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
-          result[id] = transform_2;
+          result[id].pose = transform_2;
+          result[id].descriptor = init_vec[r].descriptor;
+          result[id].tracked_by_opt_flow = true;
         }
       }
     };
@@ -257,8 +257,8 @@ class PatchOpticalFlow : public OpticalFlowBase {
     tbb::parallel_for(range, compute_func);
     // compute_func(range);
 
-    transform_map_2.clear();
-    transform_map_2.insert(result.begin(), result.end());
+    keypoint_map_2.clear();
+    keypoint_map_2.insert(result.begin(), result.end());
   }
 
   inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& pyr,
@@ -327,8 +327,8 @@ class PatchOpticalFlow : public OpticalFlowBase {
   void addPoints() {
     Eigen::aligned_vector<Eigen::Vector2d> pts0;
 
-    for (const auto& kv : transforms->observations.at(0)) {
-      pts0.emplace_back(kv.second.translation().cast<double>());
+    for (const auto& kv : transforms->keypoints.at(0)) {
+      pts0.emplace_back(kv.second.pose.translation().cast<double>());
     }
 
     KeypointsData kd;
@@ -339,8 +339,10 @@ class PatchOpticalFlow : public OpticalFlowBase {
                     config.optical_flow_detection_min_threshold,
                     config.optical_flow_detection_max_threshold,
                     transforms->input_images->masks.at(0), pts0);
+    computeAngles(pyramid->at(0).lvl(0), kd, true);
+    computeDescriptors(pyramid->at(0).lvl(0), kd);
 
-    Keypoints new_poses0, new_poses1;
+    Keypoints new_kpts0, new_kpts1;
 
     for (size_t i = 0; i < kd.corners.size(); i++) {
       Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
@@ -357,17 +359,19 @@ class PatchOpticalFlow : public OpticalFlowBase {
       transform.setIdentity();
       transform.translation() = kd.corners[i].cast<Scalar>();
 
-      transforms->observations.at(0)[last_keypoint_id] = transform;
-      new_poses0[last_keypoint_id] = transform;
+      transforms->keypoints.at(0)[last_keypoint_id].pose = transform;
+      transforms->keypoints.at(0)[last_keypoint_id].descriptor = kd.corner_descriptors[i];
+      transforms->keypoints.at(0)[last_keypoint_id].tracked_by_opt_flow = false;
+      new_kpts0[last_keypoint_id] = transforms->keypoints.at(0)[last_keypoint_id];
 
       last_keypoint_id++;
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, 0, 1);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_kpts0, new_kpts1, 0, 1);
 
-      for (const auto& kv : new_poses1) {
-        transforms->observations.at(1).emplace(kv);
+      for (const auto& kv : new_kpts1) {
+        transforms->keypoints.at(1).emplace(kv);
       }
     }
   }
@@ -380,12 +384,12 @@ class PatchOpticalFlow : public OpticalFlowBase {
     std::vector<KeypointId> kpid;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& kv : transforms->observations.at(1)) {
-      auto it = transforms->observations.at(0).find(kv.first);
+    for (const auto& kv : transforms->keypoints.at(1)) {
+      auto it = transforms->keypoints.at(0).find(kv.first);
 
-      if (it != transforms->observations.at(0).end()) {
-        proj0.emplace_back(it->second.translation());
-        proj1.emplace_back(kv.second.translation());
+      if (it != transforms->keypoints.at(0).end()) {
+        proj0.emplace_back(it->second.pose.translation());
+        proj1.emplace_back(kv.second.pose.translation());
         kpid.emplace_back(kv.first);
       }
     }
@@ -410,7 +414,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
     }
 
     for (int id : lm_to_remove) {
-      transforms->observations.at(1).erase(id);
+      transforms->keypoints.at(1).erase(id);
     }
   }
 

@@ -119,7 +119,7 @@ void ScBundleAdjustmentBase<Scalar_>::updatePoints(
     // final negation of inc_l b/c we solve "H (-inc) = b"
     Vec3 inc_l = -(rld.Hllinv.at(lm_idx) * (rld.bl.at(lm_idx) - H_l_p_x));
 
-    Keypoint<Scalar>& kpt = lmdb.getLandmark(lm_idx);
+    Landmark<Scalar>& kpt = lmdb.getLandmark(lm_idx);
     kpt.direction += inc_l.template head<2>();
     kpt.inv_dist += inc_l[2];
 
@@ -217,7 +217,7 @@ void ScBundleAdjustmentBase<Scalar_>::updatePointsAbs(
     // final negation of inc_l b/c we solve "H (-inc) = b"
     Vec3 inc_l = -(ald.Hllinv.at(lm_idx) * (ald.bl.at(lm_idx) - H_l_p_x));
 
-    Keypoint<Scalar>& kpt = lmdb.getLandmark(lm_idx);
+    Landmark<Scalar>& kpt = lmdb.getLandmark(lm_idx);
     kpt.direction += inc_l.template head<2>();
     kpt.inv_dist += inc_l[2];
 
@@ -236,7 +236,7 @@ template <class Scalar_>
 void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
     Eigen::aligned_vector<RelLinData>& rld_vec,
     const std::unordered_map<
-        TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+        TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& obs_to_lin,
     const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error) {
   error = 0;
 
@@ -300,8 +300,8 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
 
             std::visit(
                 [&](const auto& cam) {
-                  for (KeypointId kpt_id : obs_kv.second) {
-                    const Keypoint<Scalar>& kpt_pos =
+                  for (LandmarkId kpt_id : obs_kv.second) {
+                    const Landmark<Scalar>& kpt_pos =
                         ba_base->lmdb.getLandmark(kpt_id);
                     const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
 
@@ -361,7 +361,7 @@ template <class Scalar_>
 void ScBundleAdjustmentBase<Scalar_>::linearizeHelperAbsStatic(
     Eigen::aligned_vector<AbsLinData>& ald_vec,
     const std::unordered_map<
-        TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+        TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& obs_to_lin,
     const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error) {
   error = 0;
 
@@ -421,8 +421,8 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperAbsStatic(
 
             std::visit(
                 [&](const auto& cam) {
-                  for (KeypointId kpt_id : obs_kv.second) {
-                    const Keypoint<Scalar>& kpt_pos =
+                  for (LandmarkId kpt_id : obs_kv.second) {
+                    const Landmark<Scalar>& kpt_pos =
                         ba_base->lmdb.getLandmark(kpt_id);
                     const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
 

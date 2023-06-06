@@ -735,7 +735,7 @@ void NfrMapper::setup_opt() {
       if (!pos_3d.array().isFinite().all() || pos_3d[3] <= 0 || pos_3d[3] > 2.0)
         continue;
 
-      Keypoint<Scalar> pos;
+      Landmark<Scalar> pos;
       pos.host_kf_id = tcid_h;
       pos.direction = StereographicParam<double>::project(pos_3d);
       pos.inv_dist = pos_3d[3];

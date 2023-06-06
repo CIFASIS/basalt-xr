@@ -129,6 +129,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       }
       input_ptr->addTime("frames_received");
 
+      // Pop queues from back-end
       while (input_depth_queue.try_pop(depth_guess)) continue;
       if (show_gui) input_ptr->depth_guess = depth_guess;
 
@@ -200,14 +201,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     size_t NUM_CAMS = calib.intrinsics.size();
 
+    // If is the first frame
     if (t_ns < 0) {
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(NUM_CAMS);
+      transforms->keypoints.resize(NUM_CAMS);
       transforms->tracking_guesses.resize(NUM_CAMS);
       transforms->matching_guesses.resize(NUM_CAMS);
-      transforms->descriptors.resize(NUM_CAMS);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
@@ -244,10 +245,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(NUM_CAMS);
+      new_transforms->keypoints.resize(NUM_CAMS);
       new_transforms->tracking_guesses.resize(NUM_CAMS);
       new_transforms->matching_guesses.resize(NUM_CAMS);
-      new_transforms->descriptors.resize(NUM_CAMS);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
@@ -258,8 +258,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         SE3 T_c1_c2 = T_c1.inverse() * T_c2;
         trackPoints(
             old_pyramid->at(i), pyramid->at(i),  //
-            transforms->observations[i], new_transforms->observations[i],
-            transforms->descriptors[i],  new_transforms->descriptors[i],
+            transforms->keypoints[i], new_transforms->keypoints[i],
             new_transforms->tracking_guesses[i],  //
             new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
@@ -281,28 +280,24 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
                    const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-                   const Keypoints& transform_map_1, Keypoints& transform_map_2,
-                   const Descriptors& descriptors_1, Descriptors& descriptors_2,
-                   Keypoints& guesses, const Masks& masks1, const Masks& masks2,
+                   const Keypoints& keypoint_map_1, Keypoints& keypoint_map_2,
+                   Poses& guesses, const Masks& masks1, const Masks& masks2,
                    const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
-    size_t num_points = transform_map_1.size();
+    size_t num_points = keypoint_map_1.size();
 
     std::vector<KeypointId> ids;
-    Eigen::aligned_vector<Eigen::AffineCompact2f> init_vec;
+    Eigen::aligned_vector<Keypoint> init_vec;
 
     ids.reserve(num_points);
     init_vec.reserve(num_points);
 
-    for (const auto& kv : transform_map_1) {
+    for (const auto& kv : keypoint_map_1) {
       ids.push_back(kv.first);
       init_vec.push_back(kv.second);
     }
 
-    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
-                                  std::hash<KeypointId>>
-        result, guesses_tbb;
-    tbb::concurrent_unordered_map<KeypointId, Descriptor>
-        desc_result;
+    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f, std::hash<KeypointId>> guesses_tbb;
+    tbb::concurrent_unordered_map<KeypointId, Keypoint, std::hash<KeypointId>> result;
 
     bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
@@ -315,7 +310,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
 
-        const Eigen::AffineCompact2f& transform_1 = init_vec[r];
+        const Eigen::AffineCompact2f& transform_1 = init_vec[r].pose;
         Eigen::AffineCompact2f transform_2 = transform_1;
 
         auto t1 = transform_1.translation();
@@ -360,11 +355,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         Scalar dist2 = (t1 - t1_recovered).squaredNorm();
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
-          result[id] = transform_2;
-          // TODO: check, this shouldn't be necessary
-          if (descriptors_1.count(id) > 0) {
-            desc_result[id] = descriptors_1.at(id);
-          }
+          result[id].pose = transform_2;
+          result[id].descriptor = init_vec[r].descriptor;
+          result[id].tracked_by_opt_flow = true;
         }
       }
     };
@@ -372,12 +365,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     tbb::blocked_range<size_t> range(0, num_points);
     tbb::parallel_for(range, compute_func);
 
-    transform_map_2.clear();
-    transform_map_2.insert(result.begin(), result.end());
+    keypoint_map_2.clear();
+    keypoint_map_2.insert(result.begin(), result.end());
     guesses.clear();
     guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
-    descriptors_2.clear();
-    descriptors_2.insert(desc_result.begin(), desc_result.end());
   }
 
   inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
@@ -450,8 +441,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
-    for (const auto& kv : transforms->observations.at(cam_id)) {
-      pts.emplace_back(kv.second.translation().cast<double>());
+    for (const auto& kv : transforms->keypoints.at(cam_id)) {
+      pts.emplace_back(kv.second.pose.translation().cast<double>());
     }
 
     KeypointsData kd;  // Detected new points
@@ -465,20 +456,22 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
     // std::vector<bool> success;
     // calib.intrinsics[cam_id].unproject(kd.corners, kd.corners_3d, success);
-    Keypoints new_poses;
+    Keypoints new_kpts;
     for (size_t i = 0; i < kd.corners.size(); i++) {  // Set new points as keypoints
       Eigen::AffineCompact2f transform;
       transform.setIdentity();
+      // Pregunta 1: qué es exactamente AffineCompact2f? cómo llamamos a está variable? pose, transform.. alguna otra idea?
       transform.translation() = kd.corners[i].cast<Scalar>();
 
-      transforms->observations.at(cam_id)[last_keypoint_id] = transform;
-      transforms->descriptors.at(cam_id)[last_keypoint_id] = kd.corner_descriptors[i];
-      new_poses[last_keypoint_id] = transform;
+      transforms->keypoints.at(cam_id)[last_keypoint_id].pose = transform;
+      transforms->keypoints.at(cam_id)[last_keypoint_id].descriptor = kd.corner_descriptors[i];
+      transforms->keypoints.at(cam_id)[last_keypoint_id].tracked_by_opt_flow = false;
+      new_kpts[last_keypoint_id] = transforms->keypoints.at(cam_id)[last_keypoint_id];
 
       last_keypoint_id++;
     }
 
-    return new_poses;
+    return new_kpts;
   }
 
   Masks cam0OverlapCellsMasksForCam(size_t cam_id) {
@@ -521,46 +514,43 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   void addPoints() {
     Masks& ms0 = transforms->input_images->masks.at(0);
-    Keypoints kps0 = addPointsForCamera(0);
+    Keypoints kpts0 = addPointsForCamera(0);
 
     const int NUM_CAMS = calib.intrinsics.size();
     for (int i = 1; i < NUM_CAMS; i++) {
       Masks& ms = transforms->input_images->masks.at(i);
-      Keypoints& mgs = transforms->matching_guesses.at(i);
+      Poses& mgs = transforms->matching_guesses.at(i);
 
       // Match features on areas that overlap with cam0 using optical flow
       auto& pyr0 = pyramid->at(0);
       auto& pyri = pyramid->at(i);
-      Keypoints kps;
-      Descriptors descr0 = transforms->descriptors.at(0);
-      Descriptors descr;
+      Keypoints kpts;
       SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
-      trackPoints(pyr0, pyri, kps0, kps, descr0, descr, mgs, ms0, ms, T_c0_ci, 0, i);
-      transforms->observations.at(i).insert(kps.begin(), kps.end());
-      transforms->descriptors.at(i).insert(descr.begin(), descr.end());
+      trackPoints(pyr0, pyri, kpts0, kpts, mgs, ms0, ms, T_c0_ci, 0, i);
+      transforms->keypoints.at(i).insert(kpts.begin(), kpts.end());
 
       // Update masks and detect features on area not overlapping with cam0
       if (!config.optical_flow_detection_nonoverlap) continue;
       ms += cam0OverlapCellsMasksForCam(i);
-      Keypoints kps_no = addPointsForCamera(i);
+      Keypoints kpts_no = addPointsForCamera(i);
     }
   }
 
   void filterPointsForCam(int cam_id) {
     if (calib.intrinsics.size() < 2) return;
 
-    std::set<KeypointId> lm_to_remove;
+    std::set<KeypointId> kpts_to_remove;
 
-    std::vector<KeypointId> kpid;
+    std::vector<KeypointId> kpts_id;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& kv : transforms->observations.at(cam_id)) {
-      auto it = transforms->observations.at(0).find(kv.first);
+    for (const auto& kv : transforms->keypoints.at(cam_id)) {
+      auto it = transforms->keypoints.at(0).find(kv.first);
 
-      if (it != transforms->observations.at(0).end()) {
-        proj0.emplace_back(it->second.translation());
-        proj1.emplace_back(kv.second.translation());
-        kpid.emplace_back(kv.first);
+      if (it != transforms->keypoints.at(0).end()) {
+        proj0.emplace_back(it->second.pose.translation());
+        proj1.emplace_back(kv.second.pose.translation());
+        kpts_id.emplace_back(kv.first);
       }
     }
 
@@ -576,16 +566,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
             std::abs(p3d0[i].transpose() * E * p3d1[i]);
 
         if (epipolar_error > config.optical_flow_epipolar_error) {
-          lm_to_remove.emplace(kpid[i]);
+          kpts_to_remove.emplace(kpts_id[i]);
         }
       } else {
-        lm_to_remove.emplace(kpid[i]);
+        kpts_to_remove.emplace(kpts_id[i]);
       }
     }
 
-    for (int id : lm_to_remove) {
-      transforms->observations.at(cam_id).erase(id);
-      transforms->descriptors.at(cam_id).erase(id);
+    for (int id : kpts_to_remove) {
+      transforms->keypoints.at(cam_id).erase(id);
     }
   }
 

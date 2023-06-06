@@ -362,7 +362,7 @@ TEST(VioTestSuite, LinearizePointsTest) {
   basalt::ExtendedUnifiedCamera<double> cam =
       basalt::ExtendedUnifiedCamera<double>::getTestProjections()[0];
 
-  basalt::Keypoint<double> kpt_pos;
+  basalt::Landmark<double> kpt_pos;
 
   Eigen::Vector4d point3d;
   cam.unproject(Eigen::Vector2d::Random() * 50, point3d);
@@ -415,7 +415,7 @@ TEST(VioTestSuite, LinearizePointsTest) {
     test_jacobian(
         "d_res_d_p", d_res_d_p,
         [&](const Eigen::Vector3d& x) {
-          basalt::Keypoint kpt_pos_new = kpt_pos;
+          basalt::Landmark kpt_pos_new = kpt_pos;
 
           kpt_pos_new.direction += x.head<2>();
           kpt_pos_new.inv_dist += x[2];

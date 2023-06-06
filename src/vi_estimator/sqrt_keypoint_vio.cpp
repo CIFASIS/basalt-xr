@@ -344,14 +344,14 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   prev_opt_flow_res[opt_flow_meas->t_ns] = opt_flow_meas;
 
   // Make new residual for existing keypoints
-  int NUM_CAMS = opt_flow_meas->observations.size();
+  int NUM_CAMS = opt_flow_meas->keypoints.size();
   std::vector<int> connected(NUM_CAMS, 0);
   std::map<int64_t, int> num_points_connected;
   std::vector<std::unordered_set<int>> unconnected_obs(NUM_CAMS);
   for (int i = 0; i < NUM_CAMS; i++) {
     TimeCamId tcid_target(opt_flow_meas->t_ns, i);
 
-    for (const auto& kv_obs : opt_flow_meas->observations[i]) {
+    for (const auto& kv_obs : opt_flow_meas->keypoints[i]) {
       int kpt_id = kv_obs.first;
 
       if (lmdb.landmarkExists(kpt_id)) {
@@ -359,7 +359,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
         KeypointObservation<Scalar> kobs;
         kobs.kpt_id = kpt_id;
-        kobs.pos = kv_obs.second.translation().cast<Scalar>();
+        // Pregunta 1: qué es exactamente AffineCompact2f? cómo llamamos a está variable? pose, transform.. alguna otra idea?
+        kobs.pos = kv_obs.second.pose.translation().cast<Scalar>();
 
         lmdb.addObservation(tcid_target, kobs);
         // obs[tcid_host][tcid_target].push_back(kobs);
@@ -406,14 +407,14 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
         std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
 
         for (const auto& kv : prev_opt_flow_res) {
-          for (size_t k = 0; k < kv.second->observations.size(); k++) {
-            auto it = kv.second->observations[k].find(lm_id);
-            if (it != kv.second->observations[k].end()) {
+          for (size_t k = 0; k < kv.second->keypoints.size(); k++) {
+            auto it = kv.second->keypoints[k].find(lm_id);
+            if (it != kv.second->keypoints[k].end()) {
               TimeCamId tcido(kv.first, k);
 
               KeypointObservation<Scalar> kobs;
               kobs.kpt_id = lm_id;
-              kobs.pos = it->second.translation().template cast<Scalar>();
+              kobs.pos = it->second.pose.translation().template cast<Scalar>();
 
               // obs[tcidl][tcido].push_back(kobs);
               kp_obs[tcido] = kobs;
@@ -430,15 +431,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
           if (valid_kp) break;
           TimeCamId tcido = kv_obs.first;
 
-          const Vec2 p0 = opt_flow_meas->observations.at(i)
-                              .at(lm_id)
-                              .translation()
-                              .cast<Scalar>();
-          const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]
-                              ->observations[tcido.cam_id]
-                              .at(lm_id)
-                              .translation()
-                              .template cast<Scalar>();
+          const Vec2 p0 = opt_flow_meas->keypoints.at(i).at(lm_id).pose.translation().cast<Scalar>();
+          const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]->keypoints[tcido.cam_id].at(lm_id).pose.translation().template cast<Scalar>();
 
           Vec4 p0_3d, p1_3d;
           bool valid1 = calib.intrinsics[i].unproject(p0, p0_3d);
@@ -459,17 +453,17 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
           if (p0_triangulated.array().isFinite().all() &&
               p0_triangulated[3] > 0 && p0_triangulated[3] < 3.0) {
-            Keypoint<Scalar> kpt_pos;
+            Landmark<Scalar> kpt_pos;
             kpt_pos.host_kf_id = tcidl;
             kpt_pos.direction =
                 StereographicParam<Scalar>::project(p0_triangulated);
             kpt_pos.inv_dist = p0_triangulated[3];
             // TODO: check, this shouldn't be necessary
-            if (opt_flow_meas->descriptors.at(i).count(lm_id) == 0) {
-              std::cout << "WARNING: Descriptor not found for keypoint " << std::endl;
+            if (opt_flow_meas->keypoints.at(i).count(lm_id) == 0) {
+              std::cout << "WARNING: Keypoint not found, we can't save the descriptor on the map." << std::endl;
             }
             else {
-              kpt_pos.descriptor = opt_flow_meas->descriptors.at(i).at(lm_id);
+              kpt_pos.descriptor = opt_flow_meas->keypoints.at(i).at(lm_id).descriptor;
             }
             lmdb.addLandmark(lm_id, kpt_pos);
 
@@ -495,8 +489,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   if (config.vio_marg_lost_landmarks) {
     for (const auto& kv : lmdb.getLandmarks()) {
       bool connected = false;
-      for (size_t i = 0; i < opt_flow_meas->observations.size(); i++) {
-        if (opt_flow_meas->observations[i].count(kv.first) > 0)
+      for (size_t i = 0; i < opt_flow_meas->keypoints.size(); i++) {
+        if (opt_flow_meas->keypoints[i].count(kv.first) > 0)
           connected = true;
       }
       if (!connected) {
@@ -509,7 +503,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
                     lost_landmaks);
 
-  size_t num_cams = opt_flow_meas->observations.size();
+  size_t num_cams = opt_flow_meas->keypoints.size();
   bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
   bool avg_depth_needed =
       opt_flow_depth_guess_queue && config.optical_flow_matching_guess_type ==

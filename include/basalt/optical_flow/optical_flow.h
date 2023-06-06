@@ -55,13 +55,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
-using KeypointId = size_t;
-// TODO: Unify Keypoints + Descriptors
-using Keypoints = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
-using Descriptor = std::bitset<256>;
-using Descriptors = Eigen::aligned_map<KeypointId, Descriptor>;
 using xrt::auxiliary::tracking::slam::timestats;
 
+// Front-end representation of keypoints
+struct Keypoint {
+  // Pregunta 1: qué es exactamente AffineCompact2f? cómo llamamos a está variable? pose, transform.. alguna otra idea?
+  Eigen::AffineCompact2f pose;
+  std::bitset<256> descriptor;
+  bool tracked_by_opt_flow;
+};
+
+using KeypointId = size_t;
+using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
+// Pregunta 1: qué es exactamente AffineCompact2f? cómo llamamos a está variable? pose, transform.. alguna otra idea?
+using Poses = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
+
+// RENAME: KeypointTrackingInput
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
   using Vec3 = Eigen::Matrix<double, 3, 1>;
@@ -87,15 +96,15 @@ struct OpticalFlowInput {
   }
 };
 
+// RENAME: KeypointTrackingResult
 struct OpticalFlowResult {
   using Ptr = std::shared_ptr<OpticalFlowResult>;
 
   int64_t t_ns;
-  // TODO: Unify obs + desc in same struct
-  std::vector<Keypoints> observations;
-  std::vector<Descriptors> descriptors;
-  std::vector<Keypoints> tracking_guesses;
-  std::vector<Keypoints> matching_guesses;
+  std::vector<Keypoints> keypoints;
+
+  std::vector<Poses> tracking_guesses;
+  std::vector<Poses> matching_guesses;
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 

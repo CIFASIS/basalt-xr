@@ -39,23 +39,23 @@ void KeypointMatching::initialize() {
  */
 void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
 
-  int NUM_CAMS = curr_frame->observations.size();
+  int NUM_CAMS = curr_frame->keypoints.size();
   for (int i=0; i < NUM_CAMS; i++) {
-    std::vector<Descriptor> descr1;
     std::vector<KeypointId> kp1;
-    std::vector<Descriptor> descr2;
     std::vector<KeypointId> kp2;
+    std::vector<Descriptor> descr1;
+    std::vector<Descriptor> descr2;
 
     // TODO: filter points already matched by optical flow
-    for (const auto& ds : curr_frame->descriptors.at(i)) {
-      kp1.push_back(ds.first);
-      descr1.push_back(ds.second);
+    for (const auto& [kpt_id, kpt] : curr_frame->keypoints.at(i)) {
+      kp1.push_back(kpt_id);
+      descr1.push_back(kpt.descriptor);
     }
 
     // TODO: filter points already matched by optical flow
-    for (const auto& kv : lmdb.getLandmarks()) {
-      kp2.push_back(kv.first);
-      descr2.push_back(kv.second.descriptor);
+    for (const auto& [kpt_id, kpt] : lmdb.getLandmarks()) {
+      kp2.push_back(kpt_id);
+      descr2.push_back(kpt.descriptor);
     }
 
     std::vector<std::pair<int, int>> matches;
@@ -71,13 +71,10 @@ void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
       // TODO: if we filter the klf matches this shouldn't be necessary
       if (new_kp_id != kp_id) {
         // TODO: check if this is necessary
-        if (curr_frame->observations.at(i).count(kp_id) == 0 || curr_frame->observations.at(i).count(new_kp_id) > 0) {
-          continue;
-        }
-        curr_frame->observations.at(i)[new_kp_id] = curr_frame->observations.at(i).at(kp_id);
-        curr_frame->descriptors.at(i)[new_kp_id] = curr_frame->descriptors.at(i).at(kp_id);
-        curr_frame->observations.at(i).erase(kp_id);
-        curr_frame->descriptors.at(i).erase(kp_id);
+        if (curr_frame->keypoints.at(i).count(kp_id) == 0 || curr_frame->keypoints.at(i).count(new_kp_id) > 0) continue;
+
+        curr_frame->keypoints.at(i)[new_kp_id] = curr_frame->keypoints.at(i).at(kp_id);
+        curr_frame->keypoints.at(i).erase(kp_id);
         num_matches++;
       }
     }

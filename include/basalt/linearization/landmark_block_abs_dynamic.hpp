@@ -34,7 +34,7 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
       Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   virtual inline void allocateLandmark(
-      Keypoint<Scalar>& lm,
+      Landmark<Scalar>& lm,
       const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>,
                                          RelPoseLin<Scalar>>& relative_pose_lin,
       const Calibration<Scalar>& calib, const AbsOrderMap& aom,
@@ -575,7 +575,7 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
 
   State state = State::Uninitialized;
 
-  Keypoint<Scalar>* lm_ptr = nullptr;
+  Landmark<Scalar>* lm_ptr = nullptr;
   const Calibration<Scalar>* calib_ = nullptr;
   const AbsOrderMap* aom_ = nullptr;
 
