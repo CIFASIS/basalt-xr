@@ -57,8 +57,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/calibration/calibration.hpp>
 
 #include <basalt/optical_flow/optical_flow.h>
+// TODO: cambiar de carpeta
+#include <basalt/vi_estimator/keypoint_matching.h>
 
 #include <basalt/serialization/headers_serialization.h>
+#include <basalt/utils/vis_utils.h>
+
+#include <basalt/vi_estimator/landmark_database.h>
 
 constexpr int UI_WIDTH = 200;
 
@@ -68,7 +73,9 @@ bool next_step();
 bool prev_step();
 
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
-pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
+pangolin::Var<bool> show_kpts("ui.show_kpts", true, false, true);
+pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_matches("ui.show_matches", false, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 
 using Button = pangolin::Var<std::function<void(void)>>;
@@ -81,16 +88,31 @@ basalt::VioDatasetPtr vio_dataset;
 
 basalt::VioConfig vio_config;
 basalt::OpticalFlowBase::Ptr opt_flow_ptr;
+basalt::KeypointMatching::Ptr match_kpts;
 
-tbb::concurrent_unordered_map<int64_t, basalt::OpticalFlowResult::Ptr,
-                              std::hash<int64_t>>
-    observations;
-tbb::concurrent_bounded_queue<basalt::OpticalFlowResult::Ptr>
-    observations_queue;
+// Pregunta 2: observations es el resultado de la detección del front-end, cómo lo llamamos?
+tbb::concurrent_unordered_map<int64_t, basalt::OpticalFlowResult::Ptr, std::hash<int64_t>> keypoints;
+tbb::concurrent_bounded_queue<basalt::OpticalFlowResult::Ptr> keypoints_queue;
 
 basalt::Calibration<double> calib;
 
 std::unordered_map<basalt::KeypointId, int> keypoint_stats;
+
+int total_opt_flow = 0, total_matches = 0;
+
+basalt::LandmarkDatabase<float>& lmdb = basalt::LandmarkDatabase<float>::getInstance();
+
+
+void add_landmarks(basalt::OpticalFlowResult::Ptr res) {
+  for (size_t cam_id = 0; cam_id < calib.intrinsics.size(); cam_id++) {
+    const basalt::Keypoints& kp_map = res->keypoints[cam_id];
+    for (const auto& [kp_id, kpt] : kp_map) {
+      basalt::Landmark<float> kpt_pos;
+      kpt_pos.descriptor = kpt.descriptor;
+      lmdb.addLandmark(kp_id, kpt_pos);
+    }
+  }
+}
 
 void feed_images() {
   std::cout << "Started input_data thread " << std::endl;
@@ -118,12 +140,14 @@ void read_result() {
   basalt::OpticalFlowResult::Ptr res;
 
   while (true) {
-    observations_queue.pop(res);
+    keypoints_queue.pop(res);
     if (!res.get()) break;
+
+    add_landmarks(res);
 
     res->input_images.reset();
 
-    observations.emplace(res->t_ns, res);
+    keypoints.emplace(res->t_ns, res);
 
     for (size_t i = 0; i < res->keypoints.size(); i++)
       for (const auto& kv : res->keypoints.at(i)) {
@@ -145,6 +169,8 @@ void read_result() {
 
   std::cout << "Mean track length: " << sum / keypoint_stats.size()
             << " num_points: " << keypoint_stats.size() << std::endl;
+  std::cout << "Total Keypoints tracked by opt flow: " << total_opt_flow << std::endl;
+  std::cout << "Total Keypoints tracked by matching: " << total_matches << std::endl;
 }
 
 int main(int argc, char** argv) {
@@ -196,8 +222,18 @@ int main(int argc, char** argv) {
 
     opt_flow_ptr =
         basalt::OpticalFlowFactory::getOpticalFlow(vio_config, calib);
-    if (show_gui) opt_flow_ptr->output_queue = &observations_queue;
-    observations_queue.set_capacity(100);
+
+    // Initialize matching keypoints process
+    {
+      match_kpts.reset(new basalt::KeypointMatching(vio_config));
+      match_kpts->initialize();
+
+      // Match OpticalFlowResult with matching keypoints input queue
+      opt_flow_ptr->output_queue = &match_kpts->input_matching_queue;
+    }
+
+    if (show_gui) match_kpts->output_matching_queue = &keypoints_queue;
+    keypoints_queue.set_capacity(100);
 
     keypoint_stats.reserve(50000);
   }
@@ -287,34 +323,64 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
   size_t frame_id = static_cast<size_t>(show_frame);
   int64_t t_ns = vio_dataset->get_image_timestamps()[frame_id];
 
-  if (show_obs) {
+  int opt_flow = 0, matches = 0;
+
+  if (show_kpts) {
     glLineWidth(1.0);
     glColor3f(1.0, 0.0, 0.0);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (observations.count(t_ns) > 0) {
-      const basalt::Keypoints& kp_map = observations.at(t_ns)->keypoints[cam_id];
+    if (keypoints.count(t_ns) > 0) {
+      const basalt::Keypoints& kp_map = keypoints.at(t_ns)->keypoints[cam_id];
+      double radius = 5;
+      float t = 0.25;
+      for (const auto& [kp_id, kpt] : kp_map) {
+        // Show keypoints
+        const Eigen::Vector2f c = kpt.pose.translation();
+        auto [r, g, b] = color_lerp(t);
+        glColor4f(r, g, b, 1);
+        pangolin::glDrawCross(c[0], c[1], radius);
+        if (kpt.detected_by_opt_flow) {
+          opt_flow ++;
+          if (show_flow) {
+            // Show optical flow patch
+            glColor3f(0.0, 1.0, 0.0);
+            Eigen::MatrixXf transformed_patch =
+                kpt.pose.linear() * opt_flow_ptr->patch_coord;
+            transformed_patch.colwise() += kpt.pose.translation();
 
-      for (const auto& kv : kp_map) {
-        Eigen::MatrixXf transformed_patch =
-            kv.second.pose.linear() * opt_flow_ptr->patch_coord;
-        transformed_patch.colwise() += kv.second.pose.translation();
-
-        for (int i = 0; i < transformed_patch.cols(); i++) {
-          const Eigen::Vector2f c = transformed_patch.col(i);
-          pangolin::glDrawCirclePerimeter(c[0], c[1], 0.5f);
+            for (int i = 0; i < transformed_patch.cols(); i++) {
+              const Eigen::Vector2f p = transformed_patch.col(i);
+              pangolin::glDrawCirclePerimeter(p[0], p[1], 0.5f);
+            }
+          }
+        }
+        if (kpt.detected_by_matching) {
+          matches++;
+          if (show_matches) {
+            // Show matched keypoints
+            glColor3f(1.0, 0.0, 0.0);
+            pangolin::glDrawCircle(c[0], c[1], radius);
+          }
         }
 
-        const Eigen::Vector2f c = kv.second.pose.translation();
-
         if (show_ids)
-          pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
+          pangolin::GlFont::I().Text("%d", kp_id).Draw(5 + c[0], 5 + c[1]);
       }
+      total_opt_flow += opt_flow;
+      total_matches += matches;
 
+      glColor3f(1.0, 0.0, 0.0);
       pangolin::GlFont::I()
           .Text("Tracked %d keypoints", kp_map.size())
           .Draw(5, 20);
+      pangolin::GlFont::I()
+          .Text("Tracked %d by opt flor", opt_flow)
+          .Draw(5, 40);
+      pangolin::GlFont::I()
+          .Text("Tracked %d by keypoint matching", matches)
+          .Draw(5, 60);
     }
   }
 }

@@ -48,8 +48,10 @@ void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
 
     // TODO: filter points already matched by optical flow
     for (const auto& [kpt_id, kpt] : curr_frame->keypoints.at(i)) {
-      kp1.push_back(kpt_id);
-      descr1.push_back(kpt.descriptor);
+      if (!kpt.detected_by_opt_flow){
+        kp1.push_back(kpt_id);
+        descr1.push_back(kpt.descriptor);
+      }
     }
 
     // TODO: filter points already matched by optical flow
@@ -74,6 +76,7 @@ void KeypointMatching::match_keypoints(OpticalFlowResult::Ptr curr_frame) {
         if (curr_frame->keypoints.at(i).count(kp_id) == 0 || curr_frame->keypoints.at(i).count(new_kp_id) > 0) continue;
 
         curr_frame->keypoints.at(i)[new_kp_id] = curr_frame->keypoints.at(i).at(kp_id);
+        curr_frame->keypoints.at(i)[new_kp_id].detected_by_matching = true;
         curr_frame->keypoints.at(i).erase(kp_id);
         num_matches++;
       }

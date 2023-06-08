@@ -62,7 +62,8 @@ struct Keypoint {
   // Pregunta 1: qué es exactamente AffineCompact2f? cómo llamamos a está variable? pose, transform.. alguna otra idea?
   Eigen::AffineCompact2f pose;
   std::bitset<256> descriptor;
-  bool tracked_by_opt_flow;
+  bool detected_by_opt_flow = false;
+  bool detected_by_matching = false;
 };
 
 using KeypointId = size_t;

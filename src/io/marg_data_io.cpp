@@ -204,7 +204,7 @@ template <class Archive>
 void serialize(Archive& ar, basalt::Keypoint& m) {
   ar(m.pose);
   ar(m.descriptor);
-  ar(m.tracked_by_opt_flow);
+  ar(m.detected_by_opt_flow);
 }
 
 template <class Archive>

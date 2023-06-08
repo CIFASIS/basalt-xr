@@ -276,7 +276,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
         if (dist2 < config.optical_flow_max_recovered_dist2) {
           result[id].pose = transform_2;
           result[id].descriptor = init_vec[r].descriptor;
-          result[id].tracked_by_opt_flow = true;
+          result[id].detected_by_opt_flow = true;
           result_pyramid_level[id] = pyramid_level[r];
         }
       }
@@ -416,7 +416,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
         transforms->keypoints.at(0)[last_keypoint_id].pose = transform;
         transforms->keypoints.at(0)[last_keypoint_id].descriptor = kd.corner_descriptors[i];
-        transforms->keypoints.at(0)[last_keypoint_id].tracked_by_opt_flow = false;
+        transforms->keypoints.at(0)[last_keypoint_id].detected_by_opt_flow = false;
         transforms->pyramid_levels.at(0)[last_keypoint_id] = level;
 
         new_kpts_main[last_keypoint_id] = transforms->keypoints.at(0)[last_keypoint_id];
