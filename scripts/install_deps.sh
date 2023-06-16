@@ -12,12 +12,12 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
-${DIR}/install_mac_os_deps.sh
+	brew install boost opencv cmake pkgconfig lz4 clang-format tbb glew eigen ccache lz4 fmt llvm
 else
 	DISTRO=$( awk -F= '/^ID/{print $2}' /etc/os-release )
 	if [ "$DISTRO" == "fedora" ]; then
-		${DIR}/install_fedora_deps.sh
+		sudo dnf install -y gcc g++ cmake ninja-build git tbb-devel eigen3-devel glew-devel ccache libjpeg-turbo-devel libpng-devel lz4-devel bzip2-devel boost-regex boost-filesystem boost-date-time boost-program-options gtest-devel opencv-devel
 	else
-		${DIR}/install_ubuntu_deps.sh
+		sudo apt-get install -y gcc g++ cmake ninja-build git libtbb-dev libeigen3-dev libglew-dev ccache libjpeg-dev libpng-dev liblz4-dev libbz2-dev libboost-regex-dev libboost-filesystem-dev libboost-date-time-dev libboost-program-options-dev libgtest-dev libopencv-dev libfmt-dev
 	fi
 fi

@@ -14,9 +14,9 @@ build-ubuntu-2204:
   when: manual
   script:
     - echo BUILD_UBUNTU_2204_JOB_ID=$CI_JOB_ID >> release.env
-    - cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=off -DBASALT_INSTANTIATIONS_DOUBLE=off -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DCMAKE_CXX_FLAGS="-mtune=haswell -march=haswell" -DCMAKE_C_FLAGS="-mtune=haswell -march=haswell"
-    - cmake --build build -- -j12
-    - cd build && make package
+    - cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBASALT_BUILD_SHARED_LIBRARY_ONLY=on -DCMAKE_CXX_FLAGS="-mtune=haswell -march=haswell" -DCMAKE_C_FLAGS="-mtune=haswell -march=haswell"
+    - time cmake --build build
+    - cd build && cpack
     - mv *.deb ../basalt-monado-ubuntu-22.04-haswell-amd64.deb
   artifacts:
     name: basalt-monado-ubuntu-22.04-haswell-amd64
@@ -33,7 +33,7 @@ release:
   script:
     - echo "Releasing artifacts of previous jobs"
     - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
-    - sudo chmod +x /usr/local/bin/release-cli
+    - chmod +x /usr/local/bin/release-cli
   needs: ["build-ubuntu-2204"]
   release:
     name: "Release of $CI_COMMIT_SHORT_SHA"

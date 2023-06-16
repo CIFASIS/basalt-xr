@@ -71,7 +71,7 @@ git clone --recursive https://gitlab.freedesktop.org/mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
 sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=off -DBASALT_INSTANTIATIONS_DOUBLE=off
+cmake .. -G Ninja -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBASALT_BUILD_SHARED_LIBRARY_ONLY=on
 make install -j12
 ```
 

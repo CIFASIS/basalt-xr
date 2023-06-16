@@ -33,9 +33,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <basalt/utils/build_config.h>
+
 #include <basalt/calibration/calibration_helper.h>
 
+#ifndef BASALT_BUILD_SHARED_LIBRARY_ONLYq
 #include <basalt/utils/apriltag.h>
+#endif
 
 #include <tbb/parallel_for.h>
 
@@ -105,6 +109,8 @@ bool estimateTransformation(
   return ransac.inliers_.size() > 8;
 }
 
+// Disabled to remove apriltag dependency for faster build times
+#ifndef BASALT_BUILD_SHARED_LIBRARY_ONLY
 void CalibHelper::detectCorners(const VioDatasetPtr &vio_data,
                                 const AprilGrid &april_grid,
                                 CalibCornerMap &calib_corners,
@@ -148,6 +154,7 @@ void CalibHelper::detectCorners(const VioDatasetPtr &vio_data,
         }
       });
 }
+#endif
 
 void CalibHelper::initCamPoses(
     const Calibration<double>::Ptr &calib,

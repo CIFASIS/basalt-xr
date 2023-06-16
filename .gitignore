@@ -3,7 +3,7 @@ cmake-build*
 .vscode
 .idea
 CMakeLists.txt.user
-build*
+build*/
 scripts/eval/eval_*
 scripts/eval_full/eval_*
 stats_*.*json

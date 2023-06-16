@@ -78,6 +78,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 # Flags used for CHECK_CXX_SOURCE_COMPILES
@@ -229,6 +230,16 @@ set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -DEIGEN_DONT_PARALLELIZE")
 # Disabling them can be useful for better compile times during development.
 option(BASALT_INSTANTIATIONS_DOUBLE "Instatiate templates for Scalar=double." ON)
 option(BASALT_INSTANTIATIONS_FLOAT "Instatiate templates for Scalar=float." ON)
+option(BASALT_BUILD_SHARED_LIBRARY_ONLY "Build only Basalt shared library" OFF)
+
+if (BASALT_BUILD_SHARED_LIBRARY_ONLY)
+  if (NOT DEFINED BASALT_INSTANTIATIONS_DOUBLE)
+    set(BASALT_INSTANTIATIONS_DOUBLE ON)
+  endif()
+  if (NOT DEFINED BUILD_TESTS)
+    set(BUILD_TESTS OFF)
+  endif()
+endif()
 
 if(BASALT_INSTANTIATIONS_DOUBLE)
   list(APPEND BASALT_COMPILE_DEFINITIONS BASALT_INSTANTIATIONS_DOUBLE)
@@ -286,24 +297,18 @@ set_property(TARGET basalt::magic_enum PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${
 # main library
 add_library(basalt_internal STATIC)
 
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/build_config.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/basalt/utils/build_config.h
+)
+target_include_directories(basalt_internal PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
 # List all header and source files with target_sources.
 # This ensures, e.g., that QtCreator >= 6.0 properly recognize these headers to belong to the project.
 # To support cmake < 3.13, use absolute paths (see: https://crascit.com/2016/01/31/enhanced-source-file-handling-with-target_sources/)
 target_sources(basalt_internal
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/aprilgrid.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/calibration_helper.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/cam_calib.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/cam_imu_calib.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/vignette.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/device/rs_t265.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/hash_bow/hash_bow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_euroc.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_kitti.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_rosbag.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_uzh.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/marg_data_io.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/linearization/block_diagonal.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/linearization/imu_block.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/linearization/landmark_block.hpp
@@ -343,17 +348,12 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/ba_base.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/landmark_database.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/marg_helper.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/nfr_mapper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sc_ba_base.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sqrt_ba_base.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sqrt_keypoint_vio.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sqrt_keypoint_vo.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/vio_estimator.h
   PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/aprilgrid.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/calibraiton_helper.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/vignette.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/dataset_io.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/marg_data_io.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/landmark_block.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/linearization_abs_qr.cpp
@@ -368,7 +368,6 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/ba_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/landmark_database.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/marg_helper.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/nfr_mapper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/sc_ba_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/sqrt_ba_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/sqrt_keypoint_vio.cpp
@@ -378,14 +377,43 @@ target_sources(basalt_internal
 
 target_link_libraries(basalt_internal
   PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado
-  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt)
+  PRIVATE basalt::magic_enum nlohmann::json fmt::fmt)
 target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
 #target_compile_definitions(basalt_internal PUBLIC BASALT_DISABLE_ASSERTS)
 
+if (NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
+target_sources(basalt_internal
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/aprilgrid.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/calibration_helper.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/cam_calib.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/cam_imu_calib.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/vignette.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/device/rs_t265.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_euroc.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_kitti.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_rosbag.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_uzh.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/marg_data_io.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/nfr_mapper.h
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/aprilgrid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/calibraiton_helper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/calibration/vignette.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/dataset_io.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/nfr_mapper.cpp
+)
+target_link_libraries(basalt_internal PRIVATE rosbag apriltag opengv)
+
+endif()
+
 add_library(basalt SHARED)
 target_sources(basalt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/monado/slam_tracker.cpp)
 target_link_libraries(basalt basalt_internal)
+
+if(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
 
 add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
 target_link_libraries(basalt_calibrate basalt_internal pangolin basalt::cli11)
@@ -431,9 +459,9 @@ if(realsense2_FOUND)
   target_link_libraries(basalt_rs_t265_vio basalt_internal realsense2::realsense2 pangolin basalt::cli11)
 endif()
 
-# Let's export only the slam_tracker.hpp functions for libORB_SLAM3.so,
-# But will let a libORB_SLAM3_EXAMPLES.so for the regular ORB-SLAM3 examples to use
-# if the user builds with -DBUILD_EXAMPLES=On
+endif(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
+
+# Let's export only the slam_tracker.hpp functions for libbasalt.so,
 set_target_properties(${PROJECT_NAME} PROPERTIES
   C_VISIBILITY_PRESET hidden
   CXX_VISIBILITY_PRESET hidden
@@ -442,15 +470,23 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map"
 )
 
+if(BASALT_BUILD_SHARED_LIBRARY_ONLY)
+  install(TARGETS basalt
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+  set(CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_config.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_ds_calib.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/monado/euroc.toml")
+  install(FILES ${CONFIG_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
+
+else()
+
 install(TARGETS basalt basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment
-  EXPORT BasaltTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
   ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 
 if(BASALT_INSTANTIATIONS_DOUBLE)
   install(TARGETS basalt_mapper_sim_naive
-    EXPORT BasaltTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
@@ -458,7 +494,6 @@ endif()
 
 if(realsense2_FOUND)
     install(TARGETS basalt_rs_t265_record basalt_rs_t265_vio
-      EXPORT BasaltTargets
       RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
       LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
       ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
@@ -470,6 +505,8 @@ install(PROGRAMS ${SCRIPTS_TO_INSTALL} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/*.json")
 install(FILES ${CONFIG_FILES}
   DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
+
+endif(BASALT_BUILD_SHARED_LIBRARY_ONLY)
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.pc.in
