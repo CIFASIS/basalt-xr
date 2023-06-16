@@ -1,7 +1,6 @@
 # Installation from source
 
-Please open an issue if these steps don't work for you. The main branch of this fork is
-[`xrtslam`](https://gitlab.freedesktop.org/mateosss/basalt/-/tree/xrtslam).
+Please open an issue if these steps don't work for you.
 
 ## Build and Install Directories
 

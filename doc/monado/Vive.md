@@ -44,8 +44,8 @@ The general calibration procedure is as follows:
       faster motions that excite all IMU axes, see these examples:
     - calib-imu1 from TUM-VI https://vision.in.tum.de/data/datasets/visual-inertial-dataset
     - Or this from ORB-SLAM3 https://www.youtube.com/watch?v=4XkivVLw5k4
-4. Now run camera calibration as explained [here](https://gitlab.freedesktop.org/mateosss/basalt/-/blob/xrtslam/doc/Calibration.md#camera-calibration)
-5. Then camera+imu (no mocap) calibration as explained [here](https://gitlab.freedesktop.org/mateosss/basalt/-/blob/xrtslam/doc/Calibration.md#camera-imu-mocap-calibration)
+4. Now run camera calibration as explained [here](https://gitlab.freedesktop.org/mateosss/basalt/-/blob/main/doc/Calibration.md#camera-calibration)
+5. Then camera+imu (no mocap) calibration as explained [here](https://gitlab.freedesktop.org/mateosss/basalt/-/blob/main/doc/Calibration.md#camera-imu-mocap-calibration)
 6. If the datasets are not good, the calibration will likely not be very good as
    well. If you want to be sure you calibrated things properly, a good idea is
    to repeat this process until you get similar results.
