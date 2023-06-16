@@ -94,6 +94,17 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                     
 set(CMAKE_CXX_FLAGS_CIDEBUG  "-O0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          # CI version with no debug symbols
 set(CMAKE_CXX_FLAGS_CIRELWITHDEBINFO "-O3 -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # CI version with no debug symbols
 
+# Limit number of jobs.
+# As of now, Basalt compilation requires >16gb if you want to use >6 jobs.
+execute_process(
+  COMMAND bash -c "grep -m1 -oP 'MemAvailable:\\s+\\K[0-9]+' /proc/meminfo"
+  OUTPUT_VARIABLE TOTAL_MEMORY
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if (TOTAL_MEMORY LESS 16000000)
+  set(CMAKE_BUILD_PARALLEL_LEVEL 6 CACHE STRING "Number of parallel build processes")
+endif()
+
 # base set of compile flags
 set(BASALT_CXX_FLAGS "-Wall -Wextra -Wno-error=unused-parameter -ftemplate-backtrace-limit=0")
 
@@ -475,8 +486,8 @@ if(BASALT_BUILD_SHARED_LIBRARY_ONLY)
     RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-  set(CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_config.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_ds_calib.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/monado/euroc.toml")
-  install(FILES ${CONFIG_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
+  set(CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_config.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_ds_calib.json")
+  set(UNIFIED_CONFIG_FILES euroc.toml)
 
 else()
 
@@ -503,10 +514,26 @@ file(GLOB SCRIPTS_TO_INSTALL "${CMAKE_CURRENT_SOURCE_DIR}/scripts/basalt_*.py")
 install(PROGRAMS ${SCRIPTS_TO_INSTALL} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
 file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/*.json")
-install(FILES ${CONFIG_FILES}
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
+file(GLOB ABSOLUTE_UNIFIED_CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/monado/*.toml.in")
+foreach(full_path IN LISTS ABSOLUTE_UNIFIED_CONFIG_FILES)
+  get_filename_component(file_name "${full_path}" NAME_WE)
+  list(APPEND UNIFIED_CONFIG_FILES ${file_name}.toml)
+endforeach()
 
 endif(BASALT_BUILD_SHARED_LIBRARY_ONLY)
+
+# Configure and install unified config toml files
+set(CONFIG_FILE_INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt) # Used for unified_config.in
+foreach(unified_config IN LISTS UNIFIED_CONFIG_FILES)
+  configure_file(
+    ${CMAKE_CURRENT_LIST_DIR}/data/monado/${unified_config}.in
+    ${CMAKE_CURRENT_BINARY_DIR}/data/monado/${unified_config}
+    @ONLY
+    )
+  list(APPEND CONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/data/monado/${unified_config})
+endforeach()
+
+install(FILES ${CONFIG_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.pc.in
