@@ -7,7 +7,15 @@ to the Basalt authors.
 Follow this file for instructions on how to get Basalt up and running with
 Monado. **Read the instructions carefully**.
 
-## Installation
+## Installation for Ubuntu 22.04
+
+Download the .deb file from the [latest release](https://gitlab.freedesktop.org/mateosss/basalt/-/releases?latest) and then run
+
+```bash
+sudo apt install -y ./basalt-monado-ubuntu-22.04-haswell-amd64.deb
+```
+
+## Installation from source
 
 This was tested on Ubuntu LTS derivatives from 18.04 and on, be sure to open an
 issue if the steps don't work for you. The main branch of this fork is
@@ -67,7 +75,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -
 make install -j12
 ```
 
-### After building Basalt
+## After installing Basalt
 
 You can now rebuild Monado so that it finds Basalt and then run any OpenXR app.
 
@@ -77,7 +85,7 @@ You might want to set the environment variables `XRT_DEBUG_GUI=1` and
 For most drivers, you don't need to do much. See the next section for optional
 info for your driver.
 
-### Drivers
+## Drivers
 
 Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Most
 of them should work without any user input.
@@ -88,7 +96,7 @@ of them should work without any user input.
 - Vive Driver (Valve Index) ([read before using](doc/monado/Vive.md))
 - RealSense Driver ([setup](doc/monado/Realsense.md))
 
-## Developing Basalt
+## Basalt Development
 
 ### Trying Basalt without Monado
 

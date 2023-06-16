@@ -25,16 +25,7 @@ if(LSB_RELEASE_PROGRAM)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   if(${LSB_RELEASE_ID_SHORT} EQUAL "22.04")
-    set(DEBIAN_DEPENDS "libtbb12, liblz4-1, libbz2-1.0, libboost-filesystem1.74.0, libboost-date-time1.74.0, libboost-program-options1.74.0, libboost-regex1.74.0, libopencv-dev, libglew2.2, libjpeg8, libpng16-16, librealsense2, librealsense2-dkms, librealsense2-gl, librealsense2-utils")
-
-  elseif(${LSB_RELEASE_ID_SHORT} EQUAL "20.04")
-    set(DEBIAN_DEPENDS "libtbb2, liblz4-1, libbz2-1.0, libboost-filesystem1.71.0, libboost-date-time1.71.0, libboost-program-options1.71.0, libboost-regex1.71.0, libopencv-dev, libglew2.1, libjpeg8, libpng16-16, librealsense2, librealsense2-dkms, librealsense2-gl, librealsense2-utils")
-
-  elseif(${LSB_RELEASE_ID_SHORT} EQUAL "18.04")
-    set(DEBIAN_DEPENDS "libtbb2, liblz4-1, libbz2-1.0, libboost-filesystem1.65.1, libboost-date-time1.65.1, libboost-program-options1.65.1, libboost-regex1.65.1, libopencv-dev, libglew2.0, libjpeg8, libpng16-16, librealsense2, librealsense2-dkms, librealsense2-gl, librealsense2-utils")
-
-  elseif(${LSB_RELEASE_ID_SHORT} EQUAL "16.04")
-    set(DEBIAN_DEPENDS "libtbb2, liblz4-1, libbz2-1.0, libboost-filesystem1.58.0, libboost-date-time1.58.0, libboost-program-options1.58.0, libboost-regex1.58.0, libopencv-dev, libglew1.13, libjpeg8, libpng12-0, libstdc++6, librealsense2, librealsense2-dkms, librealsense2-gl, librealsense2-utils")
+    set(DEBIAN_DEPENDS "libtbb12, liblz4-1, libbz2-1.0, libboost-filesystem1.74.0, libboost-date-time1.74.0, libboost-program-options1.74.0, libboost-regex1.74.0, libopencv-dev, libglew2.2, libjpeg8, libpng16-16, libuvc0, libfmt8")
   endif()
 
 endif(LSB_RELEASE_PROGRAM)
@@ -190,14 +181,8 @@ elseif(UNIX)
 
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(STATUS "Detected Linux with clang.")
-
-    # Note: Whatever the issue was, this seems to not be an issue any more, at least with more recent clang and Ubuntu versions (tested clang-12 and Ubuntu 18.04)
-    #message(WARNING "Clang on Linux is currently not fully supported. You'll likely need to get a recent version of TBB.")
-    #set(LINUX_CLANG 1)
-
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "Detected Linux with gcc.")
-
   else()
     message(WARNING "Detected Linux with unsupported compiler ${CMAKE_CXX_COMPILER_ID}")
   endif()
