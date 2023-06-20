@@ -523,8 +523,7 @@ struct LinearizeSplineOpt : public LinearizeBase<Scalar> {
       Vector6 residual = Sophus::se3_logd(T_mark_moc_meas * T_moc_mark);
 
       // TODO: check derivatives
-      Matrix6 d_res_d_T_i_mark;
-      Sophus::rightJacobianInvSE3Decoupled(residual, d_res_d_T_i_mark);
+      Matrix6 d_res_d_T_i_mark = Sophus::rightJacobianInvSE3Decoupled(residual);
       Matrix6 d_res_d_T_w_i = d_res_d_T_i_mark * T_i_mark.inverse().Adj();
       Matrix6 d_res_d_T_moc_w =
           d_res_d_T_i_mark * (T_w_i * T_i_mark).inverse().Adj();

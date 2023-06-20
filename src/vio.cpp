@@ -812,7 +812,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
         float default_depth = vio_config.optical_flow_matching_default_depth;
         double avg_depth = valid ? num_features / avg_invdepth : default_depth;
 
-        for (const Vector4d kp1 : keypoints1) {
+        for (const Vector4d& kp1 : keypoints1) {
           double u1 = kp1.x();
           double v1 = kp1.y();
           // double invdist1 = kp1.z();

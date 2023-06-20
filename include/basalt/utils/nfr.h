@@ -48,8 +48,7 @@ inline Sophus::Vector6d relPoseError(
   Sophus::Vector6d res = Sophus::se3_logd(T_i_j * T_j_i);
 
   if (d_res_d_T_w_i || d_res_d_T_w_j) {
-    Sophus::Matrix6d J;
-    Sophus::rightJacobianInvSE3Decoupled(res, J);
+    Sophus::Matrix6d J = Sophus::rightJacobianInvSE3Decoupled(res);
 
     Eigen::Matrix3d R = T_w_i.so3().inverse().matrix();
 
