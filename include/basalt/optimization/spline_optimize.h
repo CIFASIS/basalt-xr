@@ -54,8 +54,7 @@ namespace basalt {
 template <int N, typename Scalar>
 class SplineOptimization {
  public:
-  typedef LinearizeSplineOpt<N, Scalar, SparseHashAccumulator<Scalar>>
-      LinearizeT;
+  typedef LinearizeSplineOpt<N, Scalar, SparseHashAccumulator<Scalar>> LinearizeT;
 
   typedef typename LinearizeT::SE3 SE3;
   typedef typename LinearizeT::Vector2 Vector2;
@@ -111,23 +110,15 @@ class SplineOptimization {
   }
 
   int64_t getCamTimeOffsetNs() const { return calib->cam_time_offset_ns; }
-  int64_t getMocapTimeOffsetNs() const {
-    return mocap_calib->mocap_time_offset_ns;
-  }
+  int64_t getMocapTimeOffsetNs() const { return mocap_calib->mocap_time_offset_ns; }
 
   const SE3& getCamT_i_c(size_t i) const { return calib->T_i_c[i]; }
   SE3& getCamT_i_c(size_t i) { return calib->T_i_c[i]; }
 
-  VectorX getIntrinsics(size_t i) const {
-    return calib->intrinsics[i].getParam();
-  }
+  VectorX getIntrinsics(size_t i) const { return calib->intrinsics[i].getParam(); }
 
-  const CalibAccelBias<Scalar>& getAccelBias() const {
-    return calib->calib_accel_bias;
-  }
-  const CalibGyroBias<Scalar>& getGyroBias() const {
-    return calib->calib_gyro_bias;
-  }
+  const CalibAccelBias<Scalar>& getAccelBias() const { return calib->calib_accel_bias; }
+  const CalibGyroBias<Scalar>& getGyroBias() const { return calib->calib_gyro_bias; }
 
   void resetCalib(size_t num_cams, const std::vector<std::string>& cam_types) {
     BASALT_ASSERT(cam_types.size() == num_cams);
@@ -153,8 +144,7 @@ class SplineOptimization {
       archive(*calib);
       std::cout << "Loaded calibration from: " << path << std::endl;
     } else {
-      std::cerr << "No calibration found. Run camera calibration first!!!"
-                << std::endl;
+      std::cerr << "No calibration found. Run camera calibration first!!!" << std::endl;
     }
   }
 
@@ -167,8 +157,7 @@ class SplineOptimization {
     }
   }
 
-  void saveMocapCalib(const std::string& path,
-                      int64_t mocap_to_imu_offset_ns = 0) const {
+  void saveMocapCalib(const std::string& path, int64_t mocap_to_imu_offset_ns = 0) const {
     if (calib) {
       std::ofstream os(path + "mocap_calibration.json");
       cereal::JSONOutputArchive archive(os);
@@ -183,9 +172,7 @@ class SplineOptimization {
 
   bool initialized() const { return spline.numKnots() > 0; }
 
-  void initSpline(const SE3& pose, int num_knots) {
-    spline.setKnots(pose, num_knots);
-  }
+  void initSpline(const SE3& pose, int num_knots) { spline.setKnots(pose, num_knots); }
 
   void initSpline(const SplineT& other) {
     spline.setKnots(other);
@@ -223,19 +210,13 @@ class SplineOptimization {
   SE3 getT_mark_i() const { return mocap_calib->T_i_mark.inverse(); }
   void setT_mark_i(const SE3& val) { mocap_calib->T_i_mark = val.inverse(); }
 
-  Eigen::Vector3d getTransAccelWorld(int64_t t_ns) const {
-    return spline.transAccelWorld(t_ns);
-  }
+  Eigen::Vector3d getTransAccelWorld(int64_t t_ns) const { return spline.transAccelWorld(t_ns); }
 
-  Eigen::Vector3d getRotVelBody(int64_t t_ns) const {
-    return spline.rotVelBody(t_ns);
-  }
+  Eigen::Vector3d getRotVelBody(int64_t t_ns) const { return spline.rotVelBody(t_ns); }
 
   SE3 getT_w_i(int64_t t_ns) { return spline.pose(t_ns); }
 
-  void setAprilgridCorners3d(const Eigen::aligned_vector<Eigen::Vector4d>& v) {
-    aprilgrid_corner_pos_3d = v;
-  }
+  void setAprilgridCorners3d(const Eigen::aligned_vector<Eigen::Vector4d>& v) { aprilgrid_corner_pos_3d = v; }
 
   void addPoseMeasurement(int64_t t_ns, const SE3& pose) {
     min_time_us = std::min(min_time_us, t_ns);
@@ -270,10 +251,8 @@ class SplineOptimization {
     gyro_measurements.back().data = meas;
   }
 
-  void addAprilgridMeasurement(
-      int64_t t_ns, int cam_id,
-      const Eigen::aligned_vector<Eigen::Vector2d>& corners_pos,
-      const std::vector<int>& corner_id) {
+  void addAprilgridMeasurement(int64_t t_ns, int cam_id, const Eigen::aligned_vector<Eigen::Vector2d>& corners_pos,
+                               const std::vector<int>& corner_id) {
     min_time_us = std::min(min_time_us, t_ns);
     max_time_us = std::max(max_time_us, t_ns);
 
@@ -295,8 +274,7 @@ class SplineOptimization {
 
     if (spline.numKnots() == 0) {
       spline.setStartTimeNs(min_time_us);
-      spline.setKnots(pose_measurements.front().data,
-                      time_interval_us / dt_ns + N + 1);
+      spline.setKnots(pose_measurements.front().data, time_interval_us / dt_ns + N + 1);
     }
 
     recompute_size();
@@ -305,13 +283,11 @@ class SplineOptimization {
     //    std::cout << "spline.maxTimeNs() " << spline.maxTimeNs() << std::endl;
 
     while (!mocap_measurements.empty() &&
-           mocap_measurements.front().timestamp_ns <=
-               spline.minTimeNs() + spline.getDtNs())
+           mocap_measurements.front().timestamp_ns <= spline.minTimeNs() + spline.getDtNs())
       mocap_measurements.pop_front();
 
     while (!mocap_measurements.empty() &&
-           mocap_measurements.back().timestamp_ns >=
-               spline.maxTimeNs() - spline.getDtNs())
+           mocap_measurements.back().timestamp_ns >= spline.maxTimeNs() - spline.getDtNs())
       mocap_measurements.pop_back();
 
     ccd.calibration = calib.get();
@@ -326,10 +302,8 @@ class SplineOptimization {
     ccd.opt_g = true;
 
     ccd.pose_var_inv = pose_var_inv;
-    ccd.gyro_var_inv =
-        calib->dicrete_time_gyro_noise_std().array().square().inverse();
-    ccd.accel_var_inv =
-        calib->dicrete_time_accel_noise_std().array().square().inverse();
+    ccd.gyro_var_inv = calib->dicrete_time_gyro_noise_std().array().square().inverse();
+    ccd.accel_var_inv = calib->dicrete_time_accel_noise_std().array().square().inverse();
     ccd.mocap_var_inv = pose_var_inv;
   }
 
@@ -340,17 +314,14 @@ class SplineOptimization {
 
     bias_block_offset = POSE_SIZE * num_knots;
 
-    size_t T_i_c_block_offset =
-        bias_block_offset + ACCEL_BIAS_SIZE + GYRO_BIAS_SIZE + G_SIZE;
+    size_t T_i_c_block_offset = bias_block_offset + ACCEL_BIAS_SIZE + GYRO_BIAS_SIZE + G_SIZE;
 
     offset_T_i_c.emplace_back(T_i_c_block_offset);
-    for (size_t i = 0; i < calib->T_i_c.size(); i++)
-      offset_T_i_c.emplace_back(offset_T_i_c.back() + POSE_SIZE);
+    for (size_t i = 0; i < calib->T_i_c.size(); i++) offset_T_i_c.emplace_back(offset_T_i_c.back() + POSE_SIZE);
 
     offset_cam_intrinsics.emplace_back(offset_T_i_c.back());
     for (size_t i = 0; i < calib->intrinsics.size(); i++)
-      offset_cam_intrinsics.emplace_back(offset_cam_intrinsics.back() +
-                                         calib->intrinsics[i].getN());
+      offset_cam_intrinsics.emplace_back(offset_cam_intrinsics.back() + calib->intrinsics[i].getN());
 
     mocap_block_offset = offset_cam_intrinsics.back();
 
@@ -366,11 +337,9 @@ class SplineOptimization {
   }
 
   // Returns true when converged
-  bool optimize(bool use_intr, bool use_poses, bool use_april_corners,
-                bool opt_cam_time_offset, bool opt_imu_scale, bool use_mocap,
-                double huber_thresh, double stop_thresh, double& error,
-                int& num_points, double& reprojection_error,
-                bool print_info = true) {
+  bool optimize(bool use_intr, bool use_poses, bool use_april_corners, bool opt_cam_time_offset, bool opt_imu_scale,
+                bool use_mocap, double huber_thresh, double stop_thresh, double& error, int& num_points,
+                double& reprojection_error, bool print_info = true) {
     // std::cerr << "optimize num_knots " << num_knots << std::endl;
 
     ccd.opt_intrinsics = use_intr;
@@ -382,20 +351,15 @@ class SplineOptimization {
 
     // auto t1 = std::chrono::high_resolution_clock::now();
 
-    tbb::blocked_range<PoseDataIter> pose_range(pose_measurements.begin(),
-                                                pose_measurements.end());
-    tbb::blocked_range<AprilgridCornersDataIter> april_range(
-        aprilgrid_corners_measurements.begin(),
-        aprilgrid_corners_measurements.end());
+    tbb::blocked_range<PoseDataIter> pose_range(pose_measurements.begin(), pose_measurements.end());
+    tbb::blocked_range<AprilgridCornersDataIter> april_range(aprilgrid_corners_measurements.begin(),
+                                                             aprilgrid_corners_measurements.end());
 
-    tbb::blocked_range<MocapPoseDataIter> mocap_pose_range(
-        mocap_measurements.begin(), mocap_measurements.end());
+    tbb::blocked_range<MocapPoseDataIter> mocap_pose_range(mocap_measurements.begin(), mocap_measurements.end());
 
-    tbb::blocked_range<AccelDataIter> accel_range(accel_measurements.begin(),
-                                                  accel_measurements.end());
+    tbb::blocked_range<AccelDataIter> accel_range(accel_measurements.begin(), accel_measurements.end());
 
-    tbb::blocked_range<GyroDataIter> gyro_range(gyro_measurements.begin(),
-                                                gyro_measurements.end());
+    tbb::blocked_range<GyroDataIter> gyro_range(gyro_measurements.begin(), gyro_measurements.end());
 
     if (use_poses) {
       tbb::parallel_reduce(pose_range, lopt);
@@ -411,8 +375,7 @@ class SplineOptimization {
       tbb::parallel_reduce(mocap_pose_range, lopt);
       // lopt(mocap_pose_range);
     } else if (use_mocap && !mocap_initialized) {
-      std::cout << "Mocap residuals are not used. Initialize Mocap first!"
-                << std::endl;
+      std::cout << "Mocap residuals are not used. Initialize Mocap first!" << std::endl;
     }
 
     tbb::parallel_reduce(accel_range, lopt);
@@ -422,9 +385,7 @@ class SplineOptimization {
     num_points = lopt.num_points;
     reprojection_error = lopt.reprojection_error;
 
-    if (print_info)
-      std::cout << "[LINEARIZE] Error: " << lopt.error << " num points "
-                << lopt.num_points << std::endl;
+    if (print_info) std::cout << "[LINEARIZE] Error: " << lopt.error << " num points " << lopt.num_points << std::endl;
 
     lopt.accum.setup_solver();
     Eigen::VectorXd Hdiag = lopt.accum.Hdiagonal();
@@ -435,8 +396,7 @@ class SplineOptimization {
 
     while (!step && max_iter > 0 && !converged) {
       Eigen::VectorXd Hdiag_lambda = Hdiag * lambda;
-      for (int i = 0; i < Hdiag_lambda.size(); i++)
-        Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
+      for (int i = 0; i < Hdiag_lambda.size(); i++) Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
 
       VectorX inc_full = -lopt.accum.solve(&Hdiag_lambda);
       double max_inc = inc_full.array().abs().maxCoeff();
@@ -462,8 +422,7 @@ class SplineOptimization {
       if (use_mocap && mocap_initialized) {
         tbb::parallel_reduce(mocap_pose_range, eopt);
       } else if (use_mocap && !mocap_initialized) {
-        std::cout << "Mocap residuals are not used. Initialize Mocap first!"
-                  << std::endl;
+        std::cout << "Mocap residuals are not used. Initialize Mocap first!" << std::endl;
       }
 
       tbb::parallel_reduce(accel_range, eopt);
@@ -478,10 +437,8 @@ class SplineOptimization {
 
       if (step_quality < 0) {
         if (print_info)
-          std::cout << "\t[REJECTED] lambda:" << lambda
-                    << " step_quality: " << step_quality
-                    << " max_inc: " << max_inc << " Error: " << eopt.error
-                    << " num points " << eopt.num_points << std::endl;
+          std::cout << "\t[REJECTED] lambda:" << lambda << " step_quality: " << step_quality << " max_inc: " << max_inc
+                    << " Error: " << eopt.error << " num points " << eopt.num_points << std::endl;
         lambda = std::min(max_lambda, lambda_vee * lambda);
         lambda_vee *= 2;
 
@@ -492,15 +449,10 @@ class SplineOptimization {
 
       } else {
         if (print_info)
-          std::cout << "\t[ACCEPTED] lambda:" << lambda
-                    << " step_quality: " << step_quality
-                    << " max_inc: " << max_inc << " Error: " << eopt.error
-                    << " num points " << eopt.num_points << std::endl;
+          std::cout << "\t[ACCEPTED] lambda:" << lambda << " step_quality: " << step_quality << " max_inc: " << max_inc
+                    << " Error: " << eopt.error << " num points " << eopt.num_points << std::endl;
 
-        lambda = std::max(
-            min_lambda,
-            lambda *
-                std::max(1.0 / 3, 1 - std::pow(2 * step_quality - 1, 3.0)));
+        lambda = std::max(min_lambda, lambda * std::max(1.0 / 3, 1 - std::pow(2 * step_quality - 1, 3.0)));
         lambda_vee = 2;
 
         error = eopt.error;
@@ -527,15 +479,11 @@ class SplineOptimization {
  private:
   typedef typename Eigen::aligned_deque<PoseData>::const_iterator PoseDataIter;
   typedef typename Eigen::aligned_deque<GyroData>::const_iterator GyroDataIter;
-  typedef
-      typename Eigen::aligned_deque<AccelData>::const_iterator AccelDataIter;
-  typedef typename Eigen::aligned_deque<AprilgridCornersData>::const_iterator
-      AprilgridCornersDataIter;
-  typedef typename Eigen::aligned_deque<MocapPoseData>::const_iterator
-      MocapPoseDataIter;
+  typedef typename Eigen::aligned_deque<AccelData>::const_iterator AccelDataIter;
+  typedef typename Eigen::aligned_deque<AprilgridCornersData>::const_iterator AprilgridCornersDataIter;
+  typedef typename Eigen::aligned_deque<MocapPoseData>::const_iterator MocapPoseDataIter;
 
-  void applyInc(VectorX& inc_full,
-                const std::vector<size_t>& offset_cam_intrinsics) {
+  void applyInc(VectorX& inc_full, const std::vector<size_t>& offset_cam_intrinsics) {
     size_t num_knots = spline.numKnots();
 
     for (size_t i = 0; i < num_knots; i++) {
@@ -547,37 +495,28 @@ class SplineOptimization {
     }
 
     size_t bias_block_offset = POSE_SIZE * num_knots;
-    calib->calib_accel_bias += inc_full.template segment<ACCEL_BIAS_SIZE>(
-        bias_block_offset + ACCEL_BIAS_OFFSET);
+    calib->calib_accel_bias += inc_full.template segment<ACCEL_BIAS_SIZE>(bias_block_offset + ACCEL_BIAS_OFFSET);
 
-    calib->calib_gyro_bias += inc_full.template segment<GYRO_BIAS_SIZE>(
-        bias_block_offset + GYRO_BIAS_OFFSET);
+    calib->calib_gyro_bias += inc_full.template segment<GYRO_BIAS_SIZE>(bias_block_offset + GYRO_BIAS_OFFSET);
     g += inc_full.template segment<G_SIZE>(bias_block_offset + G_OFFSET);
 
-    size_t T_i_c_block_offset =
-        bias_block_offset + ACCEL_BIAS_SIZE + GYRO_BIAS_SIZE + G_SIZE;
+    size_t T_i_c_block_offset = bias_block_offset + ACCEL_BIAS_SIZE + GYRO_BIAS_SIZE + G_SIZE;
     for (size_t i = 0; i < calib->T_i_c.size(); i++) {
-      calib->T_i_c[i] *= Sophus::se3_expd(inc_full.template segment<POSE_SIZE>(
-          T_i_c_block_offset + i * POSE_SIZE));
+      calib->T_i_c[i] *= Sophus::se3_expd(inc_full.template segment<POSE_SIZE>(T_i_c_block_offset + i * POSE_SIZE));
     }
 
     for (size_t i = 0; i < calib->intrinsics.size(); i++) {
-      calib->intrinsics[i].applyInc(inc_full.segment(
-          offset_cam_intrinsics[i], calib->intrinsics[i].getN()));
+      calib->intrinsics[i].applyInc(inc_full.segment(offset_cam_intrinsics[i], calib->intrinsics[i].getN()));
     }
 
     size_t mocap_block_offset = offset_cam_intrinsics.back();
 
-    mocap_calib->T_moc_w *= Sophus::se3_expd(
-        inc_full.template segment<POSE_SIZE>(mocap_block_offset));
-    mocap_calib->T_i_mark *= Sophus::se3_expd(
-        inc_full.template segment<POSE_SIZE>(mocap_block_offset + POSE_SIZE));
+    mocap_calib->T_moc_w *= Sophus::se3_expd(inc_full.template segment<POSE_SIZE>(mocap_block_offset));
+    mocap_calib->T_i_mark *= Sophus::se3_expd(inc_full.template segment<POSE_SIZE>(mocap_block_offset + POSE_SIZE));
 
-    mocap_calib->mocap_time_offset_ns +=
-        1e9 * inc_full[mocap_block_offset + 2 * POSE_SIZE];
+    mocap_calib->mocap_time_offset_ns += 1e9 * inc_full[mocap_block_offset + 2 * POSE_SIZE];
 
-    calib->cam_time_offset_ns +=
-        1e9 * inc_full[mocap_block_offset + 2 * POSE_SIZE + 1];
+    calib->cam_time_offset_ns += 1e9 * inc_full[mocap_block_offset + 2 * POSE_SIZE + 1];
 
     //    std::cout << "bias_block_offset " << bias_block_offset << std::endl;
     //    std::cout << "mocap_block_offset " << mocap_block_offset << std::endl;

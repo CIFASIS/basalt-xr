@@ -287,7 +287,8 @@ struct slam_tracker::implementation {
 
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
-    image_data_queue = &opt_flow_ptr->input_queue;
+    opt_flow_ptr->start();
+    image_data_queue = &opt_flow_ptr->input_img_queue;
     ASSERT_(image_data_queue != nullptr);
 
     vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true, use_double);

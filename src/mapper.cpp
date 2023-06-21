@@ -70,8 +70,7 @@ using basalt::POSE_VEL_BIAS_SIZE;
 
 Eigen::Vector3d g(0, 0, -9.81);
 
-const Eigen::aligned_vector<Eigen::Vector2i> image_resolutions = {{752, 480},
-                                                                  {752, 480}};
+const Eigen::aligned_vector<Eigen::Vector2i> image_resolutions = {{752, 480}, {752, 480}};
 
 basalt::VioConfig vio_config;
 basalt::NfrMapper::Ptr nrf_mapper;
@@ -90,8 +89,7 @@ Eigen::aligned_vector<Eigen::Vector3d> rel_edges_vis;
 
 void draw_image_overlay(pangolin::View& v, size_t cam_id);
 void draw_scene();
-void load_data(const std::string& calib_path,
-               const std::string& marg_data_path);
+void load_data(const std::string& calib_path, const std::string& marg_data_path);
 void processMargData(basalt::MargData& m);
 void extractNonlinearFactors(basalt::MargData& m);
 void computeEdgeVis();
@@ -156,12 +154,9 @@ int main(int argc, char** argv) {
   CLI::App app{"App description"};
 
   app.add_option("--show-gui", show_gui, "Show GUI");
-  app.add_option("--cam-calib", cam_calib_path,
-                 "Ground-truth camera calibration used for simulation.")
-      ->required();
+  app.add_option("--cam-calib", cam_calib_path, "Ground-truth camera calibration used for simulation.")->required();
 
-  app.add_option("--marg-data", marg_data_path, "Path to cache folder.")
-      ->required();
+  app.add_option("--marg-data", marg_data_path, "Path to cache folder.")->required();
 
   app.add_option("--config-path", config_path, "Path to config file.");
 
@@ -186,8 +181,7 @@ int main(int argc, char** argv) {
   computeEdgeVis();
 
   {
-    std::cout << "Loaded " << nrf_mapper->img_data.size() << " images."
-              << std::endl;
+    std::cout << "Loaded " << nrf_mapper->img_data.size() << " images." << std::endl;
 
     show_frame1.Meta().range[1] = nrf_mapper->img_data.size() - 1;
     show_frame2.Meta().range[1] = nrf_mapper->img_data.size() - 1;
@@ -210,13 +204,11 @@ int main(int argc, char** argv) {
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View& img_view_display =
-        pangolin::CreateDisplay()
-            .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 0.4)
-            .SetLayout(pangolin::LayoutEqual);
+    pangolin::View& img_view_display = pangolin::CreateDisplay()
+                                           .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 0.4)
+                                           .SetLayout(pangolin::LayoutEqual);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0,
-                                          pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
@@ -226,25 +218,22 @@ int main(int argc, char** argv) {
       img_view.push_back(iv);
 
       img_view_display.AddDisplay(*iv);
-      iv->extern_draw_function =
-          std::bind(&draw_image_overlay, std::placeholders::_1, idx);
+      iv->extern_draw_function = std::bind(&draw_image_overlay, std::placeholders::_1, idx);
     }
 
-    camera = pangolin::OpenGlRenderState(
-        pangolin::ProjectionMatrix(640, 480, 400, 400, 320, 240, 0.001, 10000),
-        pangolin::ModelViewLookAt(-3.4, -3.7, -8.3, 2.1, 0.6, 0.2,
-                                  pangolin::AxisNegY));
+    camera =
+        pangolin::OpenGlRenderState(pangolin::ProjectionMatrix(640, 480, 400, 400, 320, 240, 0.001, 10000),
+                                    pangolin::ModelViewLookAt(-3.4, -3.7, -8.3, 2.1, 0.6, 0.2, pangolin::AxisNegY));
 
     //    pangolin::OpenGlRenderState camera(
     //        pangolin::ProjectionMatrixOrthographic(-30, 30, -30, 30, -30, 30),
     //        pangolin::ModelViewLookAt(-3.4, -3.7, -8.3, 2.1, 0.6, 0.2,
     //                                  pangolin::AxisNegY));
 
-    pangolin::View& display3D =
-        pangolin::CreateDisplay()
-            .SetAspect(-640 / 480.0)
-            .SetBounds(0.0, 1.0, 0.4, 1.0)
-            .SetHandler(new pangolin::Handler3D(camera));
+    pangolin::View& display3D = pangolin::CreateDisplay()
+                                    .SetAspect(-640 / 480.0)
+                                    .SetBounds(0.0, 1.0, 0.4, 1.0)
+                                    .SetHandler(new pangolin::Handler3D(camera));
 
     while (!pangolin::ShouldQuit()) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -272,10 +261,8 @@ int main(int argc, char** argv) {
         int64_t timestamp = image_t_ns[frame_id];
         size_t cam_id = show_cam1;
 
-        if (nrf_mapper->img_data.count(timestamp) > 0 &&
-            nrf_mapper->img_data.at(timestamp).get()) {
-          const std::vector<basalt::ImageData>& img_vec =
-              nrf_mapper->img_data.at(timestamp)->img_data;
+        if (nrf_mapper->img_data.count(timestamp) > 0 && nrf_mapper->img_data.at(timestamp).get()) {
+          const std::vector<basalt::ImageData>& img_vec = nrf_mapper->img_data.at(timestamp)->img_data;
 
           pangolin::GlPixFormat fmt;
           fmt.glformat = GL_LUMINANCE;
@@ -283,9 +270,8 @@ int main(int argc, char** argv) {
           fmt.scalable_internal_format = GL_LUMINANCE16;
 
           if (img_vec[cam_id].img.get()) {
-            img_view[0]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+            img_view[0]->SetImage(img_vec[cam_id].img->ptr, img_vec[cam_id].img->w, img_vec[cam_id].img->h,
+                                  img_vec[cam_id].img->pitch, fmt);
           } else {
             img_view[0]->Clear();
           }
@@ -307,10 +293,8 @@ int main(int argc, char** argv) {
         int64_t timestamp = image_t_ns[frame_id];
         size_t cam_id = show_cam2;
 
-        if (nrf_mapper->img_data.count(timestamp) > 0 &&
-            nrf_mapper->img_data.at(timestamp).get()) {
-          const std::vector<basalt::ImageData>& img_vec =
-              nrf_mapper->img_data.at(timestamp)->img_data;
+        if (nrf_mapper->img_data.count(timestamp) > 0 && nrf_mapper->img_data.at(timestamp).get()) {
+          const std::vector<basalt::ImageData>& img_vec = nrf_mapper->img_data.at(timestamp)->img_data;
 
           pangolin::GlPixFormat fmt;
           fmt.glformat = GL_LUMINANCE;
@@ -318,9 +302,8 @@ int main(int argc, char** argv) {
           fmt.scalable_internal_format = GL_LUMINANCE16;
 
           if (img_vec[cam_id].img.get()) {
-            img_view[1]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+            img_view[1]->SetImage(img_vec[cam_id].img->ptr, img_vec[cam_id].img->w, img_vec[cam_id].img->h,
+                                  img_vec[cam_id].img->pitch, fmt);
           } else {
             img_view[1]->Clear();
           }
@@ -348,8 +331,7 @@ int main(int argc, char** argv) {
     if (!result_path.empty()) {
       double error = alignButton();
 
-      auto exec_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-          time_end - time_start);
+      auto exec_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start);
 
       std::ofstream os(result_path);
       {
@@ -381,8 +363,7 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (nrf_mapper->feature_corners.find(tcid) !=
-        nrf_mapper->feature_corners.end()) {
+    if (nrf_mapper->feature_corners.find(tcid) != nrf_mapper->feature_corners.end()) {
       const basalt::KeypointsData& cr = nrf_mapper->feature_corners.at(tcid);
 
       for (size_t i = 0; i < cr.corners.size(); i++) {
@@ -397,9 +378,7 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
         pangolin::glDrawLine(c, c + r);
       }
 
-      pangolin::GlFont::I()
-          .Text("Detected %d corners", cr.corners.size())
-          .Draw(5, 20);
+      pangolin::GlFont::I().Text("Detected %d corners", cr.corners.size()).Draw(5, 20);
 
     } else {
       glLineWidth(1.0);
@@ -434,13 +413,11 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
     }
 
     if (idx >= 0 && show_matches) {
-      if (nrf_mapper->feature_corners.find(tcid) !=
-          nrf_mapper->feature_corners.end()) {
+      if (nrf_mapper->feature_corners.find(tcid) != nrf_mapper->feature_corners.end()) {
         const basalt::KeypointsData& cr = nrf_mapper->feature_corners.at(tcid);
 
         for (size_t i = 0; i < it->second.matches.size(); i++) {
-          size_t c_idx = idx == 0 ? it->second.matches[i].first
-                                  : it->second.matches[i].second;
+          size_t c_idx = idx == 0 ? it->second.matches[i].first : it->second.matches[i].second;
 
           Eigen::Vector2d c = cr.corners[c_idx];
           double angle = cr.corner_angles[c_idx];
@@ -457,9 +434,7 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
           }
         }
 
-        pangolin::GlFont::I()
-            .Text("Detected %d matches", it->second.matches.size())
-            .Draw(5, text_row);
+        pangolin::GlFont::I().Text("Detected %d matches", it->second.matches.size()).Draw(5, text_row);
         text_row += 20;
       }
     }
@@ -467,13 +442,11 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
     glColor3f(0.0, 1.0, 0.0);  // green
 
     if (idx >= 0 && show_inliers) {
-      if (nrf_mapper->feature_corners.find(tcid) !=
-          nrf_mapper->feature_corners.end()) {
+      if (nrf_mapper->feature_corners.find(tcid) != nrf_mapper->feature_corners.end()) {
         const basalt::KeypointsData& cr = nrf_mapper->feature_corners.at(tcid);
 
         for (size_t i = 0; i < it->second.inliers.size(); i++) {
-          size_t c_idx = idx == 0 ? it->second.inliers[i].first
-                                  : it->second.inliers[i].second;
+          size_t c_idx = idx == 0 ? it->second.inliers[i].first : it->second.inliers[i].second;
 
           Eigen::Vector2d c = cr.corners[c_idx];
           double angle = cr.corner_angles[c_idx];
@@ -490,9 +463,7 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
           }
         }
 
-        pangolin::GlFont::I()
-            .Text("Detected %d inliers", it->second.inliers.size())
-            .Draw(5, text_row);
+        pangolin::GlFont::I().Text("Detected %d inliers", it->second.inliers.size()).Draw(5, text_row);
         text_row += 20;
       }
     }
@@ -536,12 +507,10 @@ void load_data(const std::string& calib_path, const std::string& cache_path) {
     if (os.is_open()) {
       cereal::JSONInputArchive archive(os);
       archive(calib);
-      std::cout << "Loaded camera with " << calib.intrinsics.size()
-                << " cameras" << std::endl;
+      std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras" << std::endl;
 
     } else {
-      std::cerr << "could not load camera calibration " << calib_path
-                << std::endl;
+      std::cerr << "could not load camera calibration " << calib_path << std::endl;
       std::abort();
     }
   }
@@ -558,8 +527,8 @@ void load_data(const std::string& calib_path, const std::string& cache_path) {
         archive(gt_frame_t_w_i);
       }
       is.close();
-      std::cout << "Loaded " << gt_frame_t_ns.size() << " timestamps and "
-                << gt_frame_t_w_i.size() << " poses" << std::endl;
+      std::cout << "Loaded " << gt_frame_t_ns.size() << " timestamps and " << gt_frame_t_w_i.size() << " poses"
+                << std::endl;
     }
   }
 
@@ -591,14 +560,8 @@ void computeEdgeVis() {
   edges_vis.clear();
   for (const auto& kv1 : nrf_mapper->lmdb.getObservations()) {
     for (const auto& kv2 : kv1.second) {
-      Eigen::Vector3d p1 = nrf_mapper->getFramePoses()
-                               .at(kv1.first.frame_id)
-                               .getPose()
-                               .translation();
-      Eigen::Vector3d p2 = nrf_mapper->getFramePoses()
-                               .at(kv2.first.frame_id)
-                               .getPose()
-                               .translation();
+      Eigen::Vector3d p1 = nrf_mapper->getFramePoses().at(kv1.first.frame_id).getPose().translation();
+      Eigen::Vector3d p2 = nrf_mapper->getFramePoses().at(kv2.first.frame_id).getPose().translation();
 
       edges_vis.emplace_back(p1);
       edges_vis.emplace_back(p2);
@@ -607,12 +570,10 @@ void computeEdgeVis() {
 
   roll_pitch_vis.clear();
   for (const auto& v : nrf_mapper->roll_pitch_factors) {
-    const Sophus::SE3d& T_w_i =
-        nrf_mapper->getFramePoses().at(v.t_ns).getPose();
+    const Sophus::SE3d& T_w_i = nrf_mapper->getFramePoses().at(v.t_ns).getPose();
 
     Eigen::Vector3d p = T_w_i.translation();
-    Eigen::Vector3d d =
-        v.R_w_i_meas * T_w_i.so3().inverse() * (-Eigen::Vector3d::UnitZ());
+    Eigen::Vector3d d = v.R_w_i_meas * T_w_i.so3().inverse() * (-Eigen::Vector3d::UnitZ());
 
     roll_pitch_vis.emplace_back(p);
     roll_pitch_vis.emplace_back(p + 0.1 * d);
@@ -620,10 +581,8 @@ void computeEdgeVis() {
 
   rel_edges_vis.clear();
   for (const auto& v : nrf_mapper->rel_pose_factors) {
-    Eigen::Vector3d p1 =
-        nrf_mapper->getFramePoses().at(v.t_i_ns).getPose().translation();
-    Eigen::Vector3d p2 =
-        nrf_mapper->getFramePoses().at(v.t_j_ns).getPose().translation();
+    Eigen::Vector3d p1 = nrf_mapper->getFramePoses().at(v.t_i_ns).getPose().translation();
+    Eigen::Vector3d p2 = nrf_mapper->getFramePoses().at(v.t_j_ns).getPose().translation();
 
     rel_edges_vis.emplace_back(p1);
     rel_edges_vis.emplace_back(p2);
@@ -646,8 +605,7 @@ double alignButton() {
     filter_t_w_i.emplace_back(kv.second.getPose().translation());
   }
 
-  return basalt::alignSVD(filter_t_ns, filter_t_w_i, gt_frame_t_ns,
-                          gt_frame_t_w_i);
+  return basalt::alignSVD(filter_t_ns, filter_t_w_i, gt_frame_t_ns, gt_frame_t_w_i);
 }
 
 void detect() {
@@ -685,11 +643,10 @@ void saveTrajectoryButton() {
 
     for (const auto& kv : nrf_mapper->getFramePoses()) {
       const Sophus::SE3d pose = kv.second.getPose();
-      os << std::scientific << std::setprecision(18) << kv.first * 1e-9 << " "
-         << pose.translation().x() << " " << pose.translation().y() << " "
-         << pose.translation().z() << " " << pose.unit_quaternion().x() << " "
-         << pose.unit_quaternion().y() << " " << pose.unit_quaternion().z()
-         << " " << pose.unit_quaternion().w() << std::endl;
+      os << std::scientific << std::setprecision(18) << kv.first * 1e-9 << " " << pose.translation().x() << " "
+         << pose.translation().y() << " " << pose.translation().z() << " " << pose.unit_quaternion().x() << " "
+         << pose.unit_quaternion().y() << " " << pose.unit_quaternion().z() << " " << pose.unit_quaternion().w()
+         << std::endl;
     }
 
     os.close();
@@ -706,17 +663,14 @@ void saveTrajectoryButton() {
 
     for (const auto& kv : nrf_mapper->getFramePoses()) {
       const Sophus::SE3d pose = kv.second.getPose();
-      os << std::scientific << std::setprecision(18) << kv.first << ","
-         << pose.translation().x() << "," << pose.translation().y() << ","
-         << pose.translation().z() << "," << pose.unit_quaternion().w() << ","
-         << pose.unit_quaternion().x() << "," << pose.unit_quaternion().y()
-         << "," << pose.unit_quaternion().z() << std::endl;
+      os << std::scientific << std::setprecision(18) << kv.first << "," << pose.translation().x() << ","
+         << pose.translation().y() << "," << pose.translation().z() << "," << pose.unit_quaternion().w() << ","
+         << pose.unit_quaternion().x() << "," << pose.unit_quaternion().y() << "," << pose.unit_quaternion().z()
+         << std::endl;
     }
 
     os.close();
 
-    std::cout
-        << "Saved trajectory in Euroc Dataset format in keyframeTrajectory.csv"
-        << std::endl;
+    std::cout << "Saved trajectory in Euroc Dataset format in keyframeTrajectory.csv" << std::endl;
   }
 }

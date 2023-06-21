@@ -48,14 +48,13 @@ class LinearizationBase {
 
   virtual void get_dense_H_b(MatX& H, VecX& b) const = 0;
 
-  static std::unique_ptr<LinearizationBase> create(
-      BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom,
-      const Options& options,
-      const MargLinData<Scalar>* marg_lin_data = nullptr,
-      const ImuLinData<Scalar>* imu_lin_data = nullptr,
-      const std::set<FrameId>* used_frames = nullptr,
-      const std::unordered_set<KeypointId>* lost_landmarks = nullptr,
-      int64_t last_state_to_marg = std::numeric_limits<int64_t>::max());
+  static std::unique_ptr<LinearizationBase> create(BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom,
+                                                   const Options& options,
+                                                   const MargLinData<Scalar>* marg_lin_data = nullptr,
+                                                   const ImuLinData<Scalar>* imu_lin_data = nullptr,
+                                                   const std::set<FrameId>* used_frames = nullptr,
+                                                   const std::unordered_set<KeypointId>* lost_landmarks = nullptr,
+                                                   int64_t last_state_to_marg = std::numeric_limits<int64_t>::max());
 };
 
 bool isLinearizationSqrt(const LinearizationType& type);

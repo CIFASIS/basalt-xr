@@ -76,17 +76,14 @@ struct PoseVelBiasStateWithLin {
     delta.setZero();
   };
 
-  PoseVelBiasStateWithLin(int64_t t_ns, const SE3& T_w_i, const Vec3& vel_w_i,
-                          const Vec3& bias_gyro, const Vec3& bias_accel,
-                          bool linearized)
-      : linearized(linearized),
-        state_linearized(t_ns, T_w_i, vel_w_i, bias_gyro, bias_accel) {
+  PoseVelBiasStateWithLin(int64_t t_ns, const SE3& T_w_i, const Vec3& vel_w_i, const Vec3& bias_gyro,
+                          const Vec3& bias_accel, bool linearized)
+      : linearized(linearized), state_linearized(t_ns, T_w_i, vel_w_i, bias_gyro, bias_accel) {
     delta.setZero();
     state_current = state_linearized;
   }
 
-  explicit PoseVelBiasStateWithLin(const PoseVelBiasState<Scalar>& other)
-      : linearized(false), state_linearized(other) {
+  explicit PoseVelBiasStateWithLin(const PoseVelBiasState<Scalar>& other) : linearized(false), state_linearized(other) {
     delta.setZero();
     state_current = other;
   }
@@ -130,9 +127,7 @@ struct PoseVelBiasStateWithLin {
     }
   }
 
-  inline const PoseVelBiasState<Scalar>& getStateLin() const {
-    return state_linearized;
-  }
+  inline const PoseVelBiasState<Scalar>& getStateLin() const { return state_linearized; }
 
   inline bool isLinearized() const { return linearized; }
   inline const VecN& getDelta() const { return delta; }
@@ -205,8 +200,7 @@ struct PoseStateWithLin {
   explicit PoseStateWithLin(const PoseVelBiasStateWithLin<Scalar>& other)
       : linearized(other.linearized),
         delta(other.delta.template head<6>()),
-        pose_linearized(other.state_linearized.t_ns,
-                        other.state_linearized.T_w_i) {
+        pose_linearized(other.state_linearized.t_ns, other.state_linearized.T_w_i) {
     T_w_i_current = pose_linearized.T_w_i;
     PoseState<Scalar>::incPose(delta, T_w_i_current);
   }
@@ -297,8 +291,7 @@ struct AbsOrderMap {
 
   void print_order() {
     for (const auto& kv : abs_order_map) {
-      std::cout << kv.first << " (" << kv.second.first << ","
-                << kv.second.second << ")" << std::endl;
+      std::cout << kv.first << " (" << kv.second.first << "," << kv.second.second << ")" << std::endl;
     }
     std::cout << std::endl;
   }

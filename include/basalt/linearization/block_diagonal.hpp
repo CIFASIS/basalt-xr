@@ -15,30 +15,24 @@ namespace basalt {
 
 // map of camera index to block; used to represent sparse block diagonal matrix
 template <typename Scalar>
-using IndexedBlocks =
-    std::unordered_map<size_t,
-                       Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>;
+using IndexedBlocks = std::unordered_map<size_t, Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>;
 
 // scale dimensions of JTJ as you would do for jacobian scaling of J beforehand,
 // with diagonal scaling matrix D: For jacobain we would use JD, so for JTJ we
 // use DJTJD.
 template <typename Scalar>
-void scale_jacobians(
-    IndexedBlocks<Scalar>& block_diagonal, size_t num_blocks, size_t block_size,
-    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& scaling_vector) {
-  BASALT_ASSERT(num_blocks * block_size ==
-                unsigned_cast(scaling_vector.size()));
+void scale_jacobians(IndexedBlocks<Scalar>& block_diagonal, size_t num_blocks, size_t block_size,
+                     const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& scaling_vector) {
+  BASALT_ASSERT(num_blocks * block_size == unsigned_cast(scaling_vector.size()));
   for (auto& [cam_idx, block] : block_diagonal) {
-    auto D =
-        scaling_vector.segment(block_size * cam_idx, block_size).asDiagonal();
+    auto D = scaling_vector.segment(block_size * cam_idx, block_size).asDiagonal();
     block = D * block * D;
   }
 }
 
 // add diagonal to block-diagonal matrix; missing blocks are assumed to be 0
 template <typename Scalar>
-void add_diagonal(IndexedBlocks<Scalar>& block_diagonal, size_t num_blocks,
-                  size_t block_size,
+void add_diagonal(IndexedBlocks<Scalar>& block_diagonal, size_t num_blocks, size_t block_size,
                   const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& diagonal) {
   BASALT_ASSERT(num_blocks * block_size == unsigned_cast(diagonal.size()));
   for (size_t idx = 0; idx < num_blocks; ++idx) {
@@ -67,8 +61,7 @@ class BlockDiagonalAccumulator {
     }
   }
 
-  inline void add_diag(size_t num_blocks, size_t block_size,
-                       const VecX& diagonal) {
+  inline void add_diag(size_t num_blocks, size_t block_size, const VecX& diagonal) {
     add_diagonal(block_diagonal_, num_blocks, block_size, diagonal);
   }
 

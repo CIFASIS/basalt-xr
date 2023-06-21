@@ -49,22 +49,15 @@ int main(int argc, char **argv) {
   CLI::App app{"Calibrate IMU"};
 
   app.add_option("--dataset-path", dataset_path, "Path to dataset")->required();
-  app.add_option("--result-path", result_path, "Path to result folder")
-      ->required();
-  app.add_option("--dataset-type", dataset_type, "Dataset type (euroc, bag)")
-      ->required();
+  app.add_option("--result-path", result_path, "Path to result folder")->required();
+  app.add_option("--dataset-type", dataset_type, "Dataset type (euroc, bag)")->required();
 
-  app.add_option("--aprilgrid", aprilgrid_path,
-                 "Path to Aprilgrid config file)")
-      ->required();
+  app.add_option("--aprilgrid", aprilgrid_path, "Path to Aprilgrid config file)")->required();
 
-  app.add_option("--cache-name", cache_dataset_name,
-                 "Name to save cached files");
+  app.add_option("--cache-name", cache_dataset_name, "Name to save cached files");
 
   app.add_option("--skip-images", skip_images, "Number of images to skip");
-  app.add_option("--cam-types", cam_types,
-                 "Type of cameras (eucm, ds, kb4, pinhole)")
-      ->required();
+  app.add_option("--cam-types", cam_types, "Type of cameras (eucm, ds, kb4, pinhole)")->required();
 
   try {
     app.parse(argc, argv);
@@ -72,8 +65,8 @@ int main(int argc, char **argv) {
     return app.exit(e);
   }
 
-  basalt::CamCalib cv(dataset_path, dataset_type, aprilgrid_path, result_path,
-                      cache_dataset_name, skip_images, cam_types);
+  basalt::CamCalib cv(dataset_path, dataset_type, aprilgrid_path, result_path, cache_dataset_name, skip_images,
+                      cam_types);
 
   cv.renderingLoop();
 

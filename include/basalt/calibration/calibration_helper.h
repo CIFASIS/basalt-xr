@@ -68,53 +68,40 @@ struct CalibInitPoseData {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-using CalibCornerMap = tbb::concurrent_unordered_map<TimeCamId, CalibCornerData,
-                                                     std::hash<TimeCamId>>;
+using CalibCornerMap = tbb::concurrent_unordered_map<TimeCamId, CalibCornerData, std::hash<TimeCamId>>;
 
-using CalibInitPoseMap =
-    tbb::concurrent_unordered_map<TimeCamId, CalibInitPoseData,
-                                  std::hash<TimeCamId>>;
+using CalibInitPoseMap = tbb::concurrent_unordered_map<TimeCamId, CalibInitPoseData, std::hash<TimeCamId>>;
 
 class CalibHelper {
  public:
-  static void detectCorners(const VioDatasetPtr& vio_data,
-                            const AprilGrid& april_grid,
-                            CalibCornerMap& calib_corners,
+  static void detectCorners(const VioDatasetPtr& vio_data, const AprilGrid& april_grid, CalibCornerMap& calib_corners,
                             CalibCornerMap& calib_corners_rejected);
 
-  static void initCamPoses(
-      const Calibration<double>::Ptr& calib,
-      const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
-      CalibCornerMap& calib_corners, CalibInitPoseMap& calib_init_poses);
+  static void initCamPoses(const Calibration<double>::Ptr& calib,
+                           const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
+                           CalibCornerMap& calib_corners, CalibInitPoseMap& calib_init_poses);
 
-  static bool initializeIntrinsics(
-      const Eigen::aligned_vector<Eigen::Vector2d>& corners,
-      const std::vector<int>& corner_ids, const AprilGrid& aprilgrid, int cols,
-      int rows, Eigen::Vector4d& init_intr);
+  static bool initializeIntrinsics(const Eigen::aligned_vector<Eigen::Vector2d>& corners,
+                                   const std::vector<int>& corner_ids, const AprilGrid& aprilgrid, int cols, int rows,
+                                   Eigen::Vector4d& init_intr);
 
-  static bool initializeIntrinsicsPinhole(
-      const std::vector<CalibCornerData*> pinhole_corners,
-      const AprilGrid& aprilgrid, int cols, int rows,
-      Eigen::Vector4d& init_intr);
+  static bool initializeIntrinsicsPinhole(const std::vector<CalibCornerData*> pinhole_corners,
+                                          const AprilGrid& aprilgrid, int cols, int rows, Eigen::Vector4d& init_intr);
 
  private:
   inline static double square(double x) { return x * x; }
 
-  inline static double hypot(double a, double b) {
-    return sqrt(square(a) + square(b));
-  }
+  inline static double hypot(double a, double b) { return sqrt(square(a) + square(b)); }
 
-  static void computeInitialPose(
-      const Calibration<double>::Ptr& calib, size_t cam_id,
-      const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
-      const basalt::CalibCornerData& cd, basalt::CalibInitPoseData& cp);
+  static void computeInitialPose(const Calibration<double>::Ptr& calib, size_t cam_id,
+                                 const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
+                                 const basalt::CalibCornerData& cd, basalt::CalibInitPoseData& cp);
 
-  static size_t computeReprojectionError(
-      const UnifiedCamera<double>& cam_calib,
-      const Eigen::aligned_vector<Eigen::Vector2d>& corners,
-      const std::vector<int>& corner_ids,
-      const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
-      const Sophus::SE3d& T_target_camera, double& error);
+  static size_t computeReprojectionError(const UnifiedCamera<double>& cam_calib,
+                                         const Eigen::aligned_vector<Eigen::Vector2d>& corners,
+                                         const std::vector<int>& corner_ids,
+                                         const Eigen::aligned_vector<Eigen::Vector4d>& aprilgrid_corner_pos_3d,
+                                         const Sophus::SE3d& T_target_camera, double& error);
 };
 
 }  // namespace basalt

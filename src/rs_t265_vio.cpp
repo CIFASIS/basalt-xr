@@ -97,8 +97,7 @@ pangolin::Var<bool> follow("ui.follow", true, false, true);
 basalt::VioVisualizationData::Ptr curr_vis_data;
 
 tbb::concurrent_bounded_queue<basalt::VioVisualizationData::Ptr> out_vis_queue;
-tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr>
-    out_state_queue;
+tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr> out_state_queue;
 
 std::vector<int64_t> vio_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
@@ -132,11 +131,9 @@ int main(int argc, char** argv) {
   CLI::App app{"RealSense T265 Live Vio"};
 
   app.add_option("--show-gui", show_gui, "Show GUI");
-  app.add_option("--cam-calib", cam_calib_path,
-                 "Ground-truth camera calibration used for simulation.");
+  app.add_option("--cam-calib", cam_calib_path, "Ground-truth camera calibration used for simulation.");
 
-  app.add_option("--marg-data", marg_data_path,
-                 "Path to folder where marginalization data will be stored.");
+  app.add_option("--marg-data", marg_data_path, "Path to folder where marginalization data will be stored.");
 
   app.add_option("--print-queue", print_queue, "Print queue.");
   app.add_option("--config-path", config_path, "Path to config file.");
@@ -144,10 +141,8 @@ int main(int argc, char** argv) {
   app.add_option("--step-by-step", step_by_step, "Path to config file.");
   app.add_option("--use-double", use_double, "Use double not float.");
 
-  app.add_option("--exposure", exposure,
-                 "Shutter time in ms, 0 by default to use auto exposure");
-  app.add_flag("--is-d455", is_d455,
-               "If set will work on a D455 (probably on a D435 too)");
+  app.add_option("--exposure", exposure, "Shutter time in ms, 0 by default to use auto exposure");
+  app.add_flag("--is-d455", is_d455, "If set will work on a D455 (probably on a D435 too)");
   app.add_option("--d455-video-width", d455.video_width, "Frame width");
   app.add_option("--d455-video-height", d455.video_height, "Frame height");
   app.add_option("--d455-video-fps", d455.video_fps, "Video FPS");
@@ -163,8 +158,8 @@ int main(int argc, char** argv) {
   // global thread limit is in effect until global_control object is destroyed
   std::unique_ptr<tbb::global_control> tbb_global_control;
   if (num_threads > 0) {
-    tbb_global_control = std::make_unique<tbb::global_control>(
-        tbb::global_control::max_allowed_parallelism, num_threads);
+    tbb_global_control =
+        std::make_unique<tbb::global_control>(tbb::global_control::max_allowed_parallelism, num_threads);
   }
 
   if (!config_path.empty()) {
@@ -177,8 +172,7 @@ int main(int argc, char** argv) {
   int skip_frames = 1;    // Use only one frame for every `skip_frames` frames
   int webp_quality = 90;  // This is not being used
   bool manual_exposure = exposure != 0.0;
-  t265_device.reset(new basalt::RsT265Device(
-      is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
+  t265_device.reset(new basalt::RsT265Device(is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
 
   // startup device and load calibration
   t265_device->start();
@@ -189,10 +183,10 @@ int main(int argc, char** argv) {
   }
 
   opt_flow_ptr = basalt::OpticalFlowFactory::getOpticalFlow(vio_config, calib);
-  t265_device->image_data_queue = &opt_flow_ptr->input_queue;
+  opt_flow_ptr->start();
+  t265_device->image_data_queue = &opt_flow_ptr->input_img_queue;
 
-  vio = basalt::VioEstimatorFactory::getVioEstimator(
-      vio_config, calib, basalt::constants::g, true, use_double);
+  vio = basalt::VioEstimatorFactory::getVioEstimator(vio_config, calib, basalt::constants::g, true, use_double);
   vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
   t265_device->imu_data_queue = &vio->imu_data_queue;
 
@@ -266,10 +260,8 @@ int main(int argc, char** argv) {
   if (print_queue) {
     t5.reset(new std::thread([&]() {
       while (!terminate) {
-        std::cout << "opt_flow_ptr->input_queue "
-                  << opt_flow_ptr->input_queue.size()
-                  << " opt_flow_ptr->output_queue "
-                  << opt_flow_ptr->output_queue->size() << " out_state_queue "
+        std::cout << "opt_flow_ptr->input_img_queue " << opt_flow_ptr->input_img_queue.size()
+                  << " opt_flow_ptr->output_queue " << opt_flow_ptr->output_queue->size() << " out_state_queue "
                   << out_state_queue.size() << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
@@ -281,20 +273,16 @@ int main(int argc, char** argv) {
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View& img_view_display =
-        pangolin::CreateDisplay()
-            .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 0.4)
-            .SetLayout(pangolin::LayoutEqual);
+    pangolin::View& img_view_display = pangolin::CreateDisplay()
+                                           .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 0.4)
+                                           .SetLayout(pangolin::LayoutEqual);
 
-    pangolin::View& plot_display = pangolin::CreateDisplay().SetBounds(
-        0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    pangolin::View& plot_display = pangolin::CreateDisplay().SetBounds(0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
 
-    plotter =
-        new pangolin::Plotter(&imu_data_log, 0.0, 100, -3.0, 3.0, 0.01f, 0.01f);
+    plotter = new pangolin::Plotter(&imu_data_log, 0.0, 100, -3.0, 3.0, 0.01f, 0.01f);
     plot_display.AddDisplay(*plotter);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0,
-                                          pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
@@ -304,8 +292,7 @@ int main(int argc, char** argv) {
       img_view.push_back(iv);
 
       img_view_display.AddDisplay(*iv);
-      iv->extern_draw_function =
-          std::bind(&draw_image_overlay, std::placeholders::_1, idx);
+      iv->extern_draw_function = std::bind(&draw_image_overlay, std::placeholders::_1, idx);
     }
 
     Eigen::Vector3d cam_p(0.5, -2, -2);
@@ -314,14 +301,12 @@ int main(int argc, char** argv) {
 
     pangolin::OpenGlRenderState camera(
         pangolin::ProjectionMatrix(640, 480, 400, 400, 320, 240, 0.001, 10000),
-        pangolin::ModelViewLookAt(cam_p[0], cam_p[1], cam_p[2], 0, 0, 0,
-                                  pangolin::AxisZ));
+        pangolin::ModelViewLookAt(cam_p[0], cam_p[1], cam_p[2], 0, 0, 0, pangolin::AxisZ));
 
-    pangolin::View& display3D =
-        pangolin::CreateDisplay()
-            .SetAspect(-640 / 480.0)
-            .SetBounds(0.4, 1.0, 0.4, 1.0)
-            .SetHandler(new pangolin::Handler3D(camera));
+    pangolin::View& display3D = pangolin::CreateDisplay()
+                                    .SetAspect(-640 / 480.0)
+                                    .SetBounds(0.4, 1.0, 0.4, 1.0)
+                                    .SetHandler(new pangolin::Handler3D(camera));
 
     while (!pangolin::ShouldQuit()) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -352,20 +337,18 @@ int main(int argc, char** argv) {
             curr_vis_data->opt_flow_res->input_images.get()) {
           auto& img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
-          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
-               cam_id++) {
+          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS; cam_id++) {
             if (img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  img_data[cam_id].img->ptr, img_data[cam_id].img->w,
-                  img_data[cam_id].img->h, img_data[cam_id].img->pitch, fmt);
+              img_view[cam_id]->SetImage(img_data[cam_id].img->ptr, img_data[cam_id].img->w, img_data[cam_id].img->h,
+                                         img_data[cam_id].img->pitch, fmt);
           }
         }
 
         draw_plots();
       }
 
-      if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() ||
-          show_est_ba.GuiChanged() || show_est_bg.GuiChanged()) {
+      if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() || show_est_ba.GuiChanged() ||
+          show_est_bg.GuiChanged()) {
         draw_plots();
       }
 
@@ -413,15 +396,12 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
 
-          if (show_ids)
-            pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
+          if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
         }
       }
 
       glColor3f(1.0, 0.0, 0.0);
-      pangolin::GlFont::I()
-          .Text("Tracked %d points", points.size())
-          .Draw(5, 20);
+      pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
     }
   }
 }
@@ -433,22 +413,18 @@ void draw_scene() {
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   glColor3ubv(cam_color);
-  Eigen::aligned_vector<Eigen::Vector3d> sub_gt(vio_t_w_i.begin(),
-                                                vio_t_w_i.end());
+  Eigen::aligned_vector<Eigen::Vector3d> sub_gt(vio_t_w_i.begin(), vio_t_w_i.end());
   pangolin::glDrawLineStrip(sub_gt);
 
   if (curr_vis_data.get()) {
     for (const auto& p : curr_vis_data->states)
-      for (const auto& t_i_c : calib.T_i_c)
-        render_camera((p * t_i_c).matrix(), 2.0f, state_color, 0.1f);
+      for (const auto& t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0f, state_color, 0.1f);
 
     for (const auto& p : curr_vis_data->frames)
-      for (const auto& t_i_c : calib.T_i_c)
-        render_camera((p * t_i_c).matrix(), 2.0f, pose_color, 0.1f);
+      for (const auto& t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0f, pose_color, 0.1f);
 
     for (const auto& t_i_c : calib.T_i_c)
-      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0f,
-                    cam_color, 0.1f);
+      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0f, cam_color, 0.1f);
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(curr_vis_data->points);
@@ -463,12 +439,10 @@ void load_data(const std::string& calib_path) {
   if (os.is_open()) {
     cereal::JSONInputArchive archive(os);
     archive(calib);
-    std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras"
-              << std::endl;
+    std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras" << std::endl;
 
   } else {
-    std::cerr << "could not load camera calibration " << calib_path
-              << std::endl;
+    std::cerr << "could not load camera calibration " << calib_path << std::endl;
     std::abort();
   }
 }
@@ -478,45 +452,32 @@ void draw_plots() {
   plotter->ClearMarkers();
 
   if (show_est_pos) {
-    plotter->AddSeries("$0", "$4", pangolin::DrawingModeLine,
-                       pangolin::Colour::Red(), "position x", &vio_data_log);
-    plotter->AddSeries("$0", "$5", pangolin::DrawingModeLine,
-                       pangolin::Colour::Green(), "position y", &vio_data_log);
-    plotter->AddSeries("$0", "$6", pangolin::DrawingModeLine,
-                       pangolin::Colour::Blue(), "position z", &vio_data_log);
+    plotter->AddSeries("$0", "$4", pangolin::DrawingModeLine, pangolin::Colour::Red(), "position x", &vio_data_log);
+    plotter->AddSeries("$0", "$5", pangolin::DrawingModeLine, pangolin::Colour::Green(), "position y", &vio_data_log);
+    plotter->AddSeries("$0", "$6", pangolin::DrawingModeLine, pangolin::Colour::Blue(), "position z", &vio_data_log);
   }
 
   if (show_est_vel) {
-    plotter->AddSeries("$0", "$1", pangolin::DrawingModeLine,
-                       pangolin::Colour::Red(), "velocity x", &vio_data_log);
-    plotter->AddSeries("$0", "$2", pangolin::DrawingModeLine,
-                       pangolin::Colour::Green(), "velocity y", &vio_data_log);
-    plotter->AddSeries("$0", "$3", pangolin::DrawingModeLine,
-                       pangolin::Colour::Blue(), "velocity z", &vio_data_log);
+    plotter->AddSeries("$0", "$1", pangolin::DrawingModeLine, pangolin::Colour::Red(), "velocity x", &vio_data_log);
+    plotter->AddSeries("$0", "$2", pangolin::DrawingModeLine, pangolin::Colour::Green(), "velocity y", &vio_data_log);
+    plotter->AddSeries("$0", "$3", pangolin::DrawingModeLine, pangolin::Colour::Blue(), "velocity z", &vio_data_log);
   }
 
   if (show_est_bg) {
-    plotter->AddSeries("$0", "$7", pangolin::DrawingModeLine,
-                       pangolin::Colour::Red(), "gyro bias x", &vio_data_log);
-    plotter->AddSeries("$0", "$8", pangolin::DrawingModeLine,
-                       pangolin::Colour::Green(), "gyro bias y", &vio_data_log);
-    plotter->AddSeries("$0", "$9", pangolin::DrawingModeLine,
-                       pangolin::Colour::Blue(), "gyro bias z", &vio_data_log);
+    plotter->AddSeries("$0", "$7", pangolin::DrawingModeLine, pangolin::Colour::Red(), "gyro bias x", &vio_data_log);
+    plotter->AddSeries("$0", "$8", pangolin::DrawingModeLine, pangolin::Colour::Green(), "gyro bias y", &vio_data_log);
+    plotter->AddSeries("$0", "$9", pangolin::DrawingModeLine, pangolin::Colour::Blue(), "gyro bias z", &vio_data_log);
   }
 
   if (show_est_ba) {
-    plotter->AddSeries("$0", "$10", pangolin::DrawingModeLine,
-                       pangolin::Colour::Red(), "accel bias x", &vio_data_log);
-    plotter->AddSeries("$0", "$11", pangolin::DrawingModeLine,
-                       pangolin::Colour::Green(), "accel bias y",
+    plotter->AddSeries("$0", "$10", pangolin::DrawingModeLine, pangolin::Colour::Red(), "accel bias x", &vio_data_log);
+    plotter->AddSeries("$0", "$11", pangolin::DrawingModeLine, pangolin::Colour::Green(), "accel bias y",
                        &vio_data_log);
-    plotter->AddSeries("$0", "$12", pangolin::DrawingModeLine,
-                       pangolin::Colour::Blue(), "accel bias z", &vio_data_log);
+    plotter->AddSeries("$0", "$12", pangolin::DrawingModeLine, pangolin::Colour::Blue(), "accel bias z", &vio_data_log);
   }
 
   if (t265_device->last_img_data.get()) {
     double t = t265_device->last_img_data->t_ns * 1e-9;
-    plotter->AddMarker(pangolin::Marker::Vertical, t, pangolin::Marker::Equal,
-                       pangolin::Colour::White());
+    plotter->AddMarker(pangolin::Marker::Vertical, t, pangolin::Marker::Equal, pangolin::Colour::White());
   }
 }

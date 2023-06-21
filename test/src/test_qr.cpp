@@ -16,8 +16,7 @@ TEST(QRTestSuite, QRvsLLT) {
 
   std::cout << "J\n" << J << "\ncol_norms: " << J.colwise().norm() << std::endl;
   std::cout << "R\n" << R << "\ncol_norms: " << R.colwise().norm() << std::endl;
-  std::cout << "LT\n"
-            << LT << "\ncol_norms: " << LT.colwise().norm() << std::endl;
+  std::cout << "LT\n" << LT << "\ncol_norms: " << LT.colwise().norm() << std::endl;
 }
 
 TEST(QRTestSuite, QRvsLLTRankDef) {
@@ -32,8 +31,7 @@ TEST(QRTestSuite, QRvsLLTRankDef) {
 
   std::cout << "J\n" << J << "\ncol_norms: " << J.colwise().norm() << std::endl;
   std::cout << "R\n" << R << "\ncol_norms: " << R.colwise().norm() << std::endl;
-  std::cout << "LT\n"
-            << LT << "\ncol_norms: " << LT.colwise().norm() << std::endl;
+  std::cout << "LT\n" << LT << "\ncol_norms: " << LT.colwise().norm() << std::endl;
 }
 
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
@@ -52,8 +50,7 @@ TEST(QRTestSuite, RankDefLeastSquares) {
   std::cout << "full solution: " << original_solution.transpose() << std::endl;
   std::cout << "Rank " << decomp.rank() << std::endl;
 
-  std::cout << "sol OR:\t" << original_solution.tail<4>().transpose()
-            << std::endl;
+  std::cout << "sol OR:\t" << original_solution.tail<4>().transpose() << std::endl;
 
   std::set<int> idx_to_marg = {0, 1};
   std::set<int> idx_to_keep = {2, 3, 4, 5};
@@ -68,8 +65,7 @@ TEST(QRTestSuite, RankDefLeastSquares) {
     Eigen::MatrixXd marg_sqrt_H;
     Eigen::VectorXd marg_sqrt_b;
 
-    basalt::MargHelper<double>::marginalizeHelperSqToSqrt(
-        H, b, idx_to_keep, idx_to_marg, marg_sqrt_H, marg_sqrt_b);
+    basalt::MargHelper<double>::marginalizeHelperSqToSqrt(H, b, idx_to_keep, idx_to_marg, marg_sqrt_H, marg_sqrt_b);
 
     auto dec = marg_sqrt_H.completeOrthogonalDecomposition();
 
@@ -77,8 +73,7 @@ TEST(QRTestSuite, RankDefLeastSquares) {
     std::cout << "sol SQ:\t" << sol_sqrt_sc.transpose() << std::endl;
     std::cout << "rank " << dec.rank() << std::endl;
 
-    auto dec2 = (marg_sqrt_H.transpose() * marg_sqrt_H)
-                    .completeOrthogonalDecomposition();
+    auto dec2 = (marg_sqrt_H.transpose() * marg_sqrt_H).completeOrthogonalDecomposition();
 
     sol_sqrt_sc2 = dec2.solve(marg_sqrt_H.transpose() * marg_sqrt_b);
     std::cout << "sol SH:\t" << sol_sqrt_sc2.transpose() << std::endl;
@@ -93,8 +88,7 @@ TEST(QRTestSuite, RankDefLeastSquares) {
     Eigen::MatrixXd marg_H;
     Eigen::VectorXd marg_b;
 
-    basalt::MargHelper<double>::marginalizeHelperSqToSq(
-        H, b, idx_to_keep, idx_to_marg, marg_H, marg_b);
+    basalt::MargHelper<double>::marginalizeHelperSqToSq(H, b, idx_to_keep, idx_to_marg, marg_H, marg_b);
 
     auto dec = marg_H.completeOrthogonalDecomposition();
 
@@ -111,8 +105,7 @@ TEST(QRTestSuite, RankDefLeastSquares) {
     Eigen::MatrixXd marg_sqrt_H;
     Eigen::VectorXd marg_sqrt_b;
 
-    basalt::MargHelper<double>::marginalizeHelperSqrtToSqrt(
-        J1, r1, idx_to_keep, idx_to_marg, marg_sqrt_H, marg_sqrt_b);
+    basalt::MargHelper<double>::marginalizeHelperSqrtToSqrt(J1, r1, idx_to_keep, idx_to_marg, marg_sqrt_H, marg_sqrt_b);
 
     auto dec = marg_sqrt_H.completeOrthogonalDecomposition();
 

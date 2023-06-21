@@ -44,8 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <class Scalar_>
-class SqrtKeypointVoEstimator : public VioEstimatorBase,
-                                public SqrtBundleAdjustmentBase<Scalar_> {
+class SqrtKeypointVoEstimator : public VioEstimatorBase, public SqrtBundleAdjustmentBase<Scalar_> {
  public:
   using Scalar = Scalar_;
 
@@ -86,15 +85,12 @@ class SqrtKeypointVoEstimator : public VioEstimatorBase,
   using SqrtBundleAdjustmentBase<Scalar>::checkNullspace;
   using SqrtBundleAdjustmentBase<Scalar>::checkEigenvalues;
 
-  SqrtKeypointVoEstimator(const basalt::Calibration<double>& calib,
-                          const VioConfig& config);
+  SqrtKeypointVoEstimator(const basalt::Calibration<double>& calib, const VioConfig& config);
 
-  void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i,
-                  const Eigen::Vector3d& vel_w_i, const Eigen::Vector3d& bg,
+  void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i, const Eigen::Vector3d& vel_w_i, const Eigen::Vector3d& bg,
                   const Eigen::Vector3d& ba) override;
 
-  void initialize(const Eigen::Vector3d& bg,
-                  const Eigen::Vector3d& ba) override;
+  void initialize(const Eigen::Vector3d& bg, const Eigen::Vector3d& ba) override;
 
   virtual ~SqrtKeypointVoEstimator() { maybe_join(); }
 
@@ -113,8 +109,7 @@ class SqrtKeypointVoEstimator : public VioEstimatorBase,
   // int64_t propagate();
   // void addNewState(int64_t data_t_ns);
 
-  void optimize_and_marg(const OpticalFlowInput::Ptr& input_images,
-                         const std::map<int64_t, int>& num_points_connected,
+  void optimize_and_marg(const OpticalFlowInput::Ptr& input_images, const std::map<int64_t, int>& num_points_connected,
                          const std::unordered_set<KeypointId>& lost_landmaks);
 
   void marginalize(const std::map<int64_t, int>& num_points_connected,
@@ -125,19 +120,11 @@ class SqrtKeypointVoEstimator : public VioEstimatorBase,
   Eigen::VectorXd checkMargNullspace() const;
   Eigen::VectorXd checkMargEigenvalues() const;
 
-  int64_t get_t_ns() const {
-    return frame_states.at(last_state_t_ns).getState().t_ns;
-  }
-  const SE3& get_T_w_i() const {
-    return frame_states.at(last_state_t_ns).getState().T_w_i;
-  }
-  const Vec3& get_vel_w_i() const {
-    return frame_states.at(last_state_t_ns).getState().vel_w_i;
-  }
+  int64_t get_t_ns() const { return frame_states.at(last_state_t_ns).getState().t_ns; }
+  const SE3& get_T_w_i() const { return frame_states.at(last_state_t_ns).getState().T_w_i; }
+  const Vec3& get_vel_w_i() const { return frame_states.at(last_state_t_ns).getState().vel_w_i; }
 
-  const PoseVelBiasState<Scalar>& get_state() const {
-    return frame_states.at(last_state_t_ns).getState();
-  }
+  const PoseVelBiasState<Scalar>& get_state() const { return frame_states.at(last_state_t_ns).getState(); }
   PoseVelBiasState<Scalar> get_state(int64_t t_ns) const {
     PoseVelBiasState<Scalar> state;
 
@@ -192,9 +179,7 @@ class SqrtKeypointVoEstimator : public VioEstimatorBase,
     return res;
   }
 
-  Sophus::SE3d getT_w_i_init() override {
-    return T_w_i_init.template cast<double>();
-  }
+  Sophus::SE3d getT_w_i_init() override { return T_w_i_init.template cast<double>(); }
 
   void debug_finalize() override;
 

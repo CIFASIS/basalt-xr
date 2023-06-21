@@ -40,19 +40,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 VignetteEstimator::VignetteEstimator(
-    const VioDatasetPtr &vio_dataset,
-    const Eigen::aligned_vector<Eigen::Vector2d> &optical_centers,
+    const VioDatasetPtr &vio_dataset, const Eigen::aligned_vector<Eigen::Vector2d> &optical_centers,
     const Eigen::aligned_vector<Eigen::Vector2i> &resolutions,
-    const std::map<TimeCamId, Eigen::aligned_vector<Eigen::Vector3d>>
-        &reprojected_vignette,
+    const std::map<TimeCamId, Eigen::aligned_vector<Eigen::Vector3d>> &reprojected_vignette,
     const AprilGrid &april_grid)
     : vio_dataset(vio_dataset),
       optical_centers(optical_centers),
       resolutions(resolutions),
       reprojected_vignette(reprojected_vignette),
       april_grid(april_grid),
-      vign_param(vio_dataset->get_num_cams(),
-                 RdSpline<1, SPLINE_N>(knot_spacing)) {
+      vign_param(vio_dataset->get_num_cams(), RdSpline<1, SPLINE_N>(knot_spacing)) {
   vign_size = 0;
 
   for (size_t i = 0; i < vio_dataset->get_num_cams(); i++) {
@@ -65,8 +62,7 @@ VignetteEstimator::VignetteEstimator(
   // std::cerr << vign_size << std::endl;
 
   for (size_t i = 0; i < vio_dataset->get_num_cams(); i++) {
-    while (vign_param[i].maxTimeNs() <
-           int64_t(vign_size) * int64_t(1e9 * 0.7)) {
+    while (vign_param[i].maxTimeNs() < int64_t(vign_size) * int64_t(1e9 * 0.7)) {
       vign_param[i].knotsPushBack(Eigen::Matrix<double, 1, 1>(1));
     }
 
@@ -79,8 +75,7 @@ VignetteEstimator::VignetteEstimator(
   std::fill(irradiance.begin(), irradiance.end(), 1.0);
 }
 
-void VignetteEstimator::compute_error(
-    std::map<TimeCamId, std::vector<double>> *reprojected_vignette_error) {
+void VignetteEstimator::compute_error(std::map<TimeCamId, std::vector<double>> *reprojected_vignette_error) {
   //  double error = 0;
   //  double mean_residual = 0;
   double max_residual = 0;
@@ -97,18 +92,15 @@ void VignetteEstimator::compute_error(
 
     Eigen::Vector2d oc = optical_centers[tcid.cam_id];
 
-    BASALT_ASSERT(points_2d_val.size() ==
-                  april_grid.aprilgrid_vignette_pos_3d.size());
+    BASALT_ASSERT(points_2d_val.size() == april_grid.aprilgrid_vignette_pos_3d.size());
 
     std::vector<double> ve(april_grid.aprilgrid_vignette_pos_3d.size());
 
     for (size_t i = 0; i < points_2d_val.size(); i++) {
       if (points_2d_val[i][2] >= 0) {
         double val = points_2d_val[i][2];
-        int64_t loc =
-            (points_2d_val[i].head<2>() - oc).norm() * 1e9;  // in pixels * 1e9
-        double e =
-            irradiance[i] * vign_param[tcid.cam_id].evaluate(loc)[0] - val;
+        int64_t loc = (points_2d_val[i].head<2>() - oc).norm() * 1e9;  // in pixels * 1e9
+        double e = irradiance[i] * vign_param[tcid.cam_id].evaluate(loc)[0] - val;
         ve[i] = e;
         //        error += e * e;
         //        mean_residual += std::abs(e);
@@ -121,8 +113,7 @@ void VignetteEstimator::compute_error(
       }
     }
 
-    if (reprojected_vignette_error)
-      reprojected_vignette_error->emplace(tcid, ve);
+    if (reprojected_vignette_error) reprojected_vignette_error->emplace(tcid, ve);
   }
 
   //  std::cerr << "error " << error << std::endl;
@@ -153,14 +144,12 @@ void VignetteEstimator::opt_irradience() {
 
     Eigen::Vector2d oc = optical_centers[tcid.cam_id];
 
-    BASALT_ASSERT(points_2d_val.size() ==
-                  april_grid.aprilgrid_vignette_pos_3d.size());
+    BASALT_ASSERT(points_2d_val.size() == april_grid.aprilgrid_vignette_pos_3d.size());
 
     for (size_t i = 0; i < points_2d_val.size(); i++) {
       if (points_2d_val[i][2] >= 0) {
         double val = points_2d_val[i][2];
-        int64_t loc =
-            (points_2d_val[i].head<2>() - oc).norm() * 1e9;  // in pixels * 1e9
+        int64_t loc = (points_2d_val[i].head<2>() - oc).norm() * 1e9;  // in pixels * 1e9
 
         new_irradiance[i] += val / vign_param[tcid.cam_id].evaluate(loc)[0];
         new_irradiance_count[i] += 1;
@@ -169,18 +158,15 @@ void VignetteEstimator::opt_irradience() {
   }
 
   for (size_t i = 0; i < irradiance.size(); i++) {
-    if (new_irradiance_count[i] > 0)
-      irradiance[i] = new_irradiance[i] / new_irradiance_count[i];
+    if (new_irradiance_count[i] > 0) irradiance[i] = new_irradiance[i] / new_irradiance_count[i];
   }
 }
 
 void VignetteEstimator::opt_vign() {
   size_t num_knots = vign_param[0].getKnots().size();
 
-  std::vector<std::vector<double>> new_vign_param(
-      vio_dataset->get_num_cams(), std::vector<double>(num_knots, 0));
-  std::vector<std::vector<double>> new_vign_param_count(
-      vio_dataset->get_num_cams(), std::vector<double>(num_knots, 0));
+  std::vector<std::vector<double>> new_vign_param(vio_dataset->get_num_cams(), std::vector<double>(num_knots, 0));
+  std::vector<std::vector<double>> new_vign_param_count(vio_dataset->get_num_cams(), std::vector<double>(num_knots, 0));
 
   for (const auto &kv : reprojected_vignette) {
     const TimeCamId &tcid = kv.first;
@@ -195,8 +181,7 @@ void VignetteEstimator::opt_vign() {
 
     Eigen::Vector2d oc = optical_centers[tcid.cam_id];
 
-    BASALT_ASSERT(points_2d_val.size() ==
-                  april_grid.aprilgrid_vignette_pos_3d.size());
+    BASALT_ASSERT(points_2d_val.size() == april_grid.aprilgrid_vignette_pos_3d.size());
 
     for (size_t i = 0; i < points_2d_val.size(); i++) {
       if (points_2d_val[i][2] >= 0) {
@@ -207,10 +192,8 @@ void VignetteEstimator::opt_vign() {
         vign_param[tcid.cam_id].evaluate(loc, &J);
 
         for (size_t k = 0; k < J.d_val_d_knot.size(); k++) {
-          new_vign_param[tcid.cam_id][J.start_idx + k] +=
-              J.d_val_d_knot[k] * val / irradiance[i];
-          new_vign_param_count[tcid.cam_id][J.start_idx + k] +=
-              J.d_val_d_knot[k];
+          new_vign_param[tcid.cam_id][J.start_idx + k] += J.d_val_d_knot[k] * val / irradiance[i];
+          new_vign_param_count[tcid.cam_id][J.start_idx + k] += J.d_val_d_knot[k];
         }
       }
     }
@@ -247,10 +230,8 @@ void VignetteEstimator::optimize() {
   }
 }
 
-void VignetteEstimator::compute_data_log(
-    std::vector<std::vector<float>> &vign_data_log) {
-  std::vector<std::vector<double>> num_proj_points(
-      vio_dataset->get_num_cams(), std::vector<double>(vign_size, 0));
+void VignetteEstimator::compute_data_log(std::vector<std::vector<float>> &vign_data_log) {
+  std::vector<std::vector<double>> num_proj_points(vio_dataset->get_num_cams(), std::vector<double>(vign_size, 0));
 
   for (const auto &kv : reprojected_vignette) {
     const TimeCamId &tcid = kv.first;
@@ -258,8 +239,7 @@ void VignetteEstimator::compute_data_log(
 
     Eigen::Vector2d oc = optical_centers[tcid.cam_id];
 
-    BASALT_ASSERT(points_2d.size() ==
-                  april_grid.aprilgrid_vignette_pos_3d.size());
+    BASALT_ASSERT(points_2d.size() == april_grid.aprilgrid_vignette_pos_3d.size());
 
     for (size_t i = 0; i < points_2d.size(); i++) {
       if (points_2d[i][2] >= 0) {
@@ -295,8 +275,7 @@ void VignetteEstimator::save_vign_png(const std::string &path) {
         double val = vign_param[k].evaluate(loc)[0];
         if (val < 0.5) continue;
         uint16_t val_int =
-            val >= 1.0 ? std::numeric_limits<uint16_t>::max()
-                       : uint16_t(val * std::numeric_limits<uint16_t>::max());
+            val >= 1.0 ? std::numeric_limits<uint16_t>::max() : uint16_t(val * std::numeric_limits<uint16_t>::max());
         vign_img(x, y) = val_int;
       }
     }

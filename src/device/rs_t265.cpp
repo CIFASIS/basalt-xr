@@ -40,13 +40,9 @@ std::string get_date();
 
 namespace basalt {
 
-RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
-                           bool manual_exposure, int skip_frames,
-                           int webp_quality, double exposure_value)
-    : is_d455(is_d455),
-      manual_exposure(manual_exposure),
-      skip_frames(skip_frames),
-      webp_quality(webp_quality) {
+RsT265Device::RsT265Device(bool is_d455, RsD455Config d455, bool manual_exposure, int skip_frames, int webp_quality,
+                           double exposure_value)
+    : is_d455(is_d455), manual_exposure(manual_exposure), skip_frames(skip_frames), webp_quality(webp_quality) {
   rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
   context = rs2::context();
   pipe = rs2::pipeline(context);
@@ -57,14 +53,10 @@ RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
     BASALT_ASSERT_MSG(d455.accel_fps < d455.gyro_fps,
                       "Accelerometer frequency must be lower than gyroscope's "
                       "because of how IMU interpolation is implemented");
-    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F,
-                         d455.accel_fps);
-    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F,
-                         d455.gyro_fps);
-    config.enable_stream(RS2_STREAM_INFRARED, 1, d455.video_width,
-                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
-    config.enable_stream(RS2_STREAM_INFRARED, 2, d455.video_width,
-                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
+    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, d455.accel_fps);
+    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, d455.gyro_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 1, d455.video_width, d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 2, d455.video_width, d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
   } else {
     config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
     config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
@@ -79,8 +71,7 @@ RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
   }
 
   for (auto& s : context.query_devices()[0].query_sensors()) {
-    std::cout << "Sensor " << s.get_info(RS2_CAMERA_INFO_NAME)
-              << ". Supported options:" << std::endl;
+    std::cout << "Sensor " << s.get_info(RS2_CAMERA_INFO_NAME) << ". Supported options:" << std::endl;
 
     for (const auto& o : s.get_supported_options()) {
       std::cout << "\t" << rs2_option_to_string(o) << std::endl;
@@ -89,8 +80,7 @@ RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
 
   auto device = context.query_devices()[0];
 
-  std::cout << "Device " << device.get_info(RS2_CAMERA_INFO_NAME)
-            << " connected" << std::endl;
+  std::cout << "Device " << device.get_info(RS2_CAMERA_INFO_NAME) << " connected" << std::endl;
   sensor = device.query_sensors()[0];
 
   if (!manual_exposure) {
@@ -109,8 +99,7 @@ RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
 }
 
 void RsT265Device::disableLaserEmitters() {
-  std::vector<rs2::sensor> sensors =
-      pipe.get_active_profile().get_device().query_sensors();
+  std::vector<rs2::sensor> sensors = pipe.get_active_profile().get_device().query_sensors();
   for (auto&& sensor : sensors) {
     if (sensor.is<rs2::depth_stereo_sensor>()) {
       sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 0);
@@ -129,43 +118,35 @@ void RsT265Device::start() {
           motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
         RsIMUData d;
         d.timestamp = motion.get_timestamp();
-        d.data << motion.get_motion_data().x, motion.get_motion_data().y,
-            motion.get_motion_data().z;
+        d.data << motion.get_motion_data().x, motion.get_motion_data().y, motion.get_motion_data().z;
 
         gyro_data_queue.emplace_back(d);
-      } else if (motion &&
-                 motion.get_profile().stream_type() == RS2_STREAM_ACCEL &&
+      } else if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL &&
                  motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
         RsIMUData d;
         d.timestamp = motion.get_timestamp();
-        d.data << motion.get_motion_data().x, motion.get_motion_data().y,
-            motion.get_motion_data().z;
+        d.data << motion.get_motion_data().x, motion.get_motion_data().y, motion.get_motion_data().z;
 
         if (!prev_accel_data.get()) {
           prev_accel_data.reset(new RsIMUData(d));
         } else {
           BASALT_ASSERT(d.timestamp > prev_accel_data->timestamp);
 
-          while (!gyro_data_queue.empty() && gyro_data_queue.front().timestamp <
-                                                 prev_accel_data->timestamp) {
+          while (!gyro_data_queue.empty() && gyro_data_queue.front().timestamp < prev_accel_data->timestamp) {
             std::cout << "Skipping gyro data. Timestamp before the first accel "
                          "measurement.";
             gyro_data_queue.pop_front();
           }
 
-          while (!gyro_data_queue.empty() &&
-                 gyro_data_queue.front().timestamp < d.timestamp) {
+          while (!gyro_data_queue.empty() && gyro_data_queue.front().timestamp < d.timestamp) {
             RsIMUData gyro_data = gyro_data_queue.front();
             gyro_data_queue.pop_front();
 
-            double w0 = (d.timestamp - gyro_data.timestamp) /
-                        (d.timestamp - prev_accel_data->timestamp);
+            double w0 = (d.timestamp - gyro_data.timestamp) / (d.timestamp - prev_accel_data->timestamp);
 
-            double w1 = (gyro_data.timestamp - prev_accel_data->timestamp) /
-                        (d.timestamp - prev_accel_data->timestamp);
+            double w1 = (gyro_data.timestamp - prev_accel_data->timestamp) / (d.timestamp - prev_accel_data->timestamp);
 
-            Eigen::Vector3d accel_interpolated =
-                w0 * prev_accel_data->data + w1 * d.data;
+            Eigen::Vector3d accel_interpolated = w0 * prev_accel_data->data + w1 * d.data;
 
             basalt::ImuData<double>::Ptr data;
             data.reset(new basalt::ImuData<double>);
@@ -222,11 +203,9 @@ void RsT265Device::start() {
 
         data->t_ns = t_ns;
 
-        data->img_data[i].exposure =
-            vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
+        data->img_data[i].exposure = vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
 
-        data->img_data[i].img.reset(new basalt::ManagedImage<uint16_t>(
-            vf.get_width(), vf.get_height()));
+        data->img_data[i].img.reset(new basalt::ManagedImage<uint16_t>(vf.get_width(), vf.get_height()));
 
         const uint8_t* data_in = (const uint8_t*)vf.get_data();
         uint16_t* data_out = data->img_data[i].img->ptr;
@@ -253,10 +232,8 @@ void RsT265Device::start() {
       RsPoseData pdata;
       pdata.t_ns = pf.get_timestamp() * 1e6;
 
-      Eigen::Vector3d trans(data.translation.x, data.translation.y,
-                            data.translation.z);
-      Eigen::Quaterniond quat(data.rotation.w, data.rotation.x, data.rotation.y,
-                              data.rotation.z);
+      Eigen::Vector3d trans(data.translation.x, data.translation.y, data.translation.z);
+      Eigen::Quaterniond quat(data.rotation.w, data.rotation.x, data.rotation.y, data.rotation.z);
 
       pdata.data = Sophus::SE3d(quat, trans);
 
@@ -294,37 +271,30 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
 
   auto accel_stream = profile.get_stream(RS2_STREAM_ACCEL);
   auto gyro_stream = profile.get_stream(RS2_STREAM_GYRO);
-  auto cam0_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 1)
-                             : profile.get_stream(RS2_STREAM_FISHEYE, 1);
-  auto cam1_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 2)
-                             : profile.get_stream(RS2_STREAM_FISHEYE, 2);
+  auto cam0_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 1) : profile.get_stream(RS2_STREAM_FISHEYE, 1);
+  auto cam1_stream = is_d455 ? profile.get_stream(RS2_STREAM_INFRARED, 2) : profile.get_stream(RS2_STREAM_FISHEYE, 2);
 
   // get gyro extrinsics
   if (auto gyro = gyro_stream.as<rs2::motion_stream_profile>()) {
     rs2_motion_device_intrinsic intrinsics = gyro.get_motion_intrinsics();
 
     Eigen::Matrix<Scalar, 12, 1> gyro_bias_full;
-    gyro_bias_full << intrinsics.data[0][3], intrinsics.data[1][3],
-        intrinsics.data[2][3], intrinsics.data[0][0] - 1.0,
-        intrinsics.data[1][0], intrinsics.data[2][0], intrinsics.data[0][1],
-        intrinsics.data[1][1] - 1.0, intrinsics.data[2][1],
-        intrinsics.data[0][2], intrinsics.data[1][2],
-        intrinsics.data[2][2] - 1.0;
+    gyro_bias_full << intrinsics.data[0][3], intrinsics.data[1][3], intrinsics.data[2][3], intrinsics.data[0][0] - 1.0,
+        intrinsics.data[1][0], intrinsics.data[2][0], intrinsics.data[0][1], intrinsics.data[1][1] - 1.0,
+        intrinsics.data[2][1], intrinsics.data[0][2], intrinsics.data[1][2], intrinsics.data[2][2] - 1.0;
     basalt::CalibGyroBias<Scalar> gyro_bias;
     gyro_bias.getParam() = gyro_bias_full;
     calib->calib_gyro_bias = gyro_bias;
 
     // std::cout << "Gyro Bias\n" << gyro_bias_full << std::endl;
 
-    calib->gyro_noise_std = Eigen::Vector3d(intrinsics.noise_variances[0],
-                                            intrinsics.noise_variances[1],
-                                            intrinsics.noise_variances[2])
-                                .cwiseSqrt();
+    calib->gyro_noise_std =
+        Eigen::Vector3d(intrinsics.noise_variances[0], intrinsics.noise_variances[1], intrinsics.noise_variances[2])
+            .cwiseSqrt();
 
-    calib->gyro_bias_std = Eigen::Vector3d(intrinsics.bias_variances[0],
-                                           intrinsics.bias_variances[1],
-                                           intrinsics.bias_variances[2])
-                               .cwiseSqrt();
+    calib->gyro_bias_std =
+        Eigen::Vector3d(intrinsics.bias_variances[0], intrinsics.bias_variances[1], intrinsics.bias_variances[2])
+            .cwiseSqrt();
 
     // std::cout << "Gyro noise var: " << intrinsics.noise_variances[0]
     //          << " bias var: " << intrinsics.bias_variances[0] << std::endl;
@@ -336,10 +306,8 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
   if (auto accel = accel_stream.as<rs2::motion_stream_profile>()) {
     rs2_motion_device_intrinsic intrinsics = accel.get_motion_intrinsics();
     Eigen::Matrix<Scalar, 9, 1> accel_bias_full;
-    accel_bias_full << intrinsics.data[0][3], intrinsics.data[1][3],
-        intrinsics.data[2][3], intrinsics.data[0][0] - 1.0,
-        intrinsics.data[1][0], intrinsics.data[2][0],
-        intrinsics.data[1][1] - 1.0, intrinsics.data[2][1],
+    accel_bias_full << intrinsics.data[0][3], intrinsics.data[1][3], intrinsics.data[2][3], intrinsics.data[0][0] - 1.0,
+        intrinsics.data[1][0], intrinsics.data[2][0], intrinsics.data[1][1] - 1.0, intrinsics.data[2][1],
         intrinsics.data[2][2] - 1.0;
     basalt::CalibAccelBias<Scalar> accel_bias;
     accel_bias.getParam() = accel_bias_full;
@@ -347,15 +315,13 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
 
     // std::cout << "Gyro Bias\n" << accel_bias_full << std::endl;
 
-    calib->accel_noise_std = Eigen::Vector3d(intrinsics.noise_variances[0],
-                                             intrinsics.noise_variances[1],
-                                             intrinsics.noise_variances[2])
-                                 .cwiseSqrt();
+    calib->accel_noise_std =
+        Eigen::Vector3d(intrinsics.noise_variances[0], intrinsics.noise_variances[1], intrinsics.noise_variances[2])
+            .cwiseSqrt();
 
-    calib->accel_bias_std = Eigen::Vector3d(intrinsics.bias_variances[0],
-                                            intrinsics.bias_variances[1],
-                                            intrinsics.bias_variances[2])
-                                .cwiseSqrt();
+    calib->accel_bias_std =
+        Eigen::Vector3d(intrinsics.bias_variances[0], intrinsics.bias_variances[1], intrinsics.bias_variances[2])
+            .cwiseSqrt();
 
     // std::cout << "Accel noise var: " << intrinsics.noise_variances[0]
     //          << " bias var: " << intrinsics.bias_variances[0] << std::endl;
@@ -395,9 +361,8 @@ std::shared_ptr<basalt::Calibration<double>> RsT265Device::exportCalibration() {
         camera.variant = pinhole;
       } else {
         basalt::KannalaBrandtCamera4<Scalar>::VecN params;
-        params << intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy,
-            intrinsics.coeffs[0], intrinsics.coeffs[1], intrinsics.coeffs[2],
-            intrinsics.coeffs[3];
+        params << intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy, intrinsics.coeffs[0],
+            intrinsics.coeffs[1], intrinsics.coeffs[2], intrinsics.coeffs[3];
         basalt::KannalaBrandtCamera4 kannala_brandt(params);
         camera.variant = kannala_brandt;
       }

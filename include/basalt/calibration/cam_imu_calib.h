@@ -59,9 +59,8 @@ class SplineOptimization;
 
 class CamImuCalib {
  public:
-  CamImuCalib(const std::string &dataset_path, const std::string &dataset_type,
-              const std::string &aprilgrid_path, const std::string &cache_path,
-              const std::string &cache_dataset_name, int skip_images,
+  CamImuCalib(const std::string &dataset_path, const std::string &dataset_type, const std::string &aprilgrid_path,
+              const std::string &cache_path, const std::string &cache_dataset_name, int skip_images,
               const std::vector<double> &imu_noise, bool show_gui = true);
 
   ~CamImuCalib();
@@ -88,8 +87,7 @@ class CamImuCalib {
 
   void optimize();
 
-  bool optimizeWithParam(bool print_info,
-                         std::map<std::string, double> *stats = nullptr);
+  bool optimizeWithParam(bool print_info, std::map<std::string, double> *stats = nullptr);
 
   void saveCalib();
 

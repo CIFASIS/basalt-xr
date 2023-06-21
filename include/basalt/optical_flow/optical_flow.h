@@ -36,19 +36,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <chrono>
 #include <memory>
+#include <thread>
+#include <utility>
 
 #include <Eigen/Geometry>
 
 #include <basalt/utils/vio_config.h>
 
+#include <basalt/image/image_pyr.h>
 #include <basalt/imu/imu_types.h>
 #include <basalt/io/dataset_io.h>
+#include <basalt/optical_flow/patch.h>
+#include <basalt/utils/assert.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
 #include <slam_tracker.hpp>
-#include <utility>
 #include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
@@ -79,9 +83,7 @@ struct OpticalFlowInput {
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
-  void addTime(const char* name, int64_t custom_ts = INT64_MIN) {
-    stats.addTime(name, custom_ts);
-  }
+  void addTime(const char* name, int64_t custom_ts = INT64_MIN) { stats.addTime(name, custom_ts); }
 };
 
 struct OpticalFlowResult {
@@ -101,7 +103,20 @@ class OpticalFlowBase {
  public:
   using Ptr = std::shared_ptr<OpticalFlowBase>;
 
-  tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
+  OpticalFlowBase(const VioConfig& conf) : config(conf) {
+    input_img_queue.set_capacity(10);
+    input_imu_queue.set_capacity(300);
+    // patch_coord is initialized in OpticalFlowTyped since we need the Pattern type
+    // patch_coord = PatchT::pattern2.template cast<float>();
+    depth_guess = config.optical_flow_matching_default_depth;
+  }
+  ~OpticalFlowBase() { processing_thread->join(); }
+
+  virtual void processingLoop() = 0;
+
+  void start() { processing_thread.reset(new std::thread(&OpticalFlowBase::processingLoop, this)); }
+
+  tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_img_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
   tbb::concurrent_queue<PoseVelBiasState<double>::Ptr> input_state_queue;
@@ -114,11 +129,59 @@ class OpticalFlowBase {
 
   bool first_state_arrived = false;
   bool show_gui;  //!< Whether we need to store additional info for the UI
+
+  int64_t t_ns = -1;
+  size_t frame_counter = 0;
+  KeypointId last_keypoint_id = 0;
+
+  VioConfig config;
+
+  OpticalFlowResult::Ptr transforms;
+  std::shared_ptr<std::thread> processing_thread;
+  std::shared_ptr<std::vector<ManagedImagePyr<uint16_t>>> old_pyramid;
+  std::shared_ptr<std::vector<ManagedImagePyr<uint16_t>>> pyramid;
+};
+
+template <typename Scalar, template <typename> typename Pattern>
+class OpticalFlowTyped : public OpticalFlowBase {
+ public:
+  using Ptr = std::shared_ptr<OpticalFlowTyped>;
+
+  using PatchT = OpticalFlowPatch<Scalar, Pattern<Scalar>>;
+
+  using Vector2 = Eigen::Matrix<Scalar, 2, 1>;
+  using Matrix2 = Eigen::Matrix<Scalar, 2, 2>;
+
+  using Vector3 = Eigen::Matrix<Scalar, 3, 1>;
+  using Matrix3 = Eigen::Matrix<Scalar, 3, 3>;
+
+  using Vector4 = Eigen::Matrix<Scalar, 4, 1>;
+  using Matrix4 = Eigen::Matrix<Scalar, 4, 4>;
+
+  using SE2 = Sophus::SE2<Scalar>;
+  using SE3 = Sophus::SE3<Scalar>;
+
+  OpticalFlowTyped(const VioConfig& conf, const basalt::Calibration<double>& cal)
+      : OpticalFlowBase(conf), calib(cal.template cast<Scalar>()) {
+    patch_coord = PatchT::pattern2.template cast<float>();
+
+    E.resize(getNumCams());
+    for (size_t i = 0; i < getNumCams(); i++) {
+      Eigen::Matrix4d Ed;
+      SE3 T_i_j = calib.T_i_c[0].inverse() * calib.T_i_c[1];
+      computeEssential(T_i_j.template cast<double>(), Ed);
+      E[i] = Ed.cast<Scalar>();
+    }
+  }
+
+  size_t getNumCams() const { return calib.intrinsics.size(); }
+
+  const Calibration<Scalar> calib;
+  std::vector<Matrix4> E;  // Essential matrix w.r.t. cam 0
 };
 
 class OpticalFlowFactory {
  public:
-  static OpticalFlowBase::Ptr getOpticalFlow(const VioConfig& config,
-                                             const Calibration<double>& cam);
+  static OpticalFlowBase::Ptr getOpticalFlow(const VioConfig& config, const Calibration<double>& cam);
 };
 }  // namespace basalt

@@ -72,10 +72,8 @@ struct LinearizeBase {
 
   typedef typename Eigen::aligned_vector<PoseData>::const_iterator PoseDataIter;
   typedef typename Eigen::aligned_vector<GyroData>::const_iterator GyroDataIter;
-  typedef
-      typename Eigen::aligned_vector<AccelData>::const_iterator AccelDataIter;
-  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator
-      AprilgridCornersDataIter;
+  typedef typename Eigen::aligned_vector<AccelData>::const_iterator AccelDataIter;
+  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator AprilgridCornersDataIter;
 
   template <int INTRINSICS_SIZE>
   struct PoseCalibH {
@@ -99,8 +97,7 @@ struct LinearizeBase {
   struct CalibCommonData {
     const Calibration<Scalar>* calibration = nullptr;
     const MocapCalibration<Scalar>* mocap_calibration = nullptr;
-    const Eigen::aligned_vector<Eigen::Vector4d>* aprilgrid_corner_pos_3d =
-        nullptr;
+    const Eigen::aligned_vector<Eigen::Vector4d>* aprilgrid_corner_pos_3d = nullptr;
 
     // Calib data
     const std::vector<size_t>* offset_T_i_c = nullptr;
@@ -132,19 +129,15 @@ struct LinearizeBase {
   };
 
   template <class CamT>
-  inline void linearize_point(const Eigen::Vector2d& corner_pos, int corner_id,
-                              const Eigen::Matrix4d& T_c_w, const CamT& cam,
-                              PoseCalibH<CamT::N>* cph, double& error,
-                              int& num_points, double& reproj_err) const {
+  inline void linearize_point(const Eigen::Vector2d& corner_pos, int corner_id, const Eigen::Matrix4d& T_c_w,
+                              const CamT& cam, PoseCalibH<CamT::N>* cph, double& error, int& num_points,
+                              double& reproj_err) const {
     Eigen::Matrix<double, 2, 4> d_r_d_p;
     Eigen::Matrix<double, 2, CamT::N> d_r_d_param;
 
-    BASALT_ASSERT_STREAM(
-        corner_id < int(common_data.aprilgrid_corner_pos_3d->size()),
-        "corner_id " << corner_id);
+    BASALT_ASSERT_STREAM(corner_id < int(common_data.aprilgrid_corner_pos_3d->size()), "corner_id " << corner_id);
 
-    Eigen::Vector4d point3d =
-        T_c_w * common_data.aprilgrid_corner_pos_3d->at(corner_id);
+    Eigen::Vector4d point3d = T_c_w * common_data.aprilgrid_corner_pos_3d->at(corner_id);
 
     Eigen::Vector2d proj;
     bool valid;
@@ -158,15 +151,13 @@ struct LinearizeBase {
     Eigen::Vector2d residual = proj - corner_pos;
 
     double e = residual.norm();
-    double huber_weight =
-        e < common_data.huber_thresh ? 1.0 : common_data.huber_thresh / e;
+    double huber_weight = e < common_data.huber_thresh ? 1.0 : common_data.huber_thresh / e;
 
     if (cph) {
       Eigen::Matrix<double, 4, 6> d_point_d_xi;
 
       d_point_d_xi.topLeftCorner<3, 3>().setIdentity();
-      d_point_d_xi.topRightCorner<3, 3>() =
-          -Sophus::SO3d::hat(point3d.head<3>());
+      d_point_d_xi.topRightCorner<3, 3>() = -Sophus::SO3d::hat(point3d.head<3>());
       d_point_d_xi.row(3).setZero();
 
       Eigen::Matrix<double, 2, 6> d_r_d_xi = d_r_d_p * d_point_d_xi;
@@ -174,8 +165,7 @@ struct LinearizeBase {
       cph->H_pose_accum += huber_weight * d_r_d_xi.transpose() * d_r_d_xi;
       cph->b_pose_accum += huber_weight * d_r_d_xi.transpose() * residual;
 
-      cph->H_intr_pose_accum +=
-          huber_weight * d_r_d_param.transpose() * d_r_d_xi;
+      cph->H_intr_pose_accum += huber_weight * d_r_d_param.transpose() * d_r_d_xi;
       cph->H_intr_accum += huber_weight * d_r_d_param.transpose() * d_r_d_param;
       cph->b_intr_accum += huber_weight * d_r_d_param.transpose() * residual;
     }

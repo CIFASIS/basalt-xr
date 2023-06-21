@@ -58,9 +58,8 @@ class KittiVioDataset : public VioDataset {
   Eigen::aligned_vector<AccelData> accel_data;
   Eigen::aligned_vector<GyroData> gyro_data;
 
-  std::vector<int64_t> gt_timestamps;  // ordered gt timestamps
-  Eigen::aligned_vector<Sophus::SE3d>
-      gt_pose_data;  // TODO: change to eigen aligned
+  std::vector<int64_t> gt_timestamps;                // ordered gt timestamps
+  Eigen::aligned_vector<Sophus::SE3d> gt_pose_data;  // TODO: change to eigen aligned
 
   int64_t mocap_to_imu_offset_ns;
 
@@ -71,18 +70,10 @@ class KittiVioDataset : public VioDataset {
 
   std::vector<int64_t> &get_image_timestamps() { return image_timestamps; }
 
-  const Eigen::aligned_vector<AccelData> &get_accel_data() const {
-    return accel_data;
-  }
-  const Eigen::aligned_vector<GyroData> &get_gyro_data() const {
-    return gyro_data;
-  }
-  const std::vector<int64_t> &get_gt_timestamps() const {
-    return gt_timestamps;
-  }
-  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const {
-    return gt_pose_data;
-  }
+  const Eigen::aligned_vector<AccelData> &get_accel_data() const { return accel_data; }
+  const Eigen::aligned_vector<GyroData> &get_gyro_data() const { return gyro_data; }
+  const std::vector<int64_t> &get_gt_timestamps() const { return gt_timestamps; }
+  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const { return gt_pose_data; }
   int64_t get_mocap_to_imu_offset_ns() const { return mocap_to_imu_offset_ns; }
 
   std::vector<ImageData> get_image_data(int64_t t_ns) {
@@ -128,8 +119,7 @@ class KittiIO : public DatasetIoInterface {
   KittiIO() {}
 
   void read(const std::string &path) {
-    if (!fs::exists(path))
-      std::cerr << "No dataset found in " << path << std::endl;
+    if (!fs::exists(path)) std::cerr << "No dataset found in " << path << std::endl;
 
     data.reset(new KittiVioDataset);
 
@@ -161,8 +151,7 @@ class KittiIO : public DatasetIoInterface {
       int64_t t_ns = t_s * 1e9;
 
       std::stringstream ss1;
-      ss1 << std::setfill('0') << std::setw(6) << data->image_timestamps.size()
-          << ".png";
+      ss1 << std::setfill('0') << std::setw(6) << data->image_timestamps.size() << ".png";
 
       data->image_timestamps.emplace_back(t_ns);
       data->image_path[t_ns] = ss1.str();
@@ -185,9 +174,8 @@ class KittiIO : public DatasetIoInterface {
       Eigen::Matrix3d rot;
       Eigen::Vector3d pos;
 
-      ss >> rot(0, 0) >> rot(0, 1) >> rot(0, 2) >> pos[0] >> rot(1, 0) >>
-          rot(1, 1) >> rot(1, 2) >> pos[1] >> rot(2, 0) >> rot(2, 1) >>
-          rot(2, 2) >> pos[2];
+      ss >> rot(0, 0) >> rot(0, 1) >> rot(0, 2) >> pos[0] >> rot(1, 0) >> rot(1, 1) >> rot(1, 2) >> pos[1] >>
+          rot(2, 0) >> rot(2, 1) >> rot(2, 2) >> pos[2];
 
       data->gt_timestamps.emplace_back(data->image_timestamps[i]);
       data->gt_pose_data.emplace_back(Eigen::Quaterniond(rot), pos);

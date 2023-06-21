@@ -39,17 +39,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <class Scalar_>
-void MargHelper<Scalar_>::marginalizeHelperSqToSq(
-    MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
-    const std::set<int>& idx_to_marg, MatX& marg_H, VecX& marg_b) {
+void MargHelper<Scalar_>::marginalizeHelperSqToSq(MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
+                                                  const std::set<int>& idx_to_marg, MatX& marg_H, VecX& marg_b) {
   int keep_size = idx_to_keep.size();
   int marg_size = idx_to_marg.size();
 
   BASALT_ASSERT(keep_size + marg_size == abs_H.cols());
 
   // Fill permutation matrix
-  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() +
-                                                idx_to_marg.size());
+  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() + idx_to_marg.size());
 
   {
     auto it = idx_to_keep.begin();
@@ -67,8 +65,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSq(
     }
   }
 
-  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(
-      indices);
+  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(indices);
 
   const Eigen::PermutationMatrix<Eigen::Dynamic> pt = p.transpose();
 
@@ -99,8 +96,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSq(
   //          .jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
 
   // Eigen version of pseudoinverse
-  auto H_mm_decomposition = abs_H.bottomRightCorner(marg_size, marg_size)
-                                .completeOrthogonalDecomposition();
+  auto H_mm_decomposition = abs_H.bottomRightCorner(marg_size, marg_size).completeOrthogonalDecomposition();
   MatX H_mm_inv = H_mm_decomposition.pseudoInverse();
 
   // Should be more numerially stable version of:
@@ -113,8 +109,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSq(
   marg_H = abs_H.topLeftCorner(keep_size, keep_size);
   marg_b = abs_b.head(keep_size);
 
-  marg_H -= abs_H.topRightCorner(keep_size, marg_size) *
-            abs_H.bottomLeftCorner(marg_size, keep_size);
+  marg_H -= abs_H.topRightCorner(keep_size, marg_size) * abs_H.bottomLeftCorner(marg_size, keep_size);
   marg_b -= abs_H.topRightCorner(keep_size, marg_size) * abs_b.tail(marg_size);
 
   abs_H.resize(0, 0);
@@ -122,9 +117,9 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSq(
 }
 
 template <class Scalar_>
-void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
-    MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
-    const std::set<int>& idx_to_marg, MatX& marg_sqrt_H, VecX& marg_sqrt_b) {
+void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
+                                                    const std::set<int>& idx_to_marg, MatX& marg_sqrt_H,
+                                                    VecX& marg_sqrt_b) {
   // TODO: We might lose the strong initial pose prior if there are no obs
   // during marginalization (e.g. during first marginalization). Unclear when
   // this can happen. Keeping keyframes w/o any points in the optimization
@@ -137,8 +132,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
   BASALT_ASSERT(keep_size + marg_size == abs_H.cols());
 
   // Fill permutation matrix
-  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() +
-                                                idx_to_marg.size());
+  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() + idx_to_marg.size());
 
   {
     auto it = idx_to_keep.begin();
@@ -156,8 +150,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
     }
   }
 
-  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(
-      indices);
+  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(indices);
 
   const Eigen::PermutationMatrix<Eigen::Dynamic> pt = p.transpose();
 
@@ -188,8 +181,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
   //          .jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
 
   // Eigen version of pseudoinverse
-  auto H_mm_decomposition = abs_H.bottomRightCorner(marg_size, marg_size)
-                                .completeOrthogonalDecomposition();
+  auto H_mm_decomposition = abs_H.bottomRightCorner(marg_size, marg_size).completeOrthogonalDecomposition();
   MatX H_mm_inv = H_mm_decomposition.pseudoInverse();
 
   // Should be more numerially stable version of:
@@ -204,8 +196,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
   marg_H = abs_H.topLeftCorner(keep_size, keep_size);
   marg_b = abs_b.head(keep_size);
 
-  marg_H -= abs_H.topRightCorner(keep_size, marg_size) *
-            abs_H.bottomLeftCorner(marg_size, keep_size);
+  marg_H -= abs_H.topRightCorner(keep_size, marg_size) * abs_H.bottomLeftCorner(marg_size, keep_size);
   marg_b -= abs_H.topRightCorner(keep_size, marg_size) * abs_b.tail(marg_size);
 
   Eigen::LDLT<Eigen::Ref<MatX>> ldlt(marg_H);
@@ -255,9 +246,9 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSqrt(
 }
 
 template <class Scalar_>
-void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
-    MatX& Q2Jp, VecX& Q2r, const std::set<int>& idx_to_keep,
-    const std::set<int>& idx_to_marg, MatX& marg_sqrt_H, VecX& marg_sqrt_b) {
+void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(MatX& Q2Jp, VecX& Q2r, const std::set<int>& idx_to_keep,
+                                                      const std::set<int>& idx_to_marg, MatX& marg_sqrt_H,
+                                                      VecX& marg_sqrt_b) {
   Eigen::Index keep_size = idx_to_keep.size();
   Eigen::Index marg_size = idx_to_marg.size();
 
@@ -265,8 +256,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
   BASALT_ASSERT(Q2Jp.rows() == Q2r.rows());
 
   // Fill permutation matrix
-  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() +
-                                                idx_to_marg.size());
+  Eigen::Matrix<int, Eigen::Dynamic, 1> indices(idx_to_keep.size() + idx_to_marg.size());
 
   {
     auto it = idx_to_marg.begin();
@@ -285,8 +275,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
   }
 
   // TODO: check if using TranspositionMatrix is faster
-  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(
-      indices);
+  const Eigen::PermutationWrapper<Eigen::Matrix<int, Eigen::Dynamic, 1>> p(indices);
 
   Q2Jp.applyOnTheRight(p);
 
@@ -294,8 +283,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
   Eigen::Index total_rank = 0;
 
   {
-    const Scalar rank_threshold =
-        std::sqrt(std::numeric_limits<Scalar>::epsilon());
+    const Scalar rank_threshold = std::sqrt(std::numeric_limits<Scalar>::epsilon());
 
     const Eigen::Index rows = Q2Jp.rows();
     const Eigen::Index cols = Q2Jp.cols();
@@ -316,11 +304,8 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
         Q2Jp.coeffRef(total_rank, k) = beta;
 
         Q2Jp.bottomRightCorner(remainingRows, remainingCols)
-            .applyHouseholderOnTheLeft(Q2Jp.col(k).tail(remainingRows - 1),
-                                       hCoeff, tempData + k + 1);
-        Q2r.tail(remainingRows)
-            .applyHouseholderOnTheLeft(Q2Jp.col(k).tail(remainingRows - 1),
-                                       hCoeff, tempData + cols);
+            .applyHouseholderOnTheLeft(Q2Jp.col(k).tail(remainingRows - 1), hCoeff, tempData + k + 1);
+        Q2r.tail(remainingRows).applyHouseholderOnTheLeft(Q2Jp.col(k).tail(remainingRows - 1), hCoeff, tempData + cols);
         total_rank++;
       } else {
         Q2Jp.coeffRef(total_rank, k) = 0;
@@ -336,8 +321,7 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
     }
   }
 
-  Eigen::Index keep_valid_rows =
-      std::max(total_rank - marg_rank, Eigen::Index(1));
+  Eigen::Index keep_valid_rows = std::max(total_rank - marg_rank, Eigen::Index(1));
 
   marg_sqrt_H = Q2Jp.block(marg_rank, marg_size, keep_valid_rows, keep_size);
   marg_sqrt_b = Q2r.segment(marg_rank, keep_valid_rows);
@@ -350,9 +334,9 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(
 // instatiate templates
 
 // Note: double specialization is unconditional, b/c NfrMapper depends on it.
-//#ifdef BASALT_INSTANTIATIONS_DOUBLE
+// #ifdef BASALT_INSTANTIATIONS_DOUBLE
 template class MargHelper<double>;
-//#endif
+// #endif
 
 #ifdef BASALT_INSTANTIATIONS_FLOAT
 template class MargHelper<float>;

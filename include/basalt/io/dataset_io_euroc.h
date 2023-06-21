@@ -58,9 +58,8 @@ class EurocVioDataset : public VioDataset {
   Eigen::aligned_vector<AccelData> accel_data;
   Eigen::aligned_vector<GyroData> gyro_data;
 
-  std::vector<int64_t> gt_timestamps;  // ordered gt timestamps
-  Eigen::aligned_vector<Sophus::SE3d>
-      gt_pose_data;  // TODO: change to eigen aligned
+  std::vector<int64_t> gt_timestamps;                // ordered gt timestamps
+  Eigen::aligned_vector<Sophus::SE3d> gt_pose_data;  // TODO: change to eigen aligned
 
   int64_t mocap_to_imu_offset_ns = 0;
 
@@ -73,18 +72,10 @@ class EurocVioDataset : public VioDataset {
 
   std::vector<int64_t> &get_image_timestamps() { return image_timestamps; }
 
-  const Eigen::aligned_vector<AccelData> &get_accel_data() const {
-    return accel_data;
-  }
-  const Eigen::aligned_vector<GyroData> &get_gyro_data() const {
-    return gyro_data;
-  }
-  const std::vector<int64_t> &get_gt_timestamps() const {
-    return gt_timestamps;
-  }
-  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const {
-    return gt_pose_data;
-  }
+  const Eigen::aligned_vector<AccelData> &get_accel_data() const { return accel_data; }
+  const Eigen::aligned_vector<GyroData> &get_gyro_data() const { return gyro_data; }
+  const std::vector<int64_t> &get_gt_timestamps() const { return gt_timestamps; }
+  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const { return gt_pose_data; }
 
   int64_t get_mocap_to_imu_offset_ns() const { return mocap_to_imu_offset_ns; }
 
@@ -92,8 +83,7 @@ class EurocVioDataset : public VioDataset {
     std::vector<ImageData> res(num_cams);
 
     for (size_t i = 0; i < num_cams; i++) {
-      std::string full_image_path =
-          path + "/mav0/cam" + std::to_string(i) + "/data/" + image_path[t_ns];
+      std::string full_image_path = path + "/mav0/cam" + std::to_string(i) + "/data/" + image_path[t_ns];
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
@@ -124,8 +114,7 @@ class EurocVioDataset : public VioDataset {
           }
         } else if (img.type() == CV_16UC1) {
           res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-          std::memcpy(res[i].img->ptr, img.ptr(),
-                      img.cols * img.rows * sizeof(uint16_t));
+          std::memcpy(res[i].img->ptr, img.ptr(), img.cols * img.rows * sizeof(uint16_t));
 
         } else {
           std::cerr << "img.fmt.bpp " << img.type() << std::endl;
@@ -152,8 +141,7 @@ class EurocIO : public DatasetIoInterface {
   EurocIO(bool load_mocap_as_gt) : load_mocap_as_gt(load_mocap_as_gt) {}
 
   void read(const std::string &path) {
-    if (!fs::exists(path))
-      std::cerr << "No dataset found in " << path << std::endl;
+    if (!fs::exists(path)) std::cerr << "No dataset found in " << path << std::endl;
 
     data.reset(new EurocVioDataset);
 
@@ -170,8 +158,7 @@ class EurocIO : public DatasetIoInterface {
 
     read_imu_data(path + "/mav0/imu0/");
 
-    if (!load_mocap_as_gt &&
-        fs::exists(path + "/mav0/state_groundtruth_estimate0/data.csv")) {
+    if (!load_mocap_as_gt && fs::exists(path + "/mav0/state_groundtruth_estimate0/data.csv")) {
       read_gt_data_state(path + "/mav0/state_groundtruth_estimate0/");
     } else if (!load_mocap_as_gt && fs::exists(path + "/mav0/gt/data.csv")) {
       read_gt_data_pose(path + "/mav0/gt/");
@@ -194,8 +181,7 @@ class EurocIO : public DatasetIoInterface {
   VioDatasetPtr get_data() { return data; }
 
  private:
-  void read_exposure(const std::string &path,
-                     std::unordered_map<int64_t, double> &exposure_data) {
+  void read_exposure(const std::string &path, std::unordered_map<int64_t, double> &exposure_data) {
     exposure_data.clear();
 
     std::ifstream f(path + "exposure.csv");
@@ -246,8 +232,8 @@ class EurocIO : public DatasetIoInterface {
       uint64_t timestamp;
       Eigen::Vector3d gyro, accel;
 
-      ss >> timestamp >> tmp >> gyro[0] >> tmp >> gyro[1] >> tmp >> gyro[2] >>
-          tmp >> accel[0] >> tmp >> accel[1] >> tmp >> accel[2];
+      ss >> timestamp >> tmp >> gyro[0] >> tmp >> gyro[1] >> tmp >> gyro[2] >> tmp >> accel[0] >> tmp >> accel[1] >>
+          tmp >> accel[2];
 
       data->accel_data.emplace_back();
       data->accel_data.back().timestamp_ns = timestamp;
@@ -275,11 +261,9 @@ class EurocIO : public DatasetIoInterface {
       Eigen::Quaterniond q;
       Eigen::Vector3d pos, vel, accel_bias, gyro_bias;
 
-      ss >> timestamp >> tmp >> pos[0] >> tmp >> pos[1] >> tmp >> pos[2] >>
-          tmp >> q.w() >> tmp >> q.x() >> tmp >> q.y() >> tmp >> q.z() >> tmp >>
-          vel[0] >> tmp >> vel[1] >> tmp >> vel[2] >> tmp >> accel_bias[0] >>
-          tmp >> accel_bias[1] >> tmp >> accel_bias[2] >> tmp >> gyro_bias[0] >>
-          tmp >> gyro_bias[1] >> tmp >> gyro_bias[2];
+      ss >> timestamp >> tmp >> pos[0] >> tmp >> pos[1] >> tmp >> pos[2] >> tmp >> q.w() >> tmp >> q.x() >> tmp >>
+          q.y() >> tmp >> q.z() >> tmp >> vel[0] >> tmp >> vel[1] >> tmp >> vel[2] >> tmp >> accel_bias[0] >> tmp >>
+          accel_bias[1] >> tmp >> accel_bias[2] >> tmp >> gyro_bias[0] >> tmp >> gyro_bias[1] >> tmp >> gyro_bias[2];
 
       data->gt_timestamps.emplace_back(timestamp);
       data->gt_pose_data.emplace_back(q, pos);
@@ -302,8 +286,8 @@ class EurocIO : public DatasetIoInterface {
       Eigen::Quaterniond q;
       Eigen::Vector3d pos;
 
-      ss >> timestamp >> tmp >> pos[0] >> tmp >> pos[1] >> tmp >> pos[2] >>
-          tmp >> q.w() >> tmp >> q.x() >> tmp >> q.y() >> tmp >> q.z();
+      ss >> timestamp >> tmp >> pos[0] >> tmp >> pos[1] >> tmp >> pos[2] >> tmp >> q.w() >> tmp >> q.x() >> tmp >>
+          q.y() >> tmp >> q.z();
 
       data->gt_timestamps.emplace_back(timestamp);
       data->gt_pose_data.emplace_back(q, pos);

@@ -46,13 +46,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <typename Scalar, int POSE_SIZE>
-LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
-    BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom,
-    const Options& options, const MargLinData<Scalar>* marg_lin_data,
-    const ImuLinData<Scalar>* imu_lin_data,
-    const std::set<FrameId>* used_frames,
-    const std::unordered_set<KeypointId>* lost_landmarks,
-    int64_t last_state_to_marg)
+LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<Scalar>* estimator,
+                                                          const AbsOrderMap& aom, const Options& options,
+                                                          const MargLinData<Scalar>* marg_lin_data,
+                                                          const ImuLinData<Scalar>* imu_lin_data,
+                                                          const std::set<FrameId>* used_frames,
+                                                          const std::unordered_set<KeypointId>* lost_landmarks,
+                                                          int64_t last_state_to_marg)
     : options_(options),
       estimator(estimator),
       lmdb_(estimator->lmdb),
@@ -66,9 +66,8 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
       pose_damping_diagonal_sqrt(0) {
   UNUSED(last_state_to_marg);
 
-  BASALT_ASSERT_STREAM(
-      options.lb_options.huber_parameter == estimator->huber_thresh,
-      "Huber threshold should be set to the same value");
+  BASALT_ASSERT_STREAM(options.lb_options.huber_parameter == estimator->huber_thresh,
+                       "Huber threshold should be set to the same value");
 
   BASALT_ASSERT_STREAM(options.lb_options.obs_std_dev == estimator->obs_std_dev,
                        "obs_std_dev should be set to the same value");
@@ -140,8 +139,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
 
         lb = LandmarkBlock<Scalar>::template createLandmarkBlock<POSE_SIZE>();
 
-        lb->allocateLandmark(landmark, relative_pose_lin, calib, aom,
-                             options.lb_options);
+        lb->allocateLandmark(landmark, relative_pose_lin, calib, aom, options.lb_options);
       }
     };
 
@@ -162,8 +160,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
 
   if (imu_lin_data) {
     for (const auto& kv : imu_lin_data->imu_meas) {
-      imu_blocks.emplace_back(
-          new ImuBlock<Scalar>(kv.second, imu_lin_data, aom));
+      imu_blocks.emplace_back(new ImuBlock<Scalar>(kv.second, imu_lin_data, aom));
     }
   }
 
@@ -176,14 +173,12 @@ template <typename Scalar, int POSE_SIZE>
 LinearizationAbsQR<Scalar, POSE_SIZE>::~LinearizationAbsQR() = default;
 
 template <typename Scalar_, int POSE_SIZE_>
-void LinearizationAbsQR<Scalar_, POSE_SIZE_>::log_problem_stats(
-    ExecutionStats& stats) const {
+void LinearizationAbsQR<Scalar_, POSE_SIZE_>::log_problem_stats(ExecutionStats& stats) const {
   UNUSED(stats);
 }
 
 template <typename Scalar, int POSE_SIZE>
-Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(
-    bool* numerically_valid) {
+Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(bool* numerically_valid) {
   // reset damping and scaling (might be set from previous iteration)
   pose_damping_diagonal = 0;
   pose_damping_diagonal_sqrt = 0;
@@ -198,24 +193,20 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(
       RelPoseLin<Scalar>& rpl = relative_pose_lin.at(key);
 
       if (tcid_h != tcid_t) {
-        const PoseStateWithLin<Scalar>& state_h =
-            estimator->getPoseStateWithLin(tcid_h.frame_id);
-        const PoseStateWithLin<Scalar>& state_t =
-            estimator->getPoseStateWithLin(tcid_t.frame_id);
+        const PoseStateWithLin<Scalar>& state_h = estimator->getPoseStateWithLin(tcid_h.frame_id);
+        const PoseStateWithLin<Scalar>& state_t = estimator->getPoseStateWithLin(tcid_t.frame_id);
 
         // compute relative pose & Jacobians at linearization point
         Sophus::SE3<Scalar> T_t_h_sophus =
-            computeRelPose(state_h.getPoseLin(), calib.T_i_c[tcid_h.cam_id],
-                           state_t.getPoseLin(), calib.T_i_c[tcid_t.cam_id],
-                           &rpl.d_rel_d_h, &rpl.d_rel_d_t);
+            computeRelPose(state_h.getPoseLin(), calib.T_i_c[tcid_h.cam_id], state_t.getPoseLin(),
+                           calib.T_i_c[tcid_t.cam_id], &rpl.d_rel_d_h, &rpl.d_rel_d_t);
 
         // if either state is already linearized, then the current state
         // estimate is different from the linearization point, so recompute
         // the value (not Jacobian) again based on the current state.
         if (state_h.isLinearized() || state_t.isLinearized()) {
-          T_t_h_sophus =
-              computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id],
-                             state_t.getPose(), calib.T_i_c[tcid_t.cam_id]);
+          T_t_h_sophus = computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id], state_t.getPose(),
+                                        calib.T_i_c[tcid_t.cam_id]);
         }
 
         rpl.T_t_h = T_t_h_sophus.matrix();
@@ -230,12 +221,10 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(
   // Linearize landmarks
   size_t num_landmarks = landmark_blocks.size();
 
-  auto body = [&](const tbb::blocked_range<size_t>& range,
-                  std::pair<Scalar, bool> error_valid) {
+  auto body = [&](const tbb::blocked_range<size_t>& range, std::pair<Scalar, bool> error_valid) {
     for (size_t r = range.begin(); r != range.end(); ++r) {
       error_valid.first += landmark_blocks[r]->linearizeLandmark();
-      error_valid.second =
-          error_valid.second && !landmark_blocks[r]->isNumericalFailure();
+      error_valid.second = error_valid.second && !landmark_blocks[r]->isNumericalFailure();
     }
     return error_valid;
   };
@@ -280,8 +269,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::performQR() {
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::setPoseDamping(
-    const Scalar lambda) {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::setPoseDamping(const Scalar lambda) {
   BASALT_ASSERT(lambda >= 0);
 
   pose_damping_diagonal = lambda;
@@ -289,8 +277,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::setPoseDamping(
 }
 
 template <typename Scalar, int POSE_SIZE>
-Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::backSubstitute(
-    const VecX& pose_inc) {
+Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::backSubstitute(const VecX& pose_inc) {
   BASALT_ASSERT(pose_inc.size() == signed_cast(aom.total_size));
 
   auto body = [&](const tbb::blocked_range<size_t>& range, Scalar l_diff) {
@@ -301,8 +288,7 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::backSubstitute(
   };
 
   tbb::blocked_range<size_t> range(0, landmark_block_idx.size());
-  Scalar l_diff =
-      tbb::parallel_reduce(range, Scalar(0), body, std::plus<Scalar>());
+  Scalar l_diff = tbb::parallel_reduce(range, Scalar(0), body, std::plus<Scalar>());
 
   if (imu_lin_data) {
     for (auto& imu_block : imu_blocks) {
@@ -314,21 +300,18 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::backSubstitute(
     size_t marg_size = marg_lin_data->H.cols();
     VecX pose_inc_marg = pose_inc.head(marg_size);
 
-    l_diff += estimator->computeMargPriorModelCostChange(
-        *marg_lin_data, marg_scaling, pose_inc_marg);
+    l_diff += estimator->computeMargPriorModelCostChange(*marg_lin_data, marg_scaling, pose_inc_marg);
   }
 
   return l_diff;
 }
 
 template <typename Scalar, int POSE_SIZE>
-typename LinearizationAbsQR<Scalar, POSE_SIZE>::VecX
-LinearizationAbsQR<Scalar, POSE_SIZE>::getJp_diag2() const {
+typename LinearizationAbsQR<Scalar, POSE_SIZE>::VecX LinearizationAbsQR<Scalar, POSE_SIZE>::getJp_diag2() const {
   // TODO: group relative by host frame
 
   struct Reductor {
-    Reductor(size_t num_rows,
-             const std::vector<LandmarkBlockPtr>& landmark_blocks)
+    Reductor(size_t num_rows, const std::vector<LandmarkBlockPtr>& landmark_blocks)
         : num_rows_(num_rows), landmark_blocks_(landmark_blocks) {
       res_.setZero(num_rows);
     }
@@ -340,8 +323,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::getJp_diag2() const {
       }
     }
 
-    Reductor(Reductor& a, tbb::split)
-        : num_rows_(a.num_rows_), landmark_blocks_(a.landmark_blocks_) {
+    Reductor(Reductor& a, tbb::split) : num_rows_(a.num_rows_), landmark_blocks_(a.landmark_blocks_) {
       res_.setZero(num_rows_);
     };
 
@@ -377,9 +359,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::getJp_diag2() const {
   if (marg_lin_data) {
     size_t marg_size = marg_lin_data->H.cols();
     if (marg_scaling.rows() > 0) {
-      r.res_.head(marg_size) += (marg_lin_data->H * marg_scaling.asDiagonal())
-                                    .colwise()
-                                    .squaredNorm();
+      r.res_.head(marg_size) += (marg_lin_data->H * marg_scaling.asDiagonal()).colwise().squaredNorm();
     } else {
       r.res_.head(marg_size) += marg_lin_data->H.colwise().squaredNorm();
     }
@@ -401,8 +381,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::scaleJl_cols() {
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::scaleJp_cols(
-    const VecX& jacobian_scaling) {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::scaleJp_cols(const VecX& jacobian_scaling) {
   //    auto body = [&](const tbb::blocked_range<size_t>& range) {
   //      for (size_t r = range.begin(); r != range.end(); ++r) {
   //        landmark_blocks[r]->scaleJp_cols(jacobian_scaling);
@@ -443,11 +422,9 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::scaleJp_cols(
       size_t h_idx = aom.abs_order_map.at(k.first.frame_id).first;
       size_t t_idx = aom.abs_order_map.at(k.second.frame_id).first;
 
-      v.d_rel_d_h *=
-          jacobian_scaling.template segment<POSE_SIZE>(h_idx).asDiagonal();
+      v.d_rel_d_h *= jacobian_scaling.template segment<POSE_SIZE>(h_idx).asDiagonal();
 
-      v.d_rel_d_t *=
-          jacobian_scaling.template segment<POSE_SIZE>(t_idx).asDiagonal();
+      v.d_rel_d_t *= jacobian_scaling.template segment<POSE_SIZE>(t_idx).asDiagonal();
     }
   }
 
@@ -480,8 +457,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::setLandmarkDamping(Scalar lambda) {
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r(
-    MatX& Q2Jp, VecX& Q2r) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r(MatX& Q2Jp, VecX& Q2r) const {
   size_t total_size = num_rows_Q2r;
   size_t poses_size = aom.total_size;
 
@@ -534,11 +510,9 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r(
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_H_b(MatX& H,
-                                                          VecX& b) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_H_b(MatX& H, VecX& b) const {
   struct Reductor {
-    Reductor(size_t opt_size,
-             const std::vector<LandmarkBlockPtr>& landmark_blocks)
+    Reductor(size_t opt_size, const std::vector<LandmarkBlockPtr>& landmark_blocks)
         : opt_size_(opt_size), landmark_blocks_(landmark_blocks) {
       H_.setZero(opt_size_, opt_size_);
       b_.setZero(opt_size_);
@@ -551,8 +525,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_H_b(MatX& H,
       }
     }
 
-    Reductor(Reductor& a, tbb::split)
-        : opt_size_(a.opt_size_), landmark_blocks_(a.landmark_blocks_) {
+    Reductor(Reductor& a, tbb::split) : opt_size_(a.opt_size_), landmark_blocks_(a.landmark_blocks_) {
       H_.setZero(opt_size_, opt_size_);
       b_.setZero(opt_size_);
     };
@@ -591,19 +564,16 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_H_b(MatX& H,
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_pose_damping(
-    MatX& Q2Jp, size_t start_idx) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_pose_damping(MatX& Q2Jp, size_t start_idx) const {
   size_t poses_size = num_cameras * POSE_SIZE;
   if (hasPoseDamping()) {
-    Q2Jp.template block(start_idx, 0, poses_size, poses_size)
-        .diagonal()
-        .array() = pose_damping_diagonal_sqrt;
+    Q2Jp.template block(start_idx, 0, poses_size, poses_size).diagonal().array() = pose_damping_diagonal_sqrt;
   }
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_marg_prior(
-    MatX& Q2Jp, VecX& Q2r, size_t start_idx) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_marg_prior(MatX& Q2Jp, VecX& Q2r,
+                                                                          size_t start_idx) const {
   if (!marg_lin_data) return;
 
   BASALT_ASSERT(marg_lin_data->is_sqrt);
@@ -615,27 +585,23 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_marg_prior(
   estimator->computeDelta(marg_lin_data->order, delta);
 
   if (marg_scaling.rows() > 0) {
-    Q2Jp.template block(start_idx, 0, marg_rows, marg_cols) =
-        marg_lin_data->H * marg_scaling.asDiagonal();
+    Q2Jp.template block(start_idx, 0, marg_rows, marg_cols) = marg_lin_data->H * marg_scaling.asDiagonal();
   } else {
     Q2Jp.template block(start_idx, 0, marg_rows, marg_cols) = marg_lin_data->H;
   }
 
-  Q2r.template segment(start_idx, marg_rows) =
-      marg_lin_data->H * delta + marg_lin_data->b;
+  Q2r.template segment(start_idx, marg_rows) = marg_lin_data->H * delta + marg_lin_data->b;
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_pose_damping(
-    MatX& H) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_pose_damping(MatX& H) const {
   if (hasPoseDamping()) {
     H.diagonal().array() += pose_damping_diagonal;
   }
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_marg_prior(
-    MatX& H, VecX& b) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_marg_prior(MatX& H, VecX& b) const {
   if (!marg_lin_data) return;
 
   // Scaling not supported ATM
@@ -668,8 +634,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_marg_prior(
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_imu(
-    DenseAccumulator<Scalar>& accum) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_imu(DenseAccumulator<Scalar>& accum) const {
   if (!imu_lin_data) return;
 
   for (const auto& imu_block : imu_blocks) {
@@ -678,8 +643,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_imu(
 }
 
 template <typename Scalar, int POSE_SIZE>
-void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_imu(MatX& H,
-                                                              VecX& b) const {
+void LinearizationAbsQR<Scalar, POSE_SIZE>::add_dense_H_b_imu(MatX& H, VecX& b) const {
   if (!imu_lin_data) return;
 
   // workaround: create an accumulator here, to avoid implementing the

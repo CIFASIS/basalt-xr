@@ -113,8 +113,7 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
     Eigen::aligned_unordered_map<int, Mat3> Hll;
     Eigen::aligned_unordered_map<int, Mat3> Hllinv;
     Eigen::aligned_unordered_map<int, Vec3> bl;
-    Eigen::aligned_unordered_map<int, std::vector<std::pair<size_t, size_t>>>
-        lm_to_obs;
+    Eigen::aligned_unordered_map<int, std::vector<std::pair<size_t, size_t>>> lm_to_obs;
 
     Eigen::aligned_vector<FrameRelLinData> Hpppl;
 
@@ -176,8 +175,7 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
     Eigen::aligned_unordered_map<int, Mat3> Hll;
     Eigen::aligned_unordered_map<int, Mat3> Hllinv;
     Eigen::aligned_unordered_map<int, Vec3> bl;
-    Eigen::aligned_unordered_map<int, std::vector<std::pair<size_t, size_t>>>
-        lm_to_obs;
+    Eigen::aligned_unordered_map<int, std::vector<std::pair<size_t, size_t>>> lm_to_obs;
 
     Eigen::aligned_vector<FrameAbsLinData> Hpppl;
 
@@ -186,74 +184,56 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
 
   using BundleAdjustmentBase<Scalar>::computeDelta;
 
-  void linearizeHelper(
-      Eigen::aligned_vector<RelLinData>& rld_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
-      Scalar& error) const {
+  void linearizeHelper(Eigen::aligned_vector<RelLinData>& rld_vec,
+                       const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+                       Scalar& error) const {
     linearizeHelperStatic(rld_vec, obs_to_lin, this, error);
   }
 
-  void linearizeAbsHelper(
-      Eigen::aligned_vector<AbsLinData>& ald_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
-      Scalar& error) const {
+  void linearizeAbsHelper(Eigen::aligned_vector<AbsLinData>& ald_vec,
+                          const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+                          Scalar& error) const {
     linearizeHelperAbsStatic(ald_vec, obs_to_lin, this, error);
   }
 
   static void linearizeHelperStatic(
       Eigen::aligned_vector<RelLinData>& rld_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+      const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
       const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error);
 
-  void linearizeHelperAbs(
-      Eigen::aligned_vector<AbsLinData>& ald_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
-      Scalar& error) const {
+  void linearizeHelperAbs(Eigen::aligned_vector<AbsLinData>& ald_vec,
+                          const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+                          Scalar& error) const {
     linearizeHelperAbsStatic(ald_vec, obs_to_lin, this, error);
   }
 
   static void linearizeHelperAbsStatic(
       Eigen::aligned_vector<AbsLinData>& ald_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+      const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
       const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error);
 
   static void linearizeRel(const RelLinData& rld, MatX& H, VecX& b);
 
-  static void updatePoints(const AbsOrderMap& aom, const RelLinData& rld,
-                           const VecX& inc, LandmarkDatabase<Scalar>& lmdb,
-                           Scalar* l_diff = nullptr);
+  static void updatePoints(const AbsOrderMap& aom, const RelLinData& rld, const VecX& inc,
+                           LandmarkDatabase<Scalar>& lmdb, Scalar* l_diff = nullptr);
 
-  static void updatePointsAbs(const AbsOrderMap& aom, const AbsLinData& ald,
-                              const VecX& inc, LandmarkDatabase<Scalar>& lmdb,
-                              Scalar* l_diff = nullptr);
+  static void updatePointsAbs(const AbsOrderMap& aom, const AbsLinData& ald, const VecX& inc,
+                              LandmarkDatabase<Scalar>& lmdb, Scalar* l_diff = nullptr);
 
   static Eigen::VectorXd checkNullspace(
       const MatX& H, const VecX& b, const AbsOrderMap& marg_order,
-      const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>&
-          frame_states,
-      const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses,
-      bool verbose = true);
+      const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>& frame_states,
+      const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses, bool verbose = true);
 
   static Eigen::VectorXd checkEigenvalues(const MatX& H, bool verbose = true);
 
-  static void computeImuError(
-      const AbsOrderMap& aom, Scalar& imu_error, Scalar& bg_error,
-      Scalar& ba_error,
-      const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>&
-          states,
-      const Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>>&
-          imu_meas,
-      const Vec3& gyro_bias_weight, const Vec3& accel_bias_weight,
-      const Vec3& g);
+  static void computeImuError(const AbsOrderMap& aom, Scalar& imu_error, Scalar& bg_error, Scalar& ba_error,
+                              const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>& states,
+                              const Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>>& imu_meas,
+                              const Vec3& gyro_bias_weight, const Vec3& accel_bias_weight, const Vec3& g);
 
   template <class AccumT>
-  static void linearizeAbs(const MatX& rel_H, const VecX& rel_b,
-                           const RelLinDataBase& rld, const AbsOrderMap& aom,
+  static void linearizeAbs(const MatX& rel_H, const VecX& rel_b, const RelLinDataBase& rld, const AbsOrderMap& aom,
                            AccumT& accum) {
     // int asize = aom.total_size;
 
@@ -268,12 +248,10 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
       int abs_h_idx = aom.abs_order_map.at(tcid_h.frame_id).first;
       int abs_ti_idx = aom.abs_order_map.at(tcid_ti.frame_id).first;
 
-      accum.template addB<POSE_SIZE>(
-          abs_h_idx, rld.d_rel_d_h[i].transpose() *
-                         rel_b.template segment<POSE_SIZE>(i * POSE_SIZE));
-      accum.template addB<POSE_SIZE>(
-          abs_ti_idx, rld.d_rel_d_t[i].transpose() *
-                          rel_b.template segment<POSE_SIZE>(i * POSE_SIZE));
+      accum.template addB<POSE_SIZE>(abs_h_idx,
+                                     rld.d_rel_d_h[i].transpose() * rel_b.template segment<POSE_SIZE>(i * POSE_SIZE));
+      accum.template addB<POSE_SIZE>(abs_ti_idx,
+                                     rld.d_rel_d_t[i].transpose() * rel_b.template segment<POSE_SIZE>(i * POSE_SIZE));
 
       for (size_t j = 0; j < rld.order.size(); j++) {
         BASALT_ASSERT(rld.order[i].first == rld.order[j].first);
@@ -282,44 +260,33 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
 
         int abs_tj_idx = aom.abs_order_map.at(tcid_tj.frame_id).first;
 
-        if (tcid_h.frame_id == tcid_ti.frame_id ||
-            tcid_h.frame_id == tcid_tj.frame_id)
-          continue;
+        if (tcid_h.frame_id == tcid_ti.frame_id || tcid_h.frame_id == tcid_tj.frame_id) continue;
 
         accum.template addH<POSE_SIZE, POSE_SIZE>(
             abs_h_idx, abs_h_idx,
-            rld.d_rel_d_h[i].transpose() *
-                rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i,
-                                                           POSE_SIZE * j) *
+            rld.d_rel_d_h[i].transpose() * rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i, POSE_SIZE * j) *
                 rld.d_rel_d_h[j]);
 
         accum.template addH<POSE_SIZE, POSE_SIZE>(
             abs_ti_idx, abs_h_idx,
-            rld.d_rel_d_t[i].transpose() *
-                rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i,
-                                                           POSE_SIZE * j) *
+            rld.d_rel_d_t[i].transpose() * rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i, POSE_SIZE * j) *
                 rld.d_rel_d_h[j]);
 
         accum.template addH<POSE_SIZE, POSE_SIZE>(
             abs_h_idx, abs_tj_idx,
-            rld.d_rel_d_h[i].transpose() *
-                rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i,
-                                                           POSE_SIZE * j) *
+            rld.d_rel_d_h[i].transpose() * rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i, POSE_SIZE * j) *
                 rld.d_rel_d_t[j]);
 
         accum.template addH<POSE_SIZE, POSE_SIZE>(
             abs_ti_idx, abs_tj_idx,
-            rld.d_rel_d_t[i].transpose() *
-                rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i,
-                                                           POSE_SIZE * j) *
+            rld.d_rel_d_t[i].transpose() * rel_H.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * i, POSE_SIZE * j) *
                 rld.d_rel_d_t[j]);
       }
     }
   }
 
   template <class AccumT>
-  static void linearizeAbs(const AbsLinData& ald, const AbsOrderMap& aom,
-                           AccumT& accum) {
+  static void linearizeAbs(const AbsLinData& ald, const AbsOrderMap& aom, AccumT& accum) {
     for (size_t i = 0; i < ald.order.size(); i++) {
       const TimeCamId& tcid_h = ald.order[i].first;
       const TimeCamId& tcid_ti = ald.order[i].second;
@@ -330,14 +297,10 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
       const FrameAbsLinData& fald = ald.Hpppl.at(i);
 
       // Pose H and b part
-      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_h_idx,
-                                                fald.Hphph);
-      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_ti_idx,
-                                                fald.Hptpt);
-      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_ti_idx,
-                                                fald.Hphpt);
-      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_h_idx,
-                                                fald.Hphpt.transpose());
+      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_h_idx, fald.Hphph);
+      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_ti_idx, fald.Hptpt);
+      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_ti_idx, fald.Hphpt);
+      accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_h_idx, fald.Hphpt.transpose());
 
       accum.template addB<POSE_SIZE>(abs_h_idx, fald.bph);
       accum.template addB<POSE_SIZE>(abs_ti_idx, fald.bpt);
@@ -350,10 +313,8 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
         H_phl_H_ll_inv = fald.Hphl[j] * ald.Hllinv.at(lm_id);
         H_ptl_H_ll_inv = fald.Hptl[j] * ald.Hllinv.at(lm_id);
 
-        accum.template addB<POSE_SIZE>(abs_h_idx,
-                                       -H_phl_H_ll_inv * ald.bl.at(lm_id));
-        accum.template addB<POSE_SIZE>(abs_ti_idx,
-                                       -H_ptl_H_ll_inv * ald.bl.at(lm_id));
+        accum.template addB<POSE_SIZE>(abs_h_idx, -H_phl_H_ll_inv * ald.bl.at(lm_id));
+        accum.template addB<POSE_SIZE>(abs_ti_idx, -H_ptl_H_ll_inv * ald.bl.at(lm_id));
 
         const auto& other_obs = ald.lm_to_obs.at(lm_id);
 
@@ -365,25 +326,18 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
           const TimeCamId& tcid_tk = ald.order.at(other_frame_idx).second;
 
           // Assume same host frame
-          BASALT_ASSERT(tcid_hk.frame_id == tcid_h.frame_id &&
-                        tcid_hk.cam_id == tcid_h.cam_id);
+          BASALT_ASSERT(tcid_hk.frame_id == tcid_h.frame_id && tcid_hk.cam_id == tcid_h.cam_id);
 
           int abs_tk_idx = aom.abs_order_map.at(tcid_tk.frame_id).first;
 
-          Eigen::Matrix<Scalar, 3, POSE_SIZE> H_l_ph_other =
-              fald_other.Hphl[other_lm_idx].transpose();
+          Eigen::Matrix<Scalar, 3, POSE_SIZE> H_l_ph_other = fald_other.Hphl[other_lm_idx].transpose();
 
-          Eigen::Matrix<Scalar, 3, POSE_SIZE> H_l_pt_other =
-              fald_other.Hptl[other_lm_idx].transpose();
+          Eigen::Matrix<Scalar, 3, POSE_SIZE> H_l_pt_other = fald_other.Hptl[other_lm_idx].transpose();
 
-          accum.template addH<POSE_SIZE, POSE_SIZE>(
-              abs_h_idx, abs_h_idx, -H_phl_H_ll_inv * H_l_ph_other);
-          accum.template addH<POSE_SIZE, POSE_SIZE>(
-              abs_ti_idx, abs_h_idx, -H_ptl_H_ll_inv * H_l_ph_other);
-          accum.template addH<POSE_SIZE, POSE_SIZE>(
-              abs_h_idx, abs_tk_idx, -H_phl_H_ll_inv * H_l_pt_other);
-          accum.template addH<POSE_SIZE, POSE_SIZE>(
-              abs_ti_idx, abs_tk_idx, -H_ptl_H_ll_inv * H_l_pt_other);
+          accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_h_idx, -H_phl_H_ll_inv * H_l_ph_other);
+          accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_h_idx, -H_ptl_H_ll_inv * H_l_ph_other);
+          accum.template addH<POSE_SIZE, POSE_SIZE>(abs_h_idx, abs_tk_idx, -H_phl_H_ll_inv * H_l_pt_other);
+          accum.template addH<POSE_SIZE, POSE_SIZE>(abs_ti_idx, abs_tk_idx, -H_ptl_H_ll_inv * H_l_pt_other);
         }
       }
     }
@@ -393,17 +347,11 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
   struct LinearizeAbsReduce {
     static_assert(std::is_same_v<typename AccumT::Scalar, Scalar>);
 
-    using RelLinConstDataIter =
-        typename Eigen::aligned_vector<RelLinData>::const_iterator;
+    using RelLinConstDataIter = typename Eigen::aligned_vector<RelLinData>::const_iterator;
 
-    LinearizeAbsReduce(const AbsOrderMap& aom) : aom(aom) {
-      accum.reset(aom.total_size);
-    }
+    LinearizeAbsReduce(const AbsOrderMap& aom) : aom(aom) { accum.reset(aom.total_size); }
 
-    LinearizeAbsReduce(const LinearizeAbsReduce& other, tbb::split)
-        : aom(other.aom) {
-      accum.reset(aom.total_size);
-    }
+    LinearizeAbsReduce(const LinearizeAbsReduce& other, tbb::split) : aom(other.aom) { accum.reset(aom.total_size); }
 
     void operator()(const tbb::blocked_range<RelLinConstDataIter>& range) {
       for (const RelLinData& rld : range) {
@@ -425,17 +373,11 @@ class ScBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
   struct LinearizeAbsReduce2 {
     static_assert(std::is_same_v<typename AccumT::Scalar, Scalar>);
 
-    using AbsLinDataConstIter =
-        typename Eigen::aligned_vector<AbsLinData>::const_iterator;
+    using AbsLinDataConstIter = typename Eigen::aligned_vector<AbsLinData>::const_iterator;
 
-    LinearizeAbsReduce2(const AbsOrderMap& aom) : aom(aom) {
-      accum.reset(aom.total_size);
-    }
+    LinearizeAbsReduce2(const AbsOrderMap& aom) : aom(aom) { accum.reset(aom.total_size); }
 
-    LinearizeAbsReduce2(const LinearizeAbsReduce2& other, tbb::split)
-        : aom(other.aom) {
-      accum.reset(aom.total_size);
-    }
+    LinearizeAbsReduce2(const LinearizeAbsReduce2& other, tbb::split) : aom(other.aom) { accum.reset(aom.total_size); }
 
     void operator()(const tbb::blocked_range<AbsLinDataConstIter>& range) {
       for (const AbsLinData& ald : range) {

@@ -82,11 +82,8 @@ basalt::VioDatasetPtr vio_dataset;
 basalt::VioConfig vio_config;
 basalt::OpticalFlowBase::Ptr opt_flow_ptr;
 
-tbb::concurrent_unordered_map<int64_t, basalt::OpticalFlowResult::Ptr,
-                              std::hash<int64_t>>
-    observations;
-tbb::concurrent_bounded_queue<basalt::OpticalFlowResult::Ptr>
-    observations_queue;
+tbb::concurrent_unordered_map<int64_t, basalt::OpticalFlowResult::Ptr, std::hash<int64_t>> observations;
+tbb::concurrent_bounded_queue<basalt::OpticalFlowResult::Ptr> observations_queue;
 
 basalt::Calibration<double> calib;
 
@@ -97,17 +94,16 @@ void feed_images() {
 
   int NUM_CAMS = calib.intrinsics.size();
   for (size_t i = 0; i < vio_dataset->get_image_timestamps().size(); i++) {
-    basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput(NUM_CAMS));
+    basalt::OpticalFlowInput::Ptr img(new basalt::OpticalFlowInput(NUM_CAMS));
 
-    data->t_ns = vio_dataset->get_image_timestamps()[i];
-    data->img_data = vio_dataset->get_image_data(data->t_ns);
+    img->t_ns = vio_dataset->get_image_timestamps()[i];
+    img->img_data = vio_dataset->get_image_data(img->t_ns);
 
-    opt_flow_ptr->input_queue.push(data);
+    opt_flow_ptr->input_img_queue.push(img);
   }
 
   // Indicate the end of the sequence
-  basalt::OpticalFlowInput::Ptr data;
-  opt_flow_ptr->input_queue.push(data);
+  opt_flow_ptr->input_img_queue.push(nullptr);
 
   std::cout << "Finished input_data thread " << std::endl;
 }
@@ -143,8 +139,8 @@ void read_result() {
     sum += kv.second;
   }
 
-  std::cout << "Mean track length: " << sum / keypoint_stats.size()
-            << " num_points: " << keypoint_stats.size() << std::endl;
+  std::cout << "Mean track length: " << sum / keypoint_stats.size() << " num_points: " << keypoint_stats.size()
+            << std::endl;
 }
 
 int main(int argc, char** argv) {
@@ -157,15 +153,11 @@ int main(int argc, char** argv) {
   CLI::App app{"App description"};
 
   app.add_option("--show-gui", show_gui, "Show GUI");
-  app.add_option("--cam-calib", cam_calib_path,
-                 "Ground-truth camera calibration used for simulation.")
-      ->required();
+  app.add_option("--cam-calib", cam_calib_path, "Ground-truth camera calibration used for simulation.")->required();
 
-  app.add_option("--dataset-path", dataset_path, "Path to dataset.")
-      ->required();
+  app.add_option("--dataset-path", dataset_path, "Path to dataset.")->required();
 
-  app.add_option("--dataset-type", dataset_type, "Type of dataset.")
-      ->required();
+  app.add_option("--dataset-type", dataset_type, "Type of dataset.")->required();
 
   app.add_option("--config-path", config_path, "Path to config file.");
 
@@ -182,20 +174,18 @@ int main(int argc, char** argv) {
   load_data(cam_calib_path);
 
   {
-    basalt::DatasetIoInterfacePtr dataset_io =
-        basalt::DatasetIoFactory::getDatasetIo(dataset_type);
+    basalt::DatasetIoInterfacePtr dataset_io = basalt::DatasetIoFactory::getDatasetIo(dataset_type);
 
     dataset_io->read(dataset_path);
 
     vio_dataset = dataset_io->get_data();
-    vio_dataset->get_image_timestamps().erase(
-        vio_dataset->get_image_timestamps().begin());
+    vio_dataset->get_image_timestamps().erase(vio_dataset->get_image_timestamps().begin());
 
     show_frame.Meta().range[1] = vio_dataset->get_image_timestamps().size() - 1;
     show_frame.Meta().gui_changed = true;
 
-    opt_flow_ptr =
-        basalt::OpticalFlowFactory::getOpticalFlow(vio_config, calib);
+    opt_flow_ptr = basalt::OpticalFlowFactory::getOpticalFlow(vio_config, calib);
+    opt_flow_ptr->start();
     if (show_gui) opt_flow_ptr->output_queue = &observations_queue;
     observations_queue.set_capacity(100);
 
@@ -211,13 +201,11 @@ int main(int argc, char** argv) {
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View& img_view_display =
-        pangolin::CreateDisplay()
-            .SetBounds(0, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0)
-            .SetLayout(pangolin::LayoutEqual);
+    pangolin::View& img_view_display = pangolin::CreateDisplay()
+                                           .SetBounds(0, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0)
+                                           .SetLayout(pangolin::LayoutEqual);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0,
-                                          pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
@@ -227,8 +215,7 @@ int main(int argc, char** argv) {
       img_view.push_back(iv);
 
       img_view_display.AddDisplay(*iv);
-      iv->extern_draw_function =
-          std::bind(&draw_image_overlay, std::placeholders::_1, idx);
+      iv->extern_draw_function = std::bind(&draw_image_overlay, std::placeholders::_1, idx);
     }
 
     while (!pangolin::ShouldQuit()) {
@@ -242,8 +229,7 @@ int main(int argc, char** argv) {
         size_t frame_id = static_cast<size_t>(show_frame);
         int64_t timestamp = vio_dataset->get_image_timestamps()[frame_id];
 
-        const std::vector<basalt::ImageData>& img_vec =
-            vio_dataset->get_image_data(timestamp);
+        const std::vector<basalt::ImageData>& img_vec = vio_dataset->get_image_data(timestamp);
 
         for (size_t cam_id = 0; cam_id < calib.intrinsics.size(); cam_id++) {
           if (img_vec[cam_id].img.get()) {
@@ -254,8 +240,7 @@ int main(int argc, char** argv) {
             fmt.gltype = GL_UNSIGNED_SHORT;
             fmt.scalable_internal_format = GL_LUMINANCE16;
 
-            img_view[cam_id]->SetImage(img->ptr, img->w, img->h, img->pitch,
-                                       fmt);
+            img_view[cam_id]->SetImage(img->ptr, img->w, img->h, img->pitch, fmt);
           } else {
             img_view[cam_id]->Clear();
           }
@@ -294,12 +279,11 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (observations.count(t_ns) > 0) {
-      const Eigen::aligned_map<basalt::KeypointId, Eigen::AffineCompact2f>&
-          kp_map = observations.at(t_ns)->observations[cam_id];
+      const Eigen::aligned_map<basalt::KeypointId, Eigen::AffineCompact2f>& kp_map =
+          observations.at(t_ns)->observations[cam_id];
 
       for (const auto& kv : kp_map) {
-        Eigen::MatrixXf transformed_patch =
-            kv.second.linear() * opt_flow_ptr->patch_coord;
+        Eigen::MatrixXf transformed_patch = kv.second.linear() * opt_flow_ptr->patch_coord;
         transformed_patch.colwise() += kv.second.translation();
 
         for (int i = 0; i < transformed_patch.cols(); i++) {
@@ -309,13 +293,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
         const Eigen::Vector2f c = kv.second.translation();
 
-        if (show_ids)
-          pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
+        if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
       }
 
-      pangolin::GlFont::I()
-          .Text("Tracked %d keypoints", kp_map.size())
-          .Draw(5, 20);
+      pangolin::GlFont::I().Text("Tracked %d keypoints", kp_map.size()).Draw(5, 20);
     }
   }
 }
@@ -326,12 +307,10 @@ void load_data(const std::string& calib_path) {
   if (os.is_open()) {
     cereal::JSONInputArchive archive(os);
     archive(calib);
-    std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras"
-              << std::endl;
+    std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras" << std::endl;
 
   } else {
-    std::cerr << "could not load camera calibration " << calib_path
-              << std::endl;
+    std::cerr << "could not load camera calibration " << calib_path << std::endl;
     std::abort();
   }
 }

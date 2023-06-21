@@ -52,9 +52,7 @@ class Timer {
   Timer() : start_(Clock::now()) {}
 
   /// return elapsed time in seconds
-  double elapsed() const {
-    return std::chrono::duration<double>(Clock::now() - start_).count();
-  }
+  double elapsed() const { return std::chrono::duration<double>(Clock::now() - start_).count(); }
 
   /// return elapsed time in seconds and reset timer
   double reset() {

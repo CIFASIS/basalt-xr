@@ -59,9 +59,8 @@ class PosesOptimization;
 
 class CamCalib {
  public:
-  CamCalib(const std::string &dataset_path, const std::string &dataset_type,
-           const std::string &aprilgrid_path, const std::string &cache_path,
-           const std::string &cache_dataset_name, int skip_images,
+  CamCalib(const std::string &dataset_path, const std::string &dataset_type, const std::string &aprilgrid_path,
+           const std::string &cache_path, const std::string &cache_dataset_name, int skip_images,
            const std::vector<std::string> &cam_types, bool show_gui = true);
 
   ~CamCalib();
@@ -90,8 +89,7 @@ class CamCalib {
 
   void optimize();
 
-  bool optimizeWithParam(bool print_info,
-                         std::map<std::string, double> *stats = nullptr);
+  bool optimizeWithParam(bool print_info, std::map<std::string, double> *stats = nullptr);
 
   void saveCalib();
 
@@ -169,8 +167,7 @@ class CamCalib {
 
   pangolin::DataLog vign_data_log;
 
-  std::vector<std::shared_ptr<pangolin::DataLog>> polar_data_log,
-      azimuth_data_log;
+  std::vector<std::shared_ptr<pangolin::DataLog>> polar_data_log, azimuth_data_log;
 };
 
 }  // namespace basalt

@@ -141,16 +141,14 @@ void VioConfig::load(const std::string& filename) {
 namespace cereal {
 
 template <class Archive>
-std::string save_minimal(const Archive& ar,
-                         const basalt::MatchingGuessType& guess_type) {
+std::string save_minimal(const Archive& ar, const basalt::MatchingGuessType& guess_type) {
   UNUSED(ar);
   auto name = magic_enum::enum_name(guess_type);
   return std::string(name);
 }
 
 template <class Archive>
-void load_minimal(const Archive& ar, basalt::MatchingGuessType& guess_type,
-                  const std::string& name) {
+void load_minimal(const Archive& ar, basalt::MatchingGuessType& guess_type, const std::string& name) {
   UNUSED(ar);
 
   auto guess_enum = magic_enum::enum_cast<basalt::MatchingGuessType>(name);
@@ -158,24 +156,20 @@ void load_minimal(const Archive& ar, basalt::MatchingGuessType& guess_type,
   if (guess_enum.has_value()) {
     guess_type = guess_enum.value();
   } else {
-    std::cerr << "Could not find the MatchingGuessType for " << name
-              << std::endl;
+    std::cerr << "Could not find the MatchingGuessType for " << name << std::endl;
     std::abort();
   }
 }
 
 template <class Archive>
-std::string save_minimal(const Archive& ar,
-                         const basalt::LinearizationType& linearization_type) {
+std::string save_minimal(const Archive& ar, const basalt::LinearizationType& linearization_type) {
   UNUSED(ar);
   auto name = magic_enum::enum_name(linearization_type);
   return std::string(name);
 }
 
 template <class Archive>
-void load_minimal(const Archive& ar,
-                  basalt::LinearizationType& linearization_type,
-                  const std::string& name) {
+void load_minimal(const Archive& ar, basalt::LinearizationType& linearization_type, const std::string& name) {
   UNUSED(ar);
 
   auto lin_enum = magic_enum::enum_cast<basalt::LinearizationType>(name);
@@ -183,8 +177,7 @@ void load_minimal(const Archive& ar,
   if (lin_enum.has_value()) {
     linearization_type = lin_enum.value();
   } else {
-    std::cerr << "Could not find the LinearizationType for " << name
-              << std::endl;
+    std::cerr << "Could not find the LinearizationType for " << name << std::endl;
     std::abort();
   }
 }

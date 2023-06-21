@@ -54,8 +54,7 @@ struct VioVisualizationData {
 
   OpticalFlowResult::Ptr opt_flow_res;
 
-  std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>>
-      projections;
+  std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -64,10 +63,7 @@ class VioEstimatorBase {
  public:
   typedef std::shared_ptr<VioEstimatorBase> Ptr;
 
-  VioEstimatorBase()
-      : out_state_queue(nullptr),
-        out_marg_queue(nullptr),
-        out_vis_queue(nullptr) {
+  VioEstimatorBase() : out_state_queue(nullptr), out_marg_queue(nullptr), out_vis_queue(nullptr) {
     vision_data_queue.set_capacity(10);
     imu_data_queue.set_capacity(300);
     last_processed_t_ns = 0;
@@ -80,24 +76,18 @@ class VioEstimatorBase {
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> vision_data_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> imu_data_queue;
 
-  tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr>*
-      out_state_queue = nullptr;
+  tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr>* out_state_queue = nullptr;
   tbb::concurrent_bounded_queue<MargData::Ptr>* out_marg_queue = nullptr;
-  tbb::concurrent_bounded_queue<VioVisualizationData::Ptr>* out_vis_queue =
-      nullptr;
+  tbb::concurrent_bounded_queue<VioVisualizationData::Ptr>* out_vis_queue = nullptr;
 
   tbb::concurrent_queue<double>* opt_flow_depth_guess_queue = nullptr;
-  tbb::concurrent_queue<PoseVelBiasState<double>::Ptr>* opt_flow_state_queue =
-      nullptr;
+  tbb::concurrent_queue<PoseVelBiasState<double>::Ptr>* opt_flow_state_queue = nullptr;
   tbb::concurrent_queue<Masks>* opt_flow_masks_queue = nullptr;
 
-  virtual void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i,
-                          const Eigen::Vector3d& vel_w_i,
-                          const Eigen::Vector3d& bg,
-                          const Eigen::Vector3d& ba) = 0;
+  virtual void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i, const Eigen::Vector3d& vel_w_i,
+                          const Eigen::Vector3d& bg, const Eigen::Vector3d& ba) = 0;
 
-  virtual void initialize(const Eigen::Vector3d& bg,
-                          const Eigen::Vector3d& ba) = 0;
+  virtual void initialize(const Eigen::Vector3d& bg, const Eigen::Vector3d& ba) = 0;
 
   virtual void maybe_join() = 0;
 
@@ -129,14 +119,10 @@ class VioEstimatorBase {
 
 class VioEstimatorFactory {
  public:
-  static VioEstimatorBase::Ptr getVioEstimator(const VioConfig& config,
-                                               const Calibration<double>& cam,
-                                               const Eigen::Vector3d& g,
-                                               bool use_imu, bool use_double);
+  static VioEstimatorBase::Ptr getVioEstimator(const VioConfig& config, const Calibration<double>& cam,
+                                               const Eigen::Vector3d& g, bool use_imu, bool use_double);
 };
 
-double alignSVD(const std::vector<int64_t>& filter_t_ns,
-                const Eigen::aligned_vector<Eigen::Vector3d>& filter_t_w_i,
-                const std::vector<int64_t>& gt_t_ns,
-                Eigen::aligned_vector<Eigen::Vector3d>& gt_t_w_i);
+double alignSVD(const std::vector<int64_t>& filter_t_ns, const Eigen::aligned_vector<Eigen::Vector3d>& filter_t_w_i,
+                const std::vector<int64_t>& gt_t_ns, Eigen::aligned_vector<Eigen::Vector3d>& gt_t_w_i);
 }  // namespace basalt

@@ -39,17 +39,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <class Scalar>
-Sophus::SE3<Scalar> computeRelPose(
-    const Sophus::SE3<Scalar>& T_w_i_h, const Sophus::SE3<Scalar>& T_i_c_h,
-    const Sophus::SE3<Scalar>& T_w_i_t, const Sophus::SE3<Scalar>& T_i_c_t,
-    Sophus::Matrix6<Scalar>* d_rel_d_h = nullptr,
-    Sophus::Matrix6<Scalar>* d_rel_d_t = nullptr) {
+Sophus::SE3<Scalar> computeRelPose(const Sophus::SE3<Scalar>& T_w_i_h, const Sophus::SE3<Scalar>& T_i_c_h,
+                                   const Sophus::SE3<Scalar>& T_w_i_t, const Sophus::SE3<Scalar>& T_i_c_t,
+                                   Sophus::Matrix6<Scalar>* d_rel_d_h = nullptr,
+                                   Sophus::Matrix6<Scalar>* d_rel_d_t = nullptr) {
   Sophus::SE3<Scalar> tmp2 = (T_i_c_t).inverse();
 
   Sophus::SE3<Scalar> T_t_i_h_i;
   T_t_i_h_i.so3() = T_w_i_t.so3().inverse() * T_w_i_h.so3();
-  T_t_i_h_i.translation() =
-      T_w_i_t.so3().inverse() * (T_w_i_h.translation() - T_w_i_t.translation());
+  T_t_i_h_i.translation() = T_w_i_t.so3().inverse() * (T_w_i_h.translation() - T_w_i_t.translation());
 
   Sophus::SE3<Scalar> tmp = tmp2 * T_t_i_h_i;
   Sophus::SE3<Scalar> res = tmp * T_i_c_h;
@@ -80,13 +78,11 @@ Sophus::SE3<Scalar> computeRelPose(
 }
 
 template <class Scalar, class CamT>
-inline bool linearizePoint(
-    const Eigen::Matrix<Scalar, 2, 1>& kpt_obs, const Keypoint<Scalar>& kpt_pos,
-    const Eigen::Matrix<Scalar, 4, 4>& T_t_h, const CamT& cam,
-    Eigen::Matrix<Scalar, 2, 1>& res,
-    Eigen::Matrix<Scalar, 2, POSE_SIZE>* d_res_d_xi = nullptr,
-    Eigen::Matrix<Scalar, 2, 3>* d_res_d_p = nullptr,
-    Eigen::Matrix<Scalar, 4, 1>* proj = nullptr) {
+inline bool linearizePoint(const Eigen::Matrix<Scalar, 2, 1>& kpt_obs, const Keypoint<Scalar>& kpt_pos,
+                           const Eigen::Matrix<Scalar, 4, 4>& T_t_h, const CamT& cam, Eigen::Matrix<Scalar, 2, 1>& res,
+                           Eigen::Matrix<Scalar, 2, POSE_SIZE>* d_res_d_xi = nullptr,
+                           Eigen::Matrix<Scalar, 2, 3>* d_res_d_p = nullptr,
+                           Eigen::Matrix<Scalar, 4, 1>* proj = nullptr) {
   static_assert(std::is_same_v<typename CamT::Scalar, Scalar>);
 
   // Todo implement without jacobians
@@ -122,10 +118,8 @@ inline bool linearizePoint(
 
   if (d_res_d_xi) {
     Eigen::Matrix<Scalar, 4, POSE_SIZE> d_point_d_xi;
-    d_point_d_xi.template topLeftCorner<3, 3>() =
-        Eigen::Matrix<Scalar, 3, 3>::Identity() * kpt_pos.inv_dist;
-    d_point_d_xi.template topRightCorner<3, 3>() =
-        -Sophus::SO3<Scalar>::hat(p_t_3d.template head<3>());
+    d_point_d_xi.template topLeftCorner<3, 3>() = Eigen::Matrix<Scalar, 3, 3>::Identity() * kpt_pos.inv_dist;
+    d_point_d_xi.template topRightCorner<3, 3>() = -Sophus::SO3<Scalar>::hat(p_t_3d.template head<3>());
     d_point_d_xi.row(3).setZero();
 
     *d_res_d_xi = Jp * d_point_d_xi;

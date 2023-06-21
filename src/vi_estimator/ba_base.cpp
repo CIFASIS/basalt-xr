@@ -45,8 +45,7 @@ namespace basalt {
 
 template <class Scalar>
 void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
-    PoseStateWithLin<Scalar>& state_t,
-    const std::vector<std::vector<int>>& connected_obs) const {
+    PoseStateWithLin<Scalar>& state_t, const std::vector<std::vector<int>>& connected_obs) const {
   const int num_iter = 2;
 
   struct AbsLinData {
@@ -64,8 +63,7 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
     Ht.setZero();
     bt.setZero();
 
-    std::unordered_map<std::pair<TimeCamId, TimeCamId>, AbsLinData>
-        abs_lin_data;
+    std::unordered_map<std::pair<TimeCamId, TimeCamId>, AbsLinData> abs_lin_data;
 
     for (size_t cam_id = 0; cam_id < connected_obs.size(); cam_id++) {
       TimeCamId tcid_t(state_t.getT_ns(), cam_id);
@@ -74,16 +72,14 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
         std::pair<TimeCamId, TimeCamId> map_key(kpt_pos.host_kf_id, tcid_t);
 
         if (abs_lin_data.count(map_key) == 0) {
-          const PoseStateWithLin<Scalar>& state_h =
-              frame_poses.at(kpt_pos.host_kf_id.frame_id);
+          const PoseStateWithLin<Scalar>& state_h = frame_poses.at(kpt_pos.host_kf_id.frame_id);
 
           BASALT_ASSERT(kpt_pos.host_kf_id.frame_id != state_t.getT_ns());
 
           AbsLinData& ald = abs_lin_data[map_key];
 
-          SE3 T_t_h_sophus = computeRelPose<Scalar>(
-              state_h.getPose(), calib.T_i_c[kpt_pos.host_kf_id.cam_id],
-              state_t.getPose(), calib.T_i_c[cam_id], nullptr, &ald.d_rel_d_t);
+          SE3 T_t_h_sophus = computeRelPose<Scalar>(state_h.getPose(), calib.T_i_c[kpt_pos.host_kf_id.cam_id],
+                                                    state_t.getPose(), calib.T_i_c[cam_id], nullptr, &ald.d_rel_d_t);
           ald.T_t_h = T_t_h_sophus.matrix();
         }
       }
@@ -97,22 +93,18 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
 
               const Keypoint<Scalar>& kpt_pos = lmdb.getLandmark(lm_id);
               const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
-              const AbsLinData& ald =
-                  abs_lin_data.at(std::make_pair(kpt_pos.host_kf_id, tcid_t));
+              const AbsLinData& ald = abs_lin_data.at(std::make_pair(kpt_pos.host_kf_id, tcid_t));
 
               Vec2 res;
               Eigen::Matrix<Scalar, 2, POSE_SIZE> d_res_d_xi;
-              bool valid = linearizePoint(kpt_obs, kpt_pos, ald.T_t_h, cam, res,
-                                          &d_res_d_xi);
+              bool valid = linearizePoint(kpt_obs, kpt_pos, ald.T_t_h, cam, res, &d_res_d_xi);
 
               if (valid) {
                 Scalar e = res.norm();
-                Scalar huber_weight =
-                    e < huber_thresh ? Scalar(1.0) : huber_thresh / e;
+                Scalar huber_weight = e < huber_thresh ? Scalar(1.0) : huber_thresh / e;
                 Scalar obs_weight = huber_weight / (obs_std_dev * obs_std_dev);
 
-                error += Scalar(0.5) * (2 - huber_weight) * obs_weight *
-                         res.transpose() * res;
+                error += Scalar(0.5) * (2 - huber_weight) * obs_weight * res.transpose() * res;
 
                 d_res_d_xi *= ald.d_rel_d_t;
 
@@ -138,17 +130,15 @@ void BundleAdjustmentBase<Scalar>::optimize_single_frame_pose(
 }
 
 template <class Scalar_>
-void BundleAdjustmentBase<Scalar_>::computeError(
-    Scalar& error,
-    std::map<int, std::vector<std::pair<TimeCamId, Scalar>>>* outliers,
-    Scalar outlier_threshold) const {
+void BundleAdjustmentBase<Scalar_>::computeError(Scalar& error,
+                                                 std::map<int, std::vector<std::pair<TimeCamId, Scalar>>>* outliers,
+                                                 Scalar outlier_threshold) const {
   std::vector<TimeCamId> host_frames;
   for (const auto& [tcid, _] : lmdb.getObservations()) {
     host_frames.push_back(tcid);
   }
 
-  tbb::concurrent_unordered_map<int, std::vector<std::pair<TimeCamId, Scalar>>>
-      outliers_concurrent;
+  tbb::concurrent_unordered_map<int, std::vector<std::pair<TimeCamId, Scalar>>> outliers_concurrent;
 
   auto body = [&](const tbb::blocked_range<size_t>& range, Scalar local_error) {
     for (size_t r = range.begin(); r != range.end(); ++r) {
@@ -163,9 +153,8 @@ void BundleAdjustmentBase<Scalar_>::computeError(
           PoseStateWithLin state_h = getPoseStateWithLin(tcid_h.frame_id);
           PoseStateWithLin state_t = getPoseStateWithLin(tcid_t.frame_id);
 
-          Sophus::SE3<Scalar> T_t_h_sophus =
-              computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id],
-                             state_t.getPose(), calib.T_i_c[tcid_t.cam_id]);
+          Sophus::SE3<Scalar> T_t_h_sophus = computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id],
+                                                            state_t.getPose(), calib.T_i_c[tcid_t.cam_id]);
 
           T_t_h = T_t_h_sophus.matrix();
         } else {
@@ -186,21 +175,16 @@ void BundleAdjustmentBase<Scalar_>::computeError(
                   Scalar e = res.norm();
 
                   if (outliers && e > outlier_threshold) {
-                    outliers_concurrent[kpt_id].emplace_back(
-                        tcid_t, tcid_h != tcid_t ? e : -2);
+                    outliers_concurrent[kpt_id].emplace_back(tcid_t, tcid_h != tcid_t ? e : -2);
                   }
 
-                  Scalar huber_weight =
-                      e < huber_thresh ? Scalar(1.0) : huber_thresh / e;
-                  Scalar obs_weight =
-                      huber_weight / (obs_std_dev * obs_std_dev);
+                  Scalar huber_weight = e < huber_thresh ? Scalar(1.0) : huber_thresh / e;
+                  Scalar obs_weight = huber_weight / (obs_std_dev * obs_std_dev);
 
-                  local_error += Scalar(0.5) * (2 - huber_weight) * obs_weight *
-                                 res.transpose() * res;
+                  local_error += Scalar(0.5) * (2 - huber_weight) * obs_weight * res.transpose() * res;
                 } else {
                   if (outliers) {
-                    outliers_concurrent[kpt_id].emplace_back(
-                        tcid_t, tcid_h != tcid_t ? -1 : -2);
+                    outliers_concurrent[kpt_id].emplace_back(tcid_t, tcid_h != tcid_t ? -1 : -2);
                   }
                 }
               }
@@ -227,9 +211,8 @@ void BundleAdjustmentBase<Scalar_>::computeError(
 
 template <class Scalar_>
 template <class Scalar2>
-void BundleAdjustmentBase<Scalar_>::get_current_points(
-    Eigen::aligned_vector<Eigen::Matrix<Scalar2, 3, 1>>& points,
-    std::vector<int>& ids) const {
+void BundleAdjustmentBase<Scalar_>::get_current_points(Eigen::aligned_vector<Eigen::Matrix<Scalar2, 3, 1>>& points,
+                                                       std::vector<int>& ids) const {
   points.clear();
   ids.clear();
 
@@ -252,23 +235,20 @@ void BundleAdjustmentBase<Scalar_>::get_current_points(
     const Sophus::SE3<Scalar>& T_i_c = calib.T_i_c[tcid_host.cam_id];
     Mat4 T_w_c = (T_w_i * T_i_c).matrix();
 
-    for (const Keypoint<Scalar>* kpt_pos :
-         lmdb.getLandmarksForHost(tcid_host)) {
+    for (const Keypoint<Scalar>* kpt_pos : lmdb.getLandmarksForHost(tcid_host)) {
       Vec4 pt_cam = StereographicParam<Scalar>::unproject(kpt_pos->direction);
       pt_cam[3] = kpt_pos->inv_dist;
 
       Vec4 pt_w = T_w_c * pt_cam;
 
-      points.emplace_back(
-          (pt_w.template head<3>() / pt_w[3]).template cast<Scalar2>());
+      points.emplace_back((pt_w.template head<3>() / pt_w[3]).template cast<Scalar2>());
       ids.emplace_back(1);
     }
   }
 }
 
 template <class Scalar_>
-void BundleAdjustmentBase<Scalar_>::filterOutliers(Scalar outlier_threshold,
-                                                   int min_num_obs) {
+void BundleAdjustmentBase<Scalar_>::filterOutliers(Scalar outlier_threshold, int min_num_obs) {
   Scalar error;
   std::map<int, std::vector<std::pair<TimeCamId, Scalar>>> outliers;
   computeError(error, &outliers, outlier_threshold);
@@ -312,19 +292,16 @@ void BundleAdjustmentBase<Scalar_>::filterOutliers(Scalar outlier_threshold,
 }
 
 template <class Scalar_>
-void BundleAdjustmentBase<Scalar_>::computeDelta(const AbsOrderMap& marg_order,
-                                                 VecX& delta) const {
+void BundleAdjustmentBase<Scalar_>::computeDelta(const AbsOrderMap& marg_order, VecX& delta) const {
   size_t marg_size = marg_order.total_size;
   delta.setZero(marg_size);
   for (const auto& kv : marg_order.abs_order_map) {
     if (kv.second.second == POSE_SIZE) {
       BASALT_ASSERT(frame_poses.at(kv.first).isLinearized());
-      delta.template segment<POSE_SIZE>(kv.second.first) =
-          frame_poses.at(kv.first).getDelta();
+      delta.template segment<POSE_SIZE>(kv.second.first) = frame_poses.at(kv.first).getDelta();
     } else if (kv.second.second == POSE_VEL_BIAS_SIZE) {
       BASALT_ASSERT(frame_states.at(kv.first).isLinearized());
-      delta.template segment<POSE_VEL_BIAS_SIZE>(kv.second.first) =
-          frame_states.at(kv.first).getDelta();
+      delta.template segment<POSE_VEL_BIAS_SIZE>(kv.second.first) = frame_states.at(kv.first).getDelta();
     } else {
       BASALT_ASSERT(false);
     }
@@ -332,8 +309,7 @@ void BundleAdjustmentBase<Scalar_>::computeDelta(const AbsOrderMap& marg_order,
 }
 
 template <class Scalar_>
-Scalar_ BundleAdjustmentBase<Scalar_>::computeModelCostChange(
-    const MatX& H, const VecX& b, const VecX& inc) const {
+Scalar_ BundleAdjustmentBase<Scalar_>::computeModelCostChange(const MatX& H, const VecX& b, const VecX& inc) const {
   // Linearized model cost
   //
   //    L(x) = 0.5 || J*x + r ||^2
@@ -359,8 +335,7 @@ Scalar_ BundleAdjustmentBase<Scalar_>::computeModelCostChange(
 template <class Scalar_>
 template <class Scalar2>
 void BundleAdjustmentBase<Scalar_>::computeProjections(
-    std::vector<Eigen::aligned_vector<Eigen::Matrix<Scalar2, 4, 1>>>& data,
-    FrameId last_state_t_ns) const {
+    std::vector<Eigen::aligned_vector<Eigen::Matrix<Scalar2, 4, 1>>>& data, FrameId last_state_t_ns) const {
   for (const auto& kv : lmdb.getObservations()) {
     const TimeCamId& tcid_h = kv.first;
 
@@ -374,9 +349,8 @@ void BundleAdjustmentBase<Scalar_>::computeProjections(
         PoseStateWithLin<Scalar> state_h = getPoseStateWithLin(tcid_h.frame_id);
         PoseStateWithLin<Scalar> state_t = getPoseStateWithLin(tcid_t.frame_id);
 
-        Sophus::SE3<Scalar> T_t_h_sophus =
-            computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id],
-                           state_t.getPose(), calib.T_i_c[tcid_t.cam_id]);
+        Sophus::SE3<Scalar> T_t_h_sophus = computeRelPose(state_h.getPose(), calib.T_i_c[tcid_h.cam_id],
+                                                          state_t.getPose(), calib.T_i_c[tcid_t.cam_id]);
 
         T_t_h = T_t_h_sophus.matrix();
       } else {
@@ -392,8 +366,7 @@ void BundleAdjustmentBase<Scalar_>::computeProjections(
               Vec4 proj;
 
               using CamT = std::decay_t<decltype(cam)>;
-              linearizePoint<Scalar, CamT>(Vec2::Zero(), kpt_pos, T_t_h, cam,
-                                           res, nullptr, nullptr, &proj);
+              linearizePoint<Scalar, CamT>(Vec2::Zero(), kpt_pos, T_t_h, cam, res, nullptr, nullptr, &proj);
 
               proj[3] = kpt_id;
               data[tcid_t.cam_id].emplace_back(proj.template cast<Scalar2>());
@@ -405,9 +378,8 @@ void BundleAdjustmentBase<Scalar_>::computeProjections(
 }
 
 template <class Scalar_>
-void BundleAdjustmentBase<Scalar_>::linearizeMargPrior(
-    const MargLinData<Scalar>& mld, const AbsOrderMap& aom, MatX& abs_H,
-    VecX& abs_b, Scalar& marg_prior_error) const {
+void BundleAdjustmentBase<Scalar_>::linearizeMargPrior(const MargLinData<Scalar>& mld, const AbsOrderMap& aom,
+                                                       MatX& abs_H, VecX& abs_b, Scalar& marg_prior_error) const {
   // Prior is ordered to be in the top left corner of Hessian
 
   BASALT_ASSERT(size_t(mld.H.cols()) == mld.order.total_size);
@@ -462,21 +434,19 @@ void BundleAdjustmentBase<Scalar_>::linearizeMargPrior(
 
     abs_b.head(marg_size) += mld.H.transpose() * (mld.b + mld.H * delta);
 
-    marg_prior_error = delta.transpose() * mld.H.transpose() *
-                       (Scalar(0.5) * mld.H * delta + mld.b);
+    marg_prior_error = delta.transpose() * mld.H.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
   } else {
     abs_H.topLeftCorner(marg_size, marg_size) += mld.H;
 
     abs_b.head(marg_size) += mld.H * delta + mld.b;
 
-    marg_prior_error =
-        delta.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
+    marg_prior_error = delta.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
   }
 }
 
 template <class Scalar_>
-void BundleAdjustmentBase<Scalar_>::computeMargPriorError(
-    const MargLinData<Scalar>& mld, Scalar& marg_prior_error) const {
+void BundleAdjustmentBase<Scalar_>::computeMargPriorError(const MargLinData<Scalar>& mld,
+                                                          Scalar& marg_prior_error) const {
   BASALT_ASSERT(size_t(mld.H.cols()) == mld.order.total_size);
 
   // The current cost is (see above in linearizeMargPrior())
@@ -494,18 +464,16 @@ void BundleAdjustmentBase<Scalar_>::computeMargPriorError(
   computeDelta(mld.order, delta);
 
   if (mld.is_sqrt) {
-    marg_prior_error = delta.transpose() * mld.H.transpose() *
-                       (Scalar(0.5) * mld.H * delta + mld.b);
+    marg_prior_error = delta.transpose() * mld.H.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
   } else {
-    marg_prior_error =
-        delta.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
+    marg_prior_error = delta.transpose() * (Scalar(0.5) * mld.H * delta + mld.b);
   }
 }
 
 template <class Scalar_>
-Scalar_ BundleAdjustmentBase<Scalar_>::computeMargPriorModelCostChange(
-    const MargLinData<Scalar>& mld, const VecX& marg_scaling,
-    const VecX& marg_pose_inc) const {
+Scalar_ BundleAdjustmentBase<Scalar_>::computeMargPriorModelCostChange(const MargLinData<Scalar>& mld,
+                                                                       const VecX& marg_scaling,
+                                                                       const VecX& marg_pose_inc) const {
   // Quadratic prior and "delta" of the current state to the original
   // linearization point give cost function
   //
@@ -569,17 +537,15 @@ Scalar_ BundleAdjustmentBase<Scalar_>::computeMargPriorModelCostChange(
 // instatiate templates
 
 // Note: double specialization is unconditional, b/c NfrMapper depends on it.
-//#ifdef BASALT_INSTANTIATIONS_DOUBLE
+// #ifdef BASALT_INSTANTIATIONS_DOUBLE
 template class BundleAdjustmentBase<double>;
 
 template void BundleAdjustmentBase<double>::get_current_points<double>(
-    Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points,
-    std::vector<int>& ids) const;
+    Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points, std::vector<int>& ids) const;
 
 template void BundleAdjustmentBase<double>::computeProjections<double>(
-    std::vector<Eigen::aligned_vector<Eigen::Matrix<double, 4, 1>>>& data,
-    FrameId last_state_t_ns) const;
-//#endif
+    std::vector<Eigen::aligned_vector<Eigen::Matrix<double, 4, 1>>>& data, FrameId last_state_t_ns) const;
+// #endif
 
 #ifdef BASALT_INSTANTIATIONS_FLOAT
 template class BundleAdjustmentBase<float>;
@@ -589,16 +555,14 @@ template class BundleAdjustmentBase<float>;
 //    std::vector<int>& ids) const;
 
 template void BundleAdjustmentBase<float>::get_current_points<double>(
-    Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points,
-    std::vector<int>& ids) const;
+    Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points, std::vector<int>& ids) const;
 
 // template void BundleAdjustmentBase<float>::computeProjections<float>(
 //    std::vector<Eigen::aligned_vector<Eigen::Matrix<float, 4, 1>>>& data,
 //    FrameId last_state_t_ns) const;
 
 template void BundleAdjustmentBase<float>::computeProjections<double>(
-    std::vector<Eigen::aligned_vector<Eigen::Matrix<double, 4, 1>>>& data,
-    FrameId last_state_t_ns) const;
+    std::vector<Eigen::aligned_vector<Eigen::Matrix<double, 4, 1>>>& data, FrameId last_state_t_ns) const;
 #endif
 
 }  // namespace basalt

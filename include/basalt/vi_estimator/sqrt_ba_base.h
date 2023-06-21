@@ -49,76 +49,56 @@ class SqrtBundleAdjustmentBase : public BundleAdjustmentBase<Scalar_> {
   using MatX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
   using SO3 = Sophus::SO3<Scalar>;
 
-  using RelLinDataBase =
-      typename ScBundleAdjustmentBase<Scalar>::RelLinDataBase;
-  using FrameRelLinData =
-      typename ScBundleAdjustmentBase<Scalar>::FrameRelLinData;
+  using RelLinDataBase = typename ScBundleAdjustmentBase<Scalar>::RelLinDataBase;
+  using FrameRelLinData = typename ScBundleAdjustmentBase<Scalar>::FrameRelLinData;
   using RelLinData = typename ScBundleAdjustmentBase<Scalar>::RelLinData;
 
-  using FrameAbsLinData =
-      typename ScBundleAdjustmentBase<Scalar>::FrameAbsLinData;
+  using FrameAbsLinData = typename ScBundleAdjustmentBase<Scalar>::FrameAbsLinData;
   using AbsLinData = typename ScBundleAdjustmentBase<Scalar>::AbsLinData;
 
   using BundleAdjustmentBase<Scalar>::computeDelta;
 
-  void linearizeHelper(
-      Eigen::aligned_vector<RelLinData>& rld_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
-      Scalar& error) const {
-    ScBundleAdjustmentBase<Scalar>::linearizeHelperStatic(rld_vec, obs_to_lin,
-                                                          this, error);
+  void linearizeHelper(Eigen::aligned_vector<RelLinData>& rld_vec,
+                       const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+                       Scalar& error) const {
+    ScBundleAdjustmentBase<Scalar>::linearizeHelperStatic(rld_vec, obs_to_lin, this, error);
   }
 
-  void linearizeAbsHelper(
-      Eigen::aligned_vector<AbsLinData>& ald_vec,
-      const std::unordered_map<
-          TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
-      Scalar& error) const {
-    ScBundleAdjustmentBase<Scalar>::linearizeHelperAbsStatic(
-        ald_vec, obs_to_lin, this, error);
+  void linearizeAbsHelper(Eigen::aligned_vector<AbsLinData>& ald_vec,
+                          const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+                          Scalar& error) const {
+    ScBundleAdjustmentBase<Scalar>::linearizeHelperAbsStatic(ald_vec, obs_to_lin, this, error);
   }
 
   static void linearizeRel(const RelLinData& rld, MatX& H, VecX& b) {
     ScBundleAdjustmentBase<Scalar>::linearizeRel(rld, H, b);
   }
 
-  static void updatePoints(const AbsOrderMap& aom, const RelLinData& rld,
-                           const VecX& inc, LandmarkDatabase<Scalar>& lmdb,
-                           Scalar* l_diff = nullptr) {
+  static void updatePoints(const AbsOrderMap& aom, const RelLinData& rld, const VecX& inc,
+                           LandmarkDatabase<Scalar>& lmdb, Scalar* l_diff = nullptr) {
     ScBundleAdjustmentBase<Scalar>::updatePoints(aom, rld, inc, lmdb, l_diff);
   }
 
-  static void updatePointsAbs(const AbsOrderMap& aom, const AbsLinData& ald,
-                              const VecX& inc, LandmarkDatabase<Scalar>& lmdb,
-                              Scalar* l_diff = nullptr) {
-    ScBundleAdjustmentBase<Scalar>::updatePointsAbs(aom, ald, inc, lmdb,
-                                                    l_diff);
+  static void updatePointsAbs(const AbsOrderMap& aom, const AbsLinData& ald, const VecX& inc,
+                              LandmarkDatabase<Scalar>& lmdb, Scalar* l_diff = nullptr) {
+    ScBundleAdjustmentBase<Scalar>::updatePointsAbs(aom, ald, inc, lmdb, l_diff);
   }
 
   static Eigen::VectorXd checkNullspace(
-      const MargLinData<Scalar_>& mld,
-      const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>&
-          frame_states,
-      const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses,
-      bool verbose = true);
+      const MargLinData<Scalar_>& mld, const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>& frame_states,
+      const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses, bool verbose = true);
 
-  static Eigen::VectorXd checkEigenvalues(const MargLinData<Scalar_>& mld,
-                                          bool verbose = true);
+  static Eigen::VectorXd checkEigenvalues(const MargLinData<Scalar_>& mld, bool verbose = true);
 
   template <class AccumT>
-  static void linearizeAbs(const MatX& rel_H, const VecX& rel_b,
-                           const RelLinDataBase& rld, const AbsOrderMap& aom,
+  static void linearizeAbs(const MatX& rel_H, const VecX& rel_b, const RelLinDataBase& rld, const AbsOrderMap& aom,
                            AccumT& accum) {
-    return ScBundleAdjustmentBase<Scalar>::template linearizeAbs<AccumT>(
-        rel_H, rel_b, rld, aom, accum);
+    return ScBundleAdjustmentBase<Scalar>::template linearizeAbs<AccumT>(rel_H, rel_b, rld, aom, accum);
   }
 
   template <class AccumT>
-  static void linearizeAbs(const AbsLinData& ald, const AbsOrderMap& aom,
-                           AccumT& accum) {
-    return ScBundleAdjustmentBase<Scalar>::template linearizeAbs<AccumT>(
-        ald, aom, accum);
+  static void linearizeAbs(const AbsLinData& ald, const AbsOrderMap& aom, AccumT& accum) {
+    return ScBundleAdjustmentBase<Scalar>::template linearizeAbs<AccumT>(ald, aom, accum);
   }
 };
 }  // namespace basalt

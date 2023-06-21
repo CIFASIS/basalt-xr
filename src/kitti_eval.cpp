@@ -79,9 +79,8 @@ Eigen::aligned_vector<Sophus::SE3d> load_poses(const std::string& path) {
     Eigen::Matrix3d rot;
     Eigen::Vector3d pos;
 
-    ss >> rot(0, 0) >> rot(0, 1) >> rot(0, 2) >> pos[0] >> rot(1, 0) >>
-        rot(1, 1) >> rot(1, 2) >> pos[1] >> rot(2, 0) >> rot(2, 1) >>
-        rot(2, 2) >> pos[2];
+    ss >> rot(0, 0) >> rot(0, 1) >> rot(0, 2) >> pos[0] >> rot(1, 0) >> rot(1, 1) >> rot(1, 2) >> pos[1] >> rot(2, 0) >>
+        rot(2, 1) >> rot(2, 2) >> pos[2];
 
     res.emplace_back(Eigen::Quaterniond(rot), pos);
   }
@@ -89,12 +88,10 @@ Eigen::aligned_vector<Sophus::SE3d> load_poses(const std::string& path) {
   return res;
 }
 
-void eval_kitti(const std::vector<double>& lengths,
-                const Eigen::aligned_vector<Sophus::SE3d>& poses_gt,
+void eval_kitti(const std::vector<double>& lengths, const Eigen::aligned_vector<Sophus::SE3d>& poses_gt,
                 const Eigen::aligned_vector<Sophus::SE3d>& poses_result,
                 std::map<std::string, std::map<std::string, double>>& res) {
-  auto lastFrameFromSegmentLength = [](std::vector<float>& dist,
-                                       int first_frame, float len) {
+  auto lastFrameFromSegmentLength = [](std::vector<float>& dist, int first_frame, float len) {
     for (int i = first_frame; i < (int)dist.size(); i++)
       if (dist[i] > dist[first_frame] + len) return i;
     return -1;
@@ -110,8 +107,7 @@ void eval_kitti(const std::vector<double>& lengths,
     const auto& p1 = poses_gt[i - 1];
     const auto& p2 = poses_gt[i];
 
-    dist_gt.emplace_back(dist_gt.back() +
-                         (p2.translation() - p1.translation()).norm());
+    dist_gt.emplace_back(dist_gt.back() + (p2.translation() - p1.translation()).norm());
   }
 
   const size_t step_size = 10;
@@ -124,29 +120,22 @@ void eval_kitti(const std::vector<double>& lengths,
     double r_error_sum = 0;
     int num_meas = 0;
 
-    for (size_t first_frame = 0; first_frame < poses_gt.size();
-         first_frame += step_size) {
+    for (size_t first_frame = 0; first_frame < poses_gt.size(); first_frame += step_size) {
       // for all segment lengths do
 
       // compute last frame
-      int32_t last_frame =
-          lastFrameFromSegmentLength(dist_gt, first_frame, len);
+      int32_t last_frame = lastFrameFromSegmentLength(dist_gt, first_frame, len);
 
       // continue, if sequence not long enough
       if (last_frame == -1) continue;
 
       // compute rotational and translational errors
-      Sophus::SE3d pose_delta_gt =
-          poses_gt[first_frame].inverse() * poses_gt[last_frame];
-      Sophus::SE3d pose_delta_result =
-          poses_result[first_frame].inverse() * poses_result[last_frame];
+      Sophus::SE3d pose_delta_gt = poses_gt[first_frame].inverse() * poses_gt[last_frame];
+      Sophus::SE3d pose_delta_result = poses_result[first_frame].inverse() * poses_result[last_frame];
       // Sophus::SE3d pose_error = pose_delta_result.inverse() * pose_delta_gt;
-      double r_err = pose_delta_result.unit_quaternion().angularDistance(
-                         pose_delta_gt.unit_quaternion()) *
-                     180.0 / M_PI;
-      double t_err =
-          (pose_delta_result.translation() - pose_delta_gt.translation())
-              .norm();
+      double r_err =
+          pose_delta_result.unit_quaternion().angularDistance(pose_delta_gt.unit_quaternion()) * 180.0 / M_PI;
+      double t_err = (pose_delta_result.translation() - pose_delta_gt.translation()).norm();
 
       t_error_sum += t_err / len;
       r_error_sum += r_err / len;
@@ -168,14 +157,9 @@ int main(int argc, char** argv) {
 
   CLI::App app{"KITTI evaluation"};
 
-  app.add_option("--traj-path", traj_path,
-                 "Path to the file with computed trajectory.")
-      ->required();
-  app.add_option("--gt-path", gt_path,
-                 "Path to the file with ground truth trajectory.")
-      ->required();
-  app.add_option("--result-path", result_path, "Path to store the result file.")
-      ->required();
+  app.add_option("--traj-path", traj_path, "Path to the file with computed trajectory.")->required();
+  app.add_option("--gt-path", gt_path, "Path to the file with ground truth trajectory.")->required();
+  app.add_option("--result-path", result_path, "Path to store the result file.")->required();
 
   app.add_option("--eval-lengths", lengths, "Trajectory length to evaluate.");
 
@@ -186,12 +170,11 @@ int main(int argc, char** argv) {
   }
 
   const Eigen::aligned_vector<Sophus::SE3d> poses_gt = load_poses(gt_path);
-  const Eigen::aligned_vector<Sophus::SE3d> poses_result =
-      load_poses(traj_path);
+  const Eigen::aligned_vector<Sophus::SE3d> poses_result = load_poses(traj_path);
 
   if (poses_gt.empty() || poses_gt.size() != poses_result.size()) {
-    std::cerr << "Wrong number of poses: poses_gt " << poses_gt.size()
-              << " poses_result " << poses_result.size() << std::endl;
+    std::cerr << "Wrong number of poses: poses_gt " << poses_gt.size() << " poses_result " << poses_result.size()
+              << std::endl;
     std::abort();
   }
 

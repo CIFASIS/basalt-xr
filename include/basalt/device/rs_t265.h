@@ -86,8 +86,8 @@ class RsT265Device {
   static constexpr int IMU_RATE = 200;
   static constexpr int NUM_CAMS = 2;
 
-  RsT265Device(bool is_d455, RsD455Config d455, bool manual_exposure,
-               int skip_frames, int webp_quality, double exposure_value = 10.0);
+  RsT265Device(bool is_d455, RsD455Config d455, bool manual_exposure, int skip_frames, int webp_quality,
+               double exposure_value = 10.0);
 
   void start();
   void stop();
@@ -99,8 +99,7 @@ class RsT265Device {
   std::shared_ptr<basalt::Calibration<double>> exportCalibration();
 
   OpticalFlowInput::Ptr last_img_data;
-  tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr>* image_data_queue =
-      nullptr;
+  tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr>* image_data_queue = nullptr;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr>* imu_data_queue = nullptr;
   tbb::concurrent_bounded_queue<RsPoseData>* pose_data_queue = nullptr;
 

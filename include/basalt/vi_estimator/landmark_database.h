@@ -93,12 +93,10 @@ class LandmarkDatabase {
 
   void removeFrame(const FrameId& frame);
 
-  void removeKeyframes(const std::set<FrameId>& kfs_to_marg,
-                       const std::set<FrameId>& poses_to_marg,
+  void removeKeyframes(const std::set<FrameId>& kfs_to_marg, const std::set<FrameId>& poses_to_marg,
                        const std::set<FrameId>& states_to_marg_all);
 
-  void addObservation(const TimeCamId& tcid_target,
-                      const KeypointObservation<Scalar>& o);
+  void addObservation(const TimeCamId& tcid_target, const KeypointObservation<Scalar>& o);
 
   Keypoint<Scalar>& getLandmark(KeypointId lm_id);
 
@@ -107,15 +105,11 @@ class LandmarkDatabase {
 
   std::vector<TimeCamId> getHostKfs() const;
 
-  std::vector<const Keypoint<Scalar>*> getLandmarksForHost(
-      const TimeCamId& tcid) const;
+  std::vector<const Keypoint<Scalar>*> getLandmarksForHost(const TimeCamId& tcid) const;
 
-  const std::unordered_map<TimeCamId,
-                           std::map<TimeCamId, std::set<KeypointId>>>&
-  getObservations() const;
+  const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& getObservations() const;
 
-  const Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>>&
-  getLandmarks() const;
+  const Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>>& getLandmarks() const;
 
   bool landmarkExists(int lm_id) const;
 
@@ -138,17 +132,14 @@ class LandmarkDatabase {
   }
 
  private:
-  using MapIter =
-      typename Eigen::aligned_unordered_map<KeypointId,
-                                            Keypoint<Scalar>>::iterator;
+  using MapIter = typename Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>>::iterator;
   MapIter removeLandmarkHelper(MapIter it);
-  typename Keypoint<Scalar>::MapIter removeLandmarkObservationHelper(
-      MapIter it, typename Keypoint<Scalar>::MapIter it2);
+  typename Keypoint<Scalar>::MapIter removeLandmarkObservationHelper(MapIter it,
+                                                                     typename Keypoint<Scalar>::MapIter it2);
 
   Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>> kpts;
 
-  std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>
-      observations;
+  std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>> observations;
 
   static constexpr int min_num_obs = 2;
 };

@@ -43,9 +43,8 @@ namespace basalt {
 namespace {
 
 template <class Scalar>
-VioEstimatorBase::Ptr factory_helper(const VioConfig& config,
-                                     const Calibration<double>& cam,
-                                     const Eigen::Vector3d& g, bool use_imu) {
+VioEstimatorBase::Ptr factory_helper(const VioConfig& config, const Calibration<double>& cam, const Eigen::Vector3d& g,
+                                     bool use_imu) {
   VioEstimatorBase::Ptr res;
 
   if (use_imu) {
@@ -60,9 +59,8 @@ VioEstimatorBase::Ptr factory_helper(const VioConfig& config,
 
 }  // namespace
 
-VioEstimatorBase::Ptr VioEstimatorFactory::getVioEstimator(
-    const VioConfig& config, const Calibration<double>& cam,
-    const Eigen::Vector3d& g, bool use_imu, bool use_double) {
+VioEstimatorBase::Ptr VioEstimatorFactory::getVioEstimator(const VioConfig& config, const Calibration<double>& cam,
+                                                           const Eigen::Vector3d& g, bool use_imu, bool use_double) {
   if (use_double) {
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
     return factory_helper<double>(config, cam, g, use_imu);
@@ -78,10 +76,8 @@ VioEstimatorBase::Ptr VioEstimatorFactory::getVioEstimator(
   }
 }
 
-double alignSVD(const std::vector<int64_t>& filter_t_ns,
-                const Eigen::aligned_vector<Eigen::Vector3d>& filter_t_w_i,
-                const std::vector<int64_t>& gt_t_ns,
-                Eigen::aligned_vector<Eigen::Vector3d>& gt_t_w_i) {
+double alignSVD(const std::vector<int64_t>& filter_t_ns, const Eigen::aligned_vector<Eigen::Vector3d>& filter_t_w_i,
+                const std::vector<int64_t>& gt_t_ns, Eigen::aligned_vector<Eigen::Vector3d>& gt_t_w_i) {
   Eigen::aligned_vector<Eigen::Vector3d> est_associations;
   Eigen::aligned_vector<Eigen::Vector3d> gt_associations;
 
@@ -137,14 +133,12 @@ double alignSVD(const std::vector<int64_t>& filter_t_ns,
 
   Eigen::Matrix3d cov = gt * est.transpose();
 
-  Eigen::JacobiSVD<Eigen::Matrix3d> svd(
-      cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
   Eigen::Matrix3d S;
   S.setIdentity();
 
-  if (svd.matrixU().determinant() * svd.matrixV().determinant() < 0)
-    S(2, 2) = -1;
+  if (svd.matrixU().determinant() * svd.matrixV().determinant() < 0) S(2, 2) = -1;
 
   Eigen::Matrix3d rot_gt_est = svd.matrixU() * S * svd.matrixV().transpose();
   Eigen::Vector3d trans = mean_gt - rot_gt_est * mean_est;

@@ -59,9 +59,8 @@ class UzhVioDataset : public VioDataset {
   Eigen::aligned_vector<AccelData> accel_data;
   Eigen::aligned_vector<GyroData> gyro_data;
 
-  std::vector<int64_t> gt_timestamps;  // ordered gt timestamps
-  Eigen::aligned_vector<Sophus::SE3d>
-      gt_pose_data;  // TODO: change to eigen aligned
+  std::vector<int64_t> gt_timestamps;                // ordered gt timestamps
+  Eigen::aligned_vector<Sophus::SE3d> gt_pose_data;  // TODO: change to eigen aligned
 
   int64_t mocap_to_imu_offset_ns = 0;
 
@@ -74,18 +73,10 @@ class UzhVioDataset : public VioDataset {
 
   std::vector<int64_t> &get_image_timestamps() { return image_timestamps; }
 
-  const Eigen::aligned_vector<AccelData> &get_accel_data() const {
-    return accel_data;
-  }
-  const Eigen::aligned_vector<GyroData> &get_gyro_data() const {
-    return gyro_data;
-  }
-  const std::vector<int64_t> &get_gt_timestamps() const {
-    return gt_timestamps;
-  }
-  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const {
-    return gt_pose_data;
-  }
+  const Eigen::aligned_vector<AccelData> &get_accel_data() const { return accel_data; }
+  const Eigen::aligned_vector<GyroData> &get_gyro_data() const { return gyro_data; }
+  const std::vector<int64_t> &get_gt_timestamps() const { return gt_timestamps; }
+  const Eigen::aligned_vector<Sophus::SE3d> &get_gt_pose_data() const { return gt_pose_data; }
 
   int64_t get_mocap_to_imu_offset_ns() const { return mocap_to_imu_offset_ns; }
 
@@ -93,9 +84,7 @@ class UzhVioDataset : public VioDataset {
     std::vector<ImageData> res(num_cams);
 
     for (size_t i = 0; i < num_cams; i++) {
-      std::string full_image_path =
-          path + "/" +
-          (i == 0 ? left_image_path.at(t_ns) : right_image_path.at(t_ns));
+      std::string full_image_path = path + "/" + (i == 0 ? left_image_path.at(t_ns) : right_image_path.at(t_ns));
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
@@ -126,8 +115,7 @@ class UzhVioDataset : public VioDataset {
           }
         } else if (img.type() == CV_16UC1) {
           res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-          std::memcpy(res[i].img->ptr, img.ptr(),
-                      img.cols * img.rows * sizeof(uint16_t));
+          std::memcpy(res[i].img->ptr, img.ptr(), img.cols * img.rows * sizeof(uint16_t));
 
         } else {
           std::cerr << "img.fmt.bpp " << img.type() << std::endl;
@@ -154,8 +142,7 @@ class UzhIO : public DatasetIoInterface {
   UzhIO() {}
 
   void read(const std::string &path) {
-    if (!fs::exists(path))
-      std::cerr << "No dataset found in " << path << std::endl;
+    if (!fs::exists(path)) std::cerr << "No dataset found in " << path << std::endl;
 
     data.reset(new UzhVioDataset);
 
@@ -164,10 +151,8 @@ class UzhIO : public DatasetIoInterface {
 
     read_image_timestamps(path);
 
-    std::cout << "Loaded " << data->get_image_timestamps().size()
-              << " timestamps, " << data->left_image_path.size()
-              << " left images and " << data->right_image_path.size()
-              << std::endl;
+    std::cout << "Loaded " << data->get_image_timestamps().size() << " timestamps, " << data->left_image_path.size()
+              << " left images and " << data->right_image_path.size() << std::endl;
 
     //    {
     //      int64_t t_ns = data->get_image_timestamps()[0];
@@ -177,8 +162,7 @@ class UzhIO : public DatasetIoInterface {
 
     read_imu_data(path + "/imu.txt");
 
-    std::cout << "Loaded " << data->get_gyro_data().size() << " imu msgs."
-              << std::endl;
+    std::cout << "Loaded " << data->get_gyro_data().size() << " imu msgs." << std::endl;
 
     if (fs::exists(path + "/groundtruth.txt")) {
       read_gt_data_pose(path + "/groundtruth.txt");
@@ -192,8 +176,7 @@ class UzhIO : public DatasetIoInterface {
   VioDatasetPtr get_data() { return data; }
 
  private:
-  void read_exposure(const std::string &path,
-                     std::unordered_map<int64_t, double> &exposure_data) {
+  void read_exposure(const std::string &path, std::unordered_map<int64_t, double> &exposure_data) {
     exposure_data.clear();
 
     std::ifstream f(path + "exposure.csv");
@@ -265,8 +248,7 @@ class UzhIO : public DatasetIoInterface {
       double timestamp;
       Eigen::Vector3d gyro, accel;
 
-      ss >> tmp >> timestamp >> gyro[0] >> gyro[1] >> gyro[2] >> accel[0] >>
-          accel[1] >> accel[2];
+      ss >> tmp >> timestamp >> gyro[0] >> gyro[1] >> gyro[2] >> accel[0] >> accel[1] >> accel[2];
 
       int64_t t_ns = timestamp * 1e9;
 
@@ -296,8 +278,7 @@ class UzhIO : public DatasetIoInterface {
       Eigen::Quaterniond q;
       Eigen::Vector3d pos;
 
-      ss >> tmp >> timestamp >> pos[0] >> pos[1] >> pos[2] >> q.x() >> q.y() >>
-          q.z() >> q.w();
+      ss >> tmp >> timestamp >> pos[0] >> pos[1] >> pos[2] >> q.x() >> q.y() >> q.z() >> q.w();
 
       int64_t t_ns = timestamp * 1e9;
 

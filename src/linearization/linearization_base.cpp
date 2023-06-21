@@ -56,13 +56,10 @@ bool isLinearizationSqrt(const LinearizationType& type) {
 }
 
 template <typename Scalar_, int POSE_SIZE_>
-std::unique_ptr<LinearizationBase<Scalar_, POSE_SIZE_>>
-LinearizationBase<Scalar_, POSE_SIZE_>::create(
-    BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom,
-    const Options& options, const MargLinData<Scalar>* marg_lin_data,
-    const ImuLinData<Scalar>* imu_lin_data,
-    const std::set<FrameId>* used_frames,
-    const std::unordered_set<KeypointId>* lost_landmarks,
+std::unique_ptr<LinearizationBase<Scalar_, POSE_SIZE_>> LinearizationBase<Scalar_, POSE_SIZE_>::create(
+    BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom, const Options& options,
+    const MargLinData<Scalar>* marg_lin_data, const ImuLinData<Scalar>* imu_lin_data,
+    const std::set<FrameId>* used_frames, const std::unordered_set<KeypointId>* lost_landmarks,
     int64_t last_state_to_marg) {
   //  std::cout << "Creaing Linearization of type "
   //            << magic_enum::enum_name(options.linearization_type) <<
@@ -71,18 +68,15 @@ LinearizationBase<Scalar_, POSE_SIZE_>::create(
   switch (options.linearization_type) {
     case LinearizationType::ABS_QR:
       return std::make_unique<LinearizationAbsQR<Scalar, POSE_SIZE>>(
-          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames,
-          lost_landmarks, last_state_to_marg);
+          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames, lost_landmarks, last_state_to_marg);
 
     case LinearizationType::ABS_SC:
       return std::make_unique<LinearizationAbsSC<Scalar, POSE_SIZE>>(
-          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames,
-          lost_landmarks, last_state_to_marg);
+          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames, lost_landmarks, last_state_to_marg);
 
     case LinearizationType::REL_SC:
       return std::make_unique<LinearizationRelSC<Scalar, POSE_SIZE>>(
-          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames,
-          lost_landmarks, last_state_to_marg);
+          estimator, aom, options, marg_lin_data, imu_lin_data, used_frames, lost_landmarks, last_state_to_marg);
 
     default:
       std::cerr << "Could not select a valid linearization." << std::endl;
@@ -95,24 +89,19 @@ LinearizationBase<Scalar_, POSE_SIZE_>::create(
 
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
 // Scalar=double, POSE_SIZE=6
-template std::unique_ptr<LinearizationBase<double, 6>>
-LinearizationBase<double, 6>::create(
-    BundleAdjustmentBase<double>* estimator, const AbsOrderMap& aom,
-    const Options& options, const MargLinData<double>* marg_lin_data,
-    const ImuLinData<double>* imu_lin_data,
-    const std::set<FrameId>* used_frames,
-    const std::unordered_set<KeypointId>* lost_landmarks,
+template std::unique_ptr<LinearizationBase<double, 6>> LinearizationBase<double, 6>::create(
+    BundleAdjustmentBase<double>* estimator, const AbsOrderMap& aom, const Options& options,
+    const MargLinData<double>* marg_lin_data, const ImuLinData<double>* imu_lin_data,
+    const std::set<FrameId>* used_frames, const std::unordered_set<KeypointId>* lost_landmarks,
     int64_t last_state_to_marg);
 #endif
 
 #ifdef BASALT_INSTANTIATIONS_FLOAT
 // Scalar=float, POSE_SIZE=6
-template std::unique_ptr<LinearizationBase<float, 6>>
-LinearizationBase<float, 6>::create(
-    BundleAdjustmentBase<float>* estimator, const AbsOrderMap& aom,
-    const Options& options, const MargLinData<float>* marg_lin_data,
-    const ImuLinData<float>* imu_lin_data, const std::set<FrameId>* used_frames,
-    const std::unordered_set<KeypointId>* lost_landmarks,
+template std::unique_ptr<LinearizationBase<float, 6>> LinearizationBase<float, 6>::create(
+    BundleAdjustmentBase<float>* estimator, const AbsOrderMap& aom, const Options& options,
+    const MargLinData<float>* marg_lin_data, const ImuLinData<float>* imu_lin_data,
+    const std::set<FrameId>* used_frames, const std::unordered_set<KeypointId>* lost_landmarks,
     int64_t last_state_to_marg);
 #endif
 

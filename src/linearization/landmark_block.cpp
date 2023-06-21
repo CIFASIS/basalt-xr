@@ -40,8 +40,7 @@ namespace basalt {
 
 template <typename Scalar>
 template <int POSE_SIZE>
-std::unique_ptr<LandmarkBlock<Scalar>>
-LandmarkBlock<Scalar>::createLandmarkBlock() {
+std::unique_ptr<LandmarkBlock<Scalar>> LandmarkBlock<Scalar>::createLandmarkBlock() {
   return std::make_unique<LandmarkBlockAbsDynamic<Scalar, POSE_SIZE>>();
 }
 
@@ -50,14 +49,12 @@ LandmarkBlock<Scalar>::createLandmarkBlock() {
 
 #ifdef BASALT_INSTANTIATIONS_DOUBLE
 // Scalar=double, POSE_SIZE=6
-template std::unique_ptr<LandmarkBlock<double>>
-LandmarkBlock<double>::createLandmarkBlock<6>();
+template std::unique_ptr<LandmarkBlock<double>> LandmarkBlock<double>::createLandmarkBlock<6>();
 #endif
 
 #ifdef BASALT_INSTANTIATIONS_FLOAT
 // Scalar=float, POSE_SIZE=6
-template std::unique_ptr<LandmarkBlock<float>>
-LandmarkBlock<float>::createLandmarkBlock<6>();
+template std::unique_ptr<LandmarkBlock<float>> LandmarkBlock<float>::createLandmarkBlock<6>();
 #endif
 
 }  // namespace basalt

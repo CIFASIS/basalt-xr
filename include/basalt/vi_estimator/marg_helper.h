@@ -48,21 +48,15 @@ class MargHelper {
   using VecX = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
 
   // Modifies abs_H and abs_b as a side effect.
-  static void marginalizeHelperSqToSq(MatX& abs_H, VecX& abs_b,
-                                      const std::set<int>& idx_to_keep,
-                                      const std::set<int>& idx_to_marg,
-                                      MatX& marg_H, VecX& marg_b);
+  static void marginalizeHelperSqToSq(MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
+                                      const std::set<int>& idx_to_marg, MatX& marg_H, VecX& marg_b);
 
   // Modifies abs_H and abs_b as a side effect.
-  static void marginalizeHelperSqToSqrt(MatX& abs_H, VecX& abs_b,
-                                        const std::set<int>& idx_to_keep,
-                                        const std::set<int>& idx_to_marg,
-                                        MatX& marg_sqrt_H, VecX& marg_sqrt_b);
+  static void marginalizeHelperSqToSqrt(MatX& abs_H, VecX& abs_b, const std::set<int>& idx_to_keep,
+                                        const std::set<int>& idx_to_marg, MatX& marg_sqrt_H, VecX& marg_sqrt_b);
 
   // Modifies Q2Jp and Q2r as a side effect.
-  static void marginalizeHelperSqrtToSqrt(MatX& Q2Jp, VecX& Q2r,
-                                          const std::set<int>& idx_to_keep,
-                                          const std::set<int>& idx_to_marg,
-                                          MatX& marg_sqrt_H, VecX& marg_sqrt_b);
+  static void marginalizeHelperSqrtToSqrt(MatX& Q2Jp, VecX& Q2r, const std::set<int>& idx_to_keep,
+                                          const std::set<int>& idx_to_marg, MatX& marg_sqrt_H, VecX& marg_sqrt_b);
 };
 }  // namespace basalt

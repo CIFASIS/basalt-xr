@@ -71,8 +71,7 @@ void NfrMapper::addMargData(MargData::Ptr& data) {
     for (const auto& kv : data->frame_states) {
       if (data->kfs_all.count(kv.first) > 0) {
         auto state = kv.second;
-        PoseStateWithLin<double> p(state.getState().t_ns,
-                                   state.getState().T_w_i);
+        PoseStateWithLin<double> p(state.getState().t_ns, state.getState().T_w_i);
         frame_poses[kv.first] = p;
       }
     }
@@ -91,27 +90,22 @@ void NfrMapper::processMargData(MargData& m) {
 
   for (const auto& kv : m.aom.abs_order_map) {
     if (kv.second.second == POSE_SIZE) {
-      for (size_t i = 0; i < POSE_SIZE; i++)
-        idx_to_keep.emplace(kv.second.first + i);
+      for (size_t i = 0; i < POSE_SIZE; i++) idx_to_keep.emplace(kv.second.first + i);
       aom_new.abs_order_map.emplace(kv);
       aom_new.total_size += POSE_SIZE;
     } else if (kv.second.second == POSE_VEL_BIAS_SIZE) {
       if (m.kfs_all.count(kv.first) > 0) {
-        for (size_t i = 0; i < POSE_SIZE; i++)
-          idx_to_keep.emplace(kv.second.first + i);
-        for (size_t i = POSE_SIZE; i < POSE_VEL_BIAS_SIZE; i++)
-          idx_to_marg.emplace(kv.second.first + i);
+        for (size_t i = 0; i < POSE_SIZE; i++) idx_to_keep.emplace(kv.second.first + i);
+        for (size_t i = POSE_SIZE; i < POSE_VEL_BIAS_SIZE; i++) idx_to_marg.emplace(kv.second.first + i);
 
-        aom_new.abs_order_map[kv.first] =
-            std::make_pair(aom_new.total_size, POSE_SIZE);
+        aom_new.abs_order_map[kv.first] = std::make_pair(aom_new.total_size, POSE_SIZE);
         aom_new.total_size += POSE_SIZE;
 
         PoseStateWithLin<double> p(m.frame_states.at(kv.first));
         m.frame_poses[kv.first] = p;
         m.frame_states.erase(kv.first);
       } else {
-        for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++)
-          idx_to_marg.emplace(kv.second.first + i);
+        for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++) idx_to_marg.emplace(kv.second.first + i);
         m.frame_states.erase(kv.first);
       }
     } else {
@@ -127,8 +121,7 @@ void NfrMapper::processMargData(MargData& m) {
   if (!idx_to_marg.empty()) {
     Eigen::MatrixXd marg_H_new;
     Eigen::VectorXd marg_b_new;
-    MargHelper<Scalar>::marginalizeHelperSqToSq(
-        m.abs_H, m.abs_b, idx_to_keep, idx_to_marg, marg_H_new, marg_b_new);
+    MargHelper<Scalar>::marginalizeHelperSqToSq(m.abs_H, m.abs_b, idx_to_keep, idx_to_marg, marg_H_new, marg_b_new);
 
     //    std::cout << "new rank " << marg_H_new.fullPivLu().rank() << " size "
     //              << marg_H_new.cols() << std::endl;
@@ -165,8 +158,7 @@ bool NfrMapper::extractNonlinearFactors(MargData& m) {
   Sophus::SE3d T_w_i_kf = state_kf.getPose();
 
   Eigen::Vector3d pos = T_w_i_kf.translation();
-  Eigen::Vector3d yaw_dir_body =
-      T_w_i_kf.so3().inverse() * Eigen::Vector3d::UnitX();
+  Eigen::Vector3d yaw_dir_body = T_w_i_kf.so3().inverse() * Eigen::Vector3d::UnitX();
 
   Sophus::Matrix<double, 3, POSE_SIZE> d_pos_d_T_w_i;
   Sophus::Matrix<double, 1, POSE_SIZE> d_yaw_d_T_w_i;
@@ -269,14 +261,12 @@ void NfrMapper::optimize(int num_iterations) {
     //        linearizeAbs(rel_H, rel_b, rld, aom, accum);
     //      }
 
-    MapperLinearizeAbsReduce<SparseHashAccumulator<double>> lopt(aom,
-                                                                 &frame_poses);
-    tbb::blocked_range<Eigen::aligned_vector<RelLinData>::const_iterator> range(
-        rld_vec.begin(), rld_vec.end());
-    tbb::blocked_range<Eigen::aligned_vector<RollPitchFactor>::const_iterator>
-        range1(roll_pitch_factors.begin(), roll_pitch_factors.end());
-    tbb::blocked_range<Eigen::aligned_vector<RelPoseFactor>::const_iterator>
-        range2(rel_pose_factors.begin(), rel_pose_factors.end());
+    MapperLinearizeAbsReduce<SparseHashAccumulator<double>> lopt(aom, &frame_poses);
+    tbb::blocked_range<Eigen::aligned_vector<RelLinData>::const_iterator> range(rld_vec.begin(), rld_vec.end());
+    tbb::blocked_range<Eigen::aligned_vector<RollPitchFactor>::const_iterator> range1(roll_pitch_factors.begin(),
+                                                                                      roll_pitch_factors.end());
+    tbb::blocked_range<Eigen::aligned_vector<RelPoseFactor>::const_iterator> range2(rel_pose_factors.begin(),
+                                                                                    rel_pose_factors.end());
 
     tbb::parallel_reduce(range, lopt);
 
@@ -287,10 +277,8 @@ void NfrMapper::optimize(int num_iterations) {
 
     double error_total = rld_error + lopt.rel_error + lopt.roll_pitch_error;
 
-    std::cout << "[LINEARIZE] iter " << iter
-              << " before_update_error: vision: " << rld_error
-              << " rel_error: " << lopt.rel_error
-              << " roll_pitch_error: " << lopt.roll_pitch_error
+    std::cout << "[LINEARIZE] iter " << iter << " before_update_error: vision: " << rld_error
+              << " rel_error: " << lopt.rel_error << " roll_pitch_error: " << lopt.roll_pitch_error
               << " total: " << error_total << std::endl;
 
     lopt.accum.iterative_solver = true;
@@ -307,8 +295,7 @@ void NfrMapper::optimize(int num_iterations) {
 
       while (!step && max_iter > 0 && !converged) {
         Eigen::VectorXd Hdiag_lambda = Hdiag * lambda;
-        for (int i = 0; i < Hdiag_lambda.size(); i++)
-          Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
+        for (int i = 0; i < Hdiag_lambda.size(); i++) Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
 
         const Eigen::VectorXd inc = lopt.accum.solve(&Hdiag_lambda);
         double max_inc = inc.array().abs().maxCoeff();
@@ -343,29 +330,22 @@ void NfrMapper::optimize(int num_iterations) {
           computeRollPitch(after_roll_pitch_error);
         }
 
-        double after_error_total = after_update_vision_error + after_rel_error +
-                                   after_roll_pitch_error;
+        double after_error_total = after_update_vision_error + after_rel_error + after_roll_pitch_error;
 
         double f_diff = (error_total - after_error_total);
 
         if (f_diff < 0) {
-          std::cout << "\t[REJECTED] lambda:" << lambda << " f_diff: " << f_diff
-                    << " max_inc: " << max_inc
-                    << " vision_error: " << after_update_vision_error
-                    << " rel_error: " << after_rel_error
-                    << " roll_pitch_error: " << after_roll_pitch_error
-                    << " total: " << after_error_total << std::endl;
+          std::cout << "\t[REJECTED] lambda:" << lambda << " f_diff: " << f_diff << " max_inc: " << max_inc
+                    << " vision_error: " << after_update_vision_error << " rel_error: " << after_rel_error
+                    << " roll_pitch_error: " << after_roll_pitch_error << " total: " << after_error_total << std::endl;
           lambda = std::min(max_lambda, lambda_vee * lambda);
           lambda_vee *= 2;
 
           restore();
         } else {
-          std::cout << "\t[ACCEPTED] lambda:" << lambda << " f_diff: " << f_diff
-                    << " max_inc: " << max_inc
-                    << " vision_error: " << after_update_vision_error
-                    << " rel_error: " << after_rel_error
-                    << " roll_pitch_error: " << after_roll_pitch_error
-                    << " total: " << after_error_total << std::endl;
+          std::cout << "\t[ACCEPTED] lambda:" << lambda << " f_diff: " << f_diff << " max_inc: " << max_inc
+                    << " vision_error: " << after_update_vision_error << " rel_error: " << after_rel_error
+                    << " roll_pitch_error: " << after_roll_pitch_error << " total: " << after_error_total << std::endl;
 
           lambda = std::max(min_lambda, lambda / 3);
           lambda_vee = 2;
@@ -381,8 +361,7 @@ void NfrMapper::optimize(int num_iterations) {
       }
     } else {  // Use Gauss-Newton
       Eigen::VectorXd Hdiag_lambda = Hdiag * min_lambda;
-      for (int i = 0; i < Hdiag_lambda.size(); i++)
-        Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
+      for (int i = 0; i < Hdiag_lambda.size(); i++) Hdiag_lambda[i] = std::max(Hdiag_lambda[i], min_lambda);
 
       const Eigen::VectorXd inc = lopt.accum.solve(&Hdiag_lambda);
       double max_inc = inc.array().abs().maxCoeff();
@@ -407,12 +386,10 @@ void NfrMapper::optimize(int num_iterations) {
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();
-    auto elapsed =
-        std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
 
-    std::cout << "iter " << iter << " time : " << elapsed.count()
-              << "(us),  num_states " << frame_states.size() << " num_poses "
-              << frame_poses.size() << std::endl;
+    std::cout << "iter " << iter << " time : " << elapsed.count() << "(us),  num_states " << frame_states.size()
+              << " num_poses " << frame_poses.size() << std::endl;
 
     if (converged) break;
 
@@ -422,10 +399,7 @@ void NfrMapper::optimize(int num_iterations) {
   }
 }
 
-Eigen::aligned_map<int64_t, PoseStateWithLin<double>>&
-NfrMapper::getFramePoses() {
-  return frame_poses;
-}
+Eigen::aligned_map<int64_t, PoseStateWithLin<double>>& NfrMapper::getFramePoses() { return frame_poses; }
 
 void NfrMapper::computeRelPose(double& rel_error) {
   rel_error = 0;
@@ -462,52 +436,43 @@ void NfrMapper::detect_keypoints() {
 
   auto t1 = std::chrono::high_resolution_clock::now();
 
-  tbb::parallel_for(
-      tbb::blocked_range<size_t>(0, keys.size()),
-      [&](const tbb::blocked_range<size_t>& r) {
-        for (size_t j = r.begin(); j != r.end(); ++j) {
-          auto kv = img_data.find(keys[j]);
-          if (kv->second.get()) {
-            for (size_t i = 0; i < kv->second->img_data.size(); i++) {
-              TimeCamId tcid(kv->first, i);
-              KeypointsData& kd = feature_corners[tcid];
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, keys.size()), [&](const tbb::blocked_range<size_t>& r) {
+    for (size_t j = r.begin(); j != r.end(); ++j) {
+      auto kv = img_data.find(keys[j]);
+      if (kv->second.get()) {
+        for (size_t i = 0; i < kv->second->img_data.size(); i++) {
+          TimeCamId tcid(kv->first, i);
+          KeypointsData& kd = feature_corners[tcid];
 
-              if (!kv->second->img_data[i].img.get()) continue;
+          if (!kv->second->img_data[i].img.get()) continue;
 
-              const Image<const uint16_t> img =
-                  kv->second->img_data[i].img->Reinterpret<const uint16_t>();
+          const Image<const uint16_t> img = kv->second->img_data[i].img->Reinterpret<const uint16_t>();
 
-              detectKeypointsMapping(img, kd,
-                                     config.mapper_detection_num_points);
-              computeAngles(img, kd, true);
-              computeDescriptors(img, kd);
+          detectKeypointsMapping(img, kd, config.mapper_detection_num_points);
+          computeAngles(img, kd, true);
+          computeDescriptors(img, kd);
 
-              std::vector<bool> success;
-              calib.intrinsics[tcid.cam_id].unproject(kd.corners, kd.corners_3d,
-                                                      success);
+          std::vector<bool> success;
+          calib.intrinsics[tcid.cam_id].unproject(kd.corners, kd.corners_3d, success);
 
-              hash_bow_database->compute_bow(kd.corner_descriptors, kd.hashes,
-                                             kd.bow_vector);
+          hash_bow_database->compute_bow(kd.corner_descriptors, kd.hashes, kd.bow_vector);
 
-              hash_bow_database->add_to_database(tcid, kd.bow_vector);
+          hash_bow_database->add_to_database(tcid, kd.bow_vector);
 
-              // std::cout << "bow " << kd.bow_vector.size() << " desc "
-              //          << kd.corner_descriptors.size() << std::endl;
-            }
-          }
+          // std::cout << "bow " << kd.bow_vector.size() << " desc "
+          //          << kd.corner_descriptors.size() << std::endl;
         }
-      });
+      }
+    }
+  });
 
   auto t2 = std::chrono::high_resolution_clock::now();
 
-  auto elapsed1 =
-      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
+  auto elapsed1 = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
 
-  std::cout << "Processed " << feature_corners.size() << " frames."
-            << std::endl;
+  std::cout << "Processed " << feature_corners.size() << " frames." << std::endl;
 
-  std::cout << "Detection time: " << elapsed1.count() * 1e-6 << "s."
-            << std::endl;
+  std::cout << "Detection time: " << elapsed1.count() * 1e-6 << "s." << std::endl;
 }
 
 void NfrMapper::match_stereo() {
@@ -518,8 +483,7 @@ void NfrMapper::match_stereo() {
   Eigen::Matrix4d E;
   computeEssential(T_0_1, E);
 
-  std::cout << "Matching " << img_data.size() << " stereo pairs..."
-            << std::endl;
+  std::cout << "Matching " << img_data.size() << " stereo pairs..." << std::endl;
 
   int num_matches = 0;
   int num_inliers = 0;
@@ -533,8 +497,7 @@ void NfrMapper::match_stereo() {
     const KeypointsData& kd1 = feature_corners[tcid1];
     const KeypointsData& kd2 = feature_corners[tcid2];
 
-    matchDescriptors(kd1.corner_descriptors, kd2.corner_descriptors, md.matches,
-                     config.mapper_max_hamming_distance,
+    matchDescriptors(kd1.corner_descriptors, kd2.corner_descriptors, md.matches, config.mapper_max_hamming_distance,
                      config.mapper_second_best_test_ratio);
 
     num_matches += md.matches.size();
@@ -547,9 +510,8 @@ void NfrMapper::match_stereo() {
     }
   }
 
-  std::cout << "Matched " << img_data.size() << " stereo pairs with "
-            << num_inliers << " inlier matches (" << num_matches << " total)."
-            << std::endl;
+  std::cout << "Matched " << img_data.size() << " stereo pairs with " << num_inliers << " inlier matches ("
+            << num_matches << " total)." << std::endl;
 }
 
 void NfrMapper::match_all() {
@@ -579,9 +541,7 @@ void NfrMapper::match_all() {
 
       std::vector<std::pair<TimeCamId, double>> results;
 
-      hash_bow_database->querry_database(kd.bow_vector,
-                                         config.mapper_num_frames_to_match,
-                                         results, &tcid.frame_id);
+      hash_bow_database->querry_database(kd.bow_vector, config.mapper_num_frames_to_match, results, &tcid.frame_id);
 
       // std::cout << "Closest frames for " << tcid << ": ";
       for (const auto& otcid_score : results) {
@@ -606,8 +566,7 @@ void NfrMapper::match_all() {
 
   auto t2 = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Matching " << ids_to_match.size() << " image pairs..."
-            << std::endl;
+  std::cout << "Matching " << ids_to_match.size() << " image pairs..." << std::endl;
 
   std::atomic<int> total_matched = 0;
 
@@ -624,14 +583,12 @@ void NfrMapper::match_all() {
 
       MatchData md;
 
-      matchDescriptors(f1.corner_descriptors, f2.corner_descriptors, md.matches,
-                       70, 1.2);
+      matchDescriptors(f1.corner_descriptors, f2.corner_descriptors, md.matches, 70, 1.2);
 
       if (int(md.matches.size()) > config.mapper_min_matches) {
         matched++;
 
-        findInliersRansac(f1, f2, config.mapper_ransac_threshold,
-                          config.mapper_min_matches, md);
+        findInliersRansac(f1, f2, config.mapper_ransac_threshold, config.mapper_min_matches, md);
       }
 
       if (!md.inliers.empty()) feature_matches[std::make_pair(id1, id2)] = md;
@@ -644,10 +601,8 @@ void NfrMapper::match_all() {
 
   auto t3 = std::chrono::high_resolution_clock::now();
 
-  auto elapsed1 =
-      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
-  auto elapsed2 =
-      std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2);
+  auto elapsed1 = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
+  auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2);
 
   //
   int num_matches = 0;
@@ -658,14 +613,11 @@ void NfrMapper::match_all() {
     num_inliers += kv.second.inliers.size();
   }
 
-  std::cout << "Matched " << ids_to_match.size() << " image pairs with "
-            << num_inliers << " inlier matches (" << num_matches << " total)."
-            << std::endl;
+  std::cout << "Matched " << ids_to_match.size() << " image pairs with " << num_inliers << " inlier matches ("
+            << num_matches << " total)." << std::endl;
 
-  std::cout << "DB query " << elapsed1.count() * 1e-6 << "s. matching "
-            << elapsed2.count() * 1e-6
-            << "s. Geometric verification attemts: " << total_matched << "."
-            << std::endl;
+  std::cout << "DB query " << elapsed1.count() * 1e-6 << "s. matching " << elapsed2.count() * 1e-6
+            << "s. Geometric verification attemts: " << total_matched << "." << std::endl;
 }
 
 void NfrMapper::build_tracks() {
@@ -688,15 +640,13 @@ void NfrMapper::build_tracks() {
     total_track_obs_count += it.second.size();
   }
 
-  std::cout << "Built " << feature_tracks.size() << " feature tracks from "
-            << inlier_match_count << " matches. Average track length is "
-            << total_track_obs_count / (double)feature_tracks.size() << "."
+  std::cout << "Built " << feature_tracks.size() << " feature tracks from " << inlier_match_count
+            << " matches. Average track length is " << total_track_obs_count / (double)feature_tracks.size() << "."
             << std::endl;
 }
 
 void NfrMapper::setup_opt() {
-  const double min_triang_distance2 = config.mapper_min_triangulation_dist *
-                                      config.mapper_min_triangulation_dist;
+  const double min_triang_distance2 = config.mapper_min_triangulation_dist * config.mapper_min_triangulation_dist;
 
   for (const auto& kv : feature_tracks) {
     if (kv.second.size() < 2) continue;
@@ -720,20 +670,16 @@ void NfrMapper::setup_opt() {
       Eigen::Vector4d pos_3d_o;
       calib.intrinsics[tcid_o.cam_id].unproject(pos_2d_o, pos_3d_o);
 
-      Sophus::SE3d T_w_h = frame_poses.at(tcid_h.frame_id).getPose() *
-                           calib.T_i_c[tcid_h.cam_id];
-      Sophus::SE3d T_w_o = frame_poses.at(tcid_o.frame_id).getPose() *
-                           calib.T_i_c[tcid_o.cam_id];
+      Sophus::SE3d T_w_h = frame_poses.at(tcid_h.frame_id).getPose() * calib.T_i_c[tcid_h.cam_id];
+      Sophus::SE3d T_w_o = frame_poses.at(tcid_o.frame_id).getPose() * calib.T_i_c[tcid_o.cam_id];
 
       Sophus::SE3d T_h_o = T_w_h.inverse() * T_w_o;
 
       if (T_h_o.translation().squaredNorm() < min_triang_distance2) continue;
 
-      Eigen::Vector4d pos_3d =
-          triangulate(pos_3d_h.head<3>(), pos_3d_o.head<3>(), T_h_o);
+      Eigen::Vector4d pos_3d = triangulate(pos_3d_h.head<3>(), pos_3d_o.head<3>(), T_h_o);
 
-      if (!pos_3d.array().isFinite().all() || pos_3d[3] <= 0 || pos_3d[3] > 2.0)
-        continue;
+      if (!pos_3d.array().isFinite().all() || pos_3d[3] <= 0 || pos_3d[3] > 2.0) continue;
 
       Keypoint<Scalar> pos;
       pos.host_kf_id = tcid_h;

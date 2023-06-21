@@ -41,19 +41,15 @@ namespace basalt {
 
 template <class Scalar_>
 Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkNullspace(
-    const MargLinData<Scalar_>& mld,
-    const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>&
-        frame_states,
-    const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses,
-    bool verbose) {
+    const MargLinData<Scalar_>& mld, const Eigen::aligned_map<int64_t, PoseVelBiasStateWithLin<Scalar>>& frame_states,
+    const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>& frame_poses, bool verbose) {
   using Vec3d = Eigen::Vector3d;
   using VecXd = Eigen::VectorXd;
   using Mat3d = Eigen::Matrix3d;
   using MatXd = Eigen::MatrixXd;
   using SO3d = Sophus::SO3d;
 
-  BASALT_ASSERT_STREAM(size_t(mld.H.cols()) == mld.order.total_size,
-                       mld.H.cols() << " " << mld.order.total_size);
+  BASALT_ASSERT_STREAM(size_t(mld.H.cols()) == mld.order.total_size, mld.H.cols() << " " << mld.order.total_size);
   size_t marg_size = mld.order.total_size;
 
   // Idea: We construct increments that we know should lie in the null-space of
@@ -87,20 +83,13 @@ Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkNullspace(
   for (const auto& kv : mld.order.abs_order_map) {
     Vec3d trans;
     if (kv.second.second == POSE_SIZE) {
-      mean_trans += frame_poses.at(kv.first)
-                        .getPoseLin()
-                        .translation()
-                        .template cast<double>();
+      mean_trans += frame_poses.at(kv.first).getPoseLin().translation().template cast<double>();
       num_trans++;
     } else if (kv.second.second == POSE_VEL_BIAS_SIZE) {
-      mean_trans += frame_states.at(kv.first)
-                        .getStateLin()
-                        .T_w_i.translation()
-                        .template cast<double>();
+      mean_trans += frame_states.at(kv.first).getStateLin().T_w_i.translation().template cast<double>();
       num_trans++;
     } else {
-      std::cerr << "Unknown size of the state: " << kv.second.second
-                << std::endl;
+      std::cerr << "Unknown size of the state: " << kv.second.second << std::endl;
       std::abort();
     }
   }
@@ -119,15 +108,9 @@ Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkNullspace(
 
     Vec3d trans;
     if (kv.second.second == POSE_SIZE) {
-      trans = frame_poses.at(kv.first)
-                  .getPoseLin()
-                  .translation()
-                  .template cast<double>();
+      trans = frame_poses.at(kv.first).getPoseLin().translation().template cast<double>();
     } else if (kv.second.second == POSE_VEL_BIAS_SIZE) {
-      trans = frame_states.at(kv.first)
-                  .getStateLin()
-                  .T_w_i.translation()
-                  .template cast<double>();
+      trans = frame_states.at(kv.first).getStateLin().T_w_i.translation().template cast<double>();
     } else {
       BASALT_ASSERT(false);
     }
@@ -147,9 +130,7 @@ Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkNullspace(
     inc_yaw.template segment<3>(kv.second.first) = J.col(2);
 
     if (kv.second.second == POSE_VEL_BIAS_SIZE) {
-      Vec3d vel = frame_states.at(kv.first)
-                      .getStateLin()
-                      .vel_w_i.template cast<double>();
+      Vec3d vel = frame_states.at(kv.first).getStateLin().vel_w_i.template cast<double>();
 
       // Jacobian of velocity w.r.t. the rotation increment (one column each
       // for the 3 different increments)
@@ -227,8 +208,7 @@ Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkNullspace(
 }
 
 template <class Scalar_>
-Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkEigenvalues(
-    const MargLinData<Scalar_>& mld, bool verbose) {
+Eigen::VectorXd SqrtBundleAdjustmentBase<Scalar_>::checkEigenvalues(const MargLinData<Scalar_>& mld, bool verbose) {
   // Check EV of J^T J explicitly instead of doing SVD on J to easily notice if
   // we have negative EVs (numerically). We do this computation in double
   // precision to avoid any inaccuracies that come from the squaring.

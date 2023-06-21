@@ -43,13 +43,7 @@ class LandmarkBlock {
     Scalar jacobi_scaling_eps = 1e-6;
   };
 
-  enum State {
-    Uninitialized = 0,
-    Allocated,
-    NumericalFailure,
-    Linearized,
-    Marginalized
-  };
+  enum State { Uninitialized = 0, Allocated, NumericalFailure, Linearized, Marginalized };
 
   using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
   using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
@@ -60,8 +54,7 @@ class LandmarkBlock {
   using Mat36 = Eigen::Matrix<Scalar, 3, 6>;
 
   using MatX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
-  using RowMatX =
-      Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+  using RowMatX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   using RowMat3 = Eigen::Matrix<Scalar, 3, 3, Eigen::RowMajor>;
 
@@ -70,10 +63,8 @@ class LandmarkBlock {
   virtual bool isNumericalFailure() const = 0;
   virtual void allocateLandmark(
       Keypoint<Scalar>& lm,
-      const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>,
-                                         RelPoseLin<Scalar>>& relative_pose_lin,
-      const Calibration<Scalar>& calib, const AbsOrderMap& aom,
-      const Options& options,
+      const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>, RelPoseLin<Scalar>>& relative_pose_lin,
+      const Calibration<Scalar>& calib, const AbsOrderMap& aom, const Options& options,
       const std::map<TimeCamId, size_t>* rel_order = nullptr) = 0;
 
   // may set state to NumericalFailure --> linearization at this state is
@@ -95,8 +86,7 @@ class LandmarkBlock {
 
   virtual void addJp_diag2(VecX& res) const = 0;
 
-  virtual void addQ2JpTQ2Jp_blockdiag(
-      BlockDiagonalAccumulator<Scalar>& accu) const = 0;
+  virtual void addQ2JpTQ2Jp_blockdiag(BlockDiagonalAccumulator<Scalar>& accu) const = 0;
 
   virtual void scaleJl_cols() = 0;
   virtual void scaleJp_cols(const VecX& jacobian_scaling) = 0;
@@ -105,23 +95,18 @@ class LandmarkBlock {
 
   virtual size_t numReducedCams() const = 0;
 
-  virtual void get_dense_Q2Jp_Q2r(MatX& Q2Jp, VecX& Q2r,
-                                  size_t start_idx) const = 0;
+  virtual void get_dense_Q2Jp_Q2r(MatX& Q2Jp, VecX& Q2r, size_t start_idx) const = 0;
 
-  virtual void get_dense_Q2Jp_Q2r_rel(
-      MatX& Q2Jp, VecX& Q2r, size_t start_idx,
-      const std::map<TimeCamId, size_t>& rel_order) const = 0;
+  virtual void get_dense_Q2Jp_Q2r_rel(MatX& Q2Jp, VecX& Q2r, size_t start_idx,
+                                      const std::map<TimeCamId, size_t>& rel_order) const = 0;
 
   virtual void add_dense_H_b(DenseAccumulator<Scalar>& accum) const = 0;
 
   virtual void add_dense_H_b(MatX& H, VecX& b) const = 0;
 
-  virtual void add_dense_H_b_rel(
-      MatX& H_rel, VecX& b_rel,
-      const std::map<TimeCamId, size_t>& rel_order) const = 0;
+  virtual void add_dense_H_b_rel(MatX& H_rel, VecX& b_rel, const std::map<TimeCamId, size_t>& rel_order) const = 0;
 
-  virtual const Eigen::PermutationMatrix<Eigen::Dynamic>& get_rel_permutation()
-      const = 0;
+  virtual const Eigen::PermutationMatrix<Eigen::Dynamic>& get_rel_permutation() const = 0;
 
   virtual Eigen::PermutationMatrix<Eigen::Dynamic> compute_rel_permutation(
       const std::map<TimeCamId, size_t>& rel_order) const = 0;

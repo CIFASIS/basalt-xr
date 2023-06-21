@@ -74,12 +74,8 @@ class DenseAccumulator {
     BASALT_ASSERT_STREAM(i >= 0, "i " << i);
     BASALT_ASSERT_STREAM(j >= 0, "j " << j);
 
-    BASALT_ASSERT_STREAM(i + ROWS <= H.cols(), "i " << i << " ROWS " << ROWS
-                                                    << " H.rows() "
-                                                    << H.rows());
-    BASALT_ASSERT_STREAM(j + COLS <= H.rows(), "j " << j << " COLS " << COLS
-                                                    << " H.cols() "
-                                                    << H.cols());
+    BASALT_ASSERT_STREAM(i + ROWS <= H.cols(), "i " << i << " ROWS " << ROWS << " H.rows() " << H.rows());
+    BASALT_ASSERT_STREAM(j + COLS <= H.rows(), "j " << j << " COLS " << COLS << " H.cols() " << H.cols());
 
     H.template block<ROWS, COLS>(i, j) += data;
   }
@@ -88,9 +84,7 @@ class DenseAccumulator {
   inline void addB(int i, const Eigen::MatrixBase<Derived>& data) {
     BASALT_ASSERT_STREAM(i >= 0, "i " << i);
 
-    BASALT_ASSERT_STREAM(i + ROWS <= H.cols(), "i " << i << " ROWS " << ROWS
-                                                    << " H.rows() "
-                                                    << H.rows());
+    BASALT_ASSERT_STREAM(i + ROWS <= H.cols(), "i " << i << " ROWS " << ROWS << " H.rows() " << H.rows());
 
     b.template segment<ROWS>(i) += data;
   }
@@ -178,8 +172,7 @@ class SparseHashAccumulator {
     for (const auto& kv : hash_map) {
       for (int i = 0; i < kv.second.rows(); i++) {
         for (int j = 0; j < kv.second.cols(); j++) {
-          triplets.emplace_back(kv.first[0] + i, kv.first[1] + j,
-                                kv.second(i, j));
+          triplets.emplace_back(kv.first[0] + i, kv.first[1] + j, kv.second(i, j));
         }
       }
     }
@@ -209,9 +202,7 @@ class SparseHashAccumulator {
       // (interferes with TBB), the current CG is single-threaded, and we
       // can expect a substantial speedup by switching to a parallel
       // implementation of CG.
-      Eigen::ConjugateGradient<Eigen::SparseMatrix<double>,
-                               Eigen::Lower | Eigen::Upper>
-          cg;
+      Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper> cg;
 
       cg.setTolerance(tolerance);
       cg.compute(sm);
@@ -223,12 +214,10 @@ class SparseHashAccumulator {
 
     auto t3 = std::chrono::high_resolution_clock::now();
 
-    auto elapsed2 =
-        std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2);
+    auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2);
 
     if (print_info) {
-      std::cout << "Solving linear system: " << elapsed2.count() * 1e-6 << "s."
-                << std::endl;
+      std::cout << "Solving linear system: " << elapsed2.count() * 1e-6 << "s." << std::endl;
     }
 
     return res;

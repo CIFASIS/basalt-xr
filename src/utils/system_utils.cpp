@@ -53,8 +53,7 @@ bool get_memory_info(MemoryInfo& info) {
   mach_task_basic_info_data_t t_info;
   mach_msg_type_number_t t_info_count = MACH_TASK_BASIC_INFO_COUNT;
 
-  if (KERN_SUCCESS != task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
-                                (task_info_t)&t_info, &t_info_count)) {
+  if (KERN_SUCCESS != task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count)) {
     return false;
   }
   info.resident_memory = t_info.resident_size;

@@ -59,9 +59,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <class Scalar_>
-SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(
-    const Eigen::Vector3d& g_, const basalt::Calibration<double>& calib_,
-    const VioConfig& config_)
+SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(const Eigen::Vector3d& g_,
+                                                            const basalt::Calibration<double>& calib_,
+                                                            const VioConfig& config_)
     : take_kf(true),
       frames_after_kf(0),
       g(g_.cast<Scalar>()),
@@ -87,32 +87,25 @@ SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(
 
   if (marg_data.is_sqrt) {
     // prior on position
-    marg_data.H.diagonal().template head<3>().setConstant(
-        std::sqrt(Scalar(config.vio_init_pose_weight)));
+    marg_data.H.diagonal().template head<3>().setConstant(std::sqrt(Scalar(config.vio_init_pose_weight)));
     // prior on yaw
     marg_data.H(5, 5) = std::sqrt(Scalar(config.vio_init_pose_weight));
 
     // small prior to avoid jumps in bias
-    marg_data.H.diagonal().template segment<3>(9).array() =
-        std::sqrt(Scalar(config.vio_init_ba_weight));
-    marg_data.H.diagonal().template segment<3>(12).array() =
-        std::sqrt(Scalar(config.vio_init_bg_weight));
+    marg_data.H.diagonal().template segment<3>(9).array() = std::sqrt(Scalar(config.vio_init_ba_weight));
+    marg_data.H.diagonal().template segment<3>(12).array() = std::sqrt(Scalar(config.vio_init_bg_weight));
   } else {
     // prior on position
-    marg_data.H.diagonal().template head<3>().setConstant(
-        Scalar(config.vio_init_pose_weight));
+    marg_data.H.diagonal().template head<3>().setConstant(Scalar(config.vio_init_pose_weight));
     // prior on yaw
     marg_data.H(5, 5) = Scalar(config.vio_init_pose_weight);
 
     // small prior to avoid jumps in bias
-    marg_data.H.diagonal().template segment<3>(9).array() =
-        Scalar(config.vio_init_ba_weight);
-    marg_data.H.diagonal().template segment<3>(12).array() =
-        Scalar(config.vio_init_bg_weight);
+    marg_data.H.diagonal().template segment<3>(9).array() = Scalar(config.vio_init_ba_weight);
+    marg_data.H.diagonal().template segment<3>(12).array() = Scalar(config.vio_init_bg_weight);
   }
 
-  std::cout << "marg_H (sqrt:" << marg_data.is_sqrt << ")\n"
-            << marg_data.H << std::endl;
+  std::cout << "marg_H (sqrt:" << marg_data.is_sqrt << ")\n" << marg_data.H << std::endl;
 
   gyro_bias_sqrt_weight = calib.gyro_bias_std.array().inverse();
   accel_bias_sqrt_weight = calib.accel_bias_std.array().inverse();
@@ -127,18 +120,16 @@ SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::initialize(
-    int64_t t_ns, const Sophus::SE3d& T_w_i, const Eigen::Vector3d& vel_w_i,
-    const Eigen::Vector3d& bg, const Eigen::Vector3d& ba) {
+void SqrtKeypointVioEstimator<Scalar_>::initialize(int64_t t_ns, const Sophus::SE3d& T_w_i,
+                                                   const Eigen::Vector3d& vel_w_i, const Eigen::Vector3d& bg,
+                                                   const Eigen::Vector3d& ba) {
   initialized = true;
   T_w_i_init = T_w_i.cast<Scalar>();
 
   last_state_t_ns = t_ns;
-  imu_meas[t_ns] = IntegratedImuMeasurement<Scalar>(t_ns, bg.cast<Scalar>(),
-                                                    ba.cast<Scalar>());
-  frame_states[t_ns] = PoseVelBiasStateWithLin<Scalar>(
-      t_ns, T_w_i_init, vel_w_i.cast<Scalar>(), bg.cast<Scalar>(),
-      ba.cast<Scalar>(), true);
+  imu_meas[t_ns] = IntegratedImuMeasurement<Scalar>(t_ns, bg.cast<Scalar>(), ba.cast<Scalar>());
+  frame_states[t_ns] = PoseVelBiasStateWithLin<Scalar>(t_ns, T_w_i_init, vel_w_i.cast<Scalar>(), bg.cast<Scalar>(),
+                                                       ba.cast<Scalar>(), true);
 
   marg_data.order.abs_order_map[t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
   marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
@@ -150,8 +141,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
-                                                   const Eigen::Vector3d& ba_) {
+void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, const Eigen::Vector3d& ba_) {
   Vec3 bg_init = bg_.cast<Scalar>();
   Vec3 ba_init = ba_.cast<Scalar>();
 
@@ -159,8 +149,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
     OpticalFlowResult::Ptr prev_frame, curr_frame;
     typename IntegratedImuMeasurement<Scalar>::Ptr meas;
 
-    const Vec3 accel_cov =
-        calib.dicrete_time_accel_noise_std().array().square();
+    const Vec3 accel_cov = calib.dicrete_time_accel_noise_std().array().square();
     const Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
 
     typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
@@ -199,17 +188,14 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
         Vec3 vel_w_i_init;
         vel_w_i_init.setZero();
 
-        T_w_i_init.setQuaternion(Eigen::Quaternion<Scalar>::FromTwoVectors(
-            data->accel, Vec3::UnitZ()));
+        T_w_i_init.setQuaternion(Eigen::Quaternion<Scalar>::FromTwoVectors(data->accel, Vec3::UnitZ()));
 
         last_state_t_ns = curr_frame->t_ns;
-        imu_meas[last_state_t_ns] =
-            IntegratedImuMeasurement<Scalar>(last_state_t_ns, bg, ba);
-        frame_states[last_state_t_ns] = PoseVelBiasStateWithLin<Scalar>(
-            last_state_t_ns, T_w_i_init, vel_w_i_init, bg, ba, true);
+        imu_meas[last_state_t_ns] = IntegratedImuMeasurement<Scalar>(last_state_t_ns, bg, ba);
+        frame_states[last_state_t_ns] =
+            PoseVelBiasStateWithLin<Scalar>(last_state_t_ns, T_w_i_init, vel_w_i_init, bg, ba, true);
 
-        marg_data.order.abs_order_map[last_state_t_ns] =
-            std::make_pair(0, POSE_VEL_BIAS_SIZE);
+        marg_data.order.abs_order_map[last_state_t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
         marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
         marg_data.order.items = 1;
 
@@ -229,9 +215,8 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 
         auto last_state = frame_states.at(last_state_t_ns);
 
-        meas.reset(new IntegratedImuMeasurement<Scalar>(
-            prev_frame->t_ns, last_state.getState().bias_gyro,
-            last_state.getState().bias_accel));
+        meas.reset(new IntegratedImuMeasurement<Scalar>(prev_frame->t_ns, last_state.getState().bias_gyro,
+                                                        last_state.getState().bias_accel));
 
         BASALT_ASSERT_MSG(prev_frame->t_ns != curr_frame->t_ns,
                           "duplicate frame timestamps?! zero time delta leads "
@@ -283,20 +268,17 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::addIMUToQueue(
-    const ImuData<double>::Ptr& data) {
+void SqrtKeypointVioEstimator<Scalar_>::addIMUToQueue(const ImuData<double>::Ptr& data) {
   imu_data_queue.emplace(data);
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::addVisionToQueue(
-    const OpticalFlowResult::Ptr& data) {
+void SqrtKeypointVioEstimator<Scalar_>::addVisionToQueue(const OpticalFlowResult::Ptr& data) {
   vision_data_queue.push(data);
 }
 
 template <class Scalar_>
-typename ImuData<Scalar_>::Ptr
-SqrtKeypointVioEstimator<Scalar_>::popFromImuDataQueue() {
+typename ImuData<Scalar_>::Ptr SqrtKeypointVioEstimator<Scalar_>::popFromImuDataQueue() {
   ImuData<double>::Ptr data;
   imu_data_queue.pop(data);
 
@@ -313,24 +295,19 @@ SqrtKeypointVioEstimator<Scalar_>::popFromImuDataQueue() {
 }
 
 template <class Scalar_>
-bool SqrtKeypointVioEstimator<Scalar_>::measure(
-    const OpticalFlowResult::Ptr& opt_flow_meas,
-    const typename IntegratedImuMeasurement<Scalar>::Ptr& meas) {
+bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& opt_flow_meas,
+                                                const typename IntegratedImuMeasurement<Scalar>::Ptr& meas) {
   stats_sums_.add("frame_id", opt_flow_meas->t_ns).format("none");
   Timer t_total;
 
   if (meas.get()) {
-    BASALT_ASSERT(frame_states[last_state_t_ns].getState().t_ns ==
-                  meas->get_start_t_ns());
-    BASALT_ASSERT(opt_flow_meas->t_ns ==
-                  meas->get_dt_ns() + meas->get_start_t_ns());
+    BASALT_ASSERT(frame_states[last_state_t_ns].getState().t_ns == meas->get_start_t_ns());
+    BASALT_ASSERT(opt_flow_meas->t_ns == meas->get_dt_ns() + meas->get_start_t_ns());
     BASALT_ASSERT(meas->get_dt_ns() > 0);
 
-    PoseVelBiasState<Scalar> next_state =
-        frame_states.at(last_state_t_ns).getState();
+    PoseVelBiasState<Scalar> next_state = frame_states.at(last_state_t_ns).getState();
 
-    meas->predictState(frame_states.at(last_state_t_ns).getState(), g,
-                       next_state);
+    meas->predictState(frame_states.at(last_state_t_ns).getState(), g, next_state);
 
     last_state_t_ns = opt_flow_meas->t_ns;
     next_state.t_ns = opt_flow_meas->t_ns;
@@ -376,16 +353,14 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     }
   }
 
-  if (Scalar(connected[0]) / (connected[0] + unconnected_obs[0].size()) <
-          Scalar(config.vio_new_kf_keypoints_thresh) &&
+  if (Scalar(connected[0]) / (connected[0] + unconnected_obs[0].size()) < Scalar(config.vio_new_kf_keypoints_thresh) &&
       frames_after_kf > config.vio_min_frames_after_kf)
     take_kf = true;
 
   if (config.vio_debug) {
     for (int i = 0; i < NUM_CAMS; i++) {
       std::cout << "connected[" << i << "] = " << connected[i] << ", "
-                << "unconnected[" << i << "] =" << unconnected_obs[i].size()
-                << std::endl;
+                << "unconnected[" << i << "] =" << unconnected_obs[i].size() << std::endl;
     }
   }
 
@@ -424,16 +399,12 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
         // triangulate
         bool valid_kp = false;
         const Scalar min_triang_distance2 =
-            Scalar(config.vio_min_triangulation_dist *
-                   config.vio_min_triangulation_dist);
+            Scalar(config.vio_min_triangulation_dist * config.vio_min_triangulation_dist);
         for (const auto& kv_obs : kp_obs) {
           if (valid_kp) break;
           TimeCamId tcido = kv_obs.first;
 
-          const Vec2 p0 = opt_flow_meas->observations.at(i)
-                              .at(lm_id)
-                              .translation()
-                              .cast<Scalar>();
+          const Vec2 p0 = opt_flow_meas->observations.at(i).at(lm_id).translation().cast<Scalar>();
           const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]
                               ->observations[tcido.cam_id]
                               .at(lm_id)
@@ -446,23 +417,17 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
           if (!valid1 || !valid2) continue;
 
           SE3 T_i0_i1 =
-              getPoseStateWithLin(tcidl.frame_id).getPose().inverse() *
-              getPoseStateWithLin(tcido.frame_id).getPose();
-          SE3 T_0_1 =
-              calib.T_i_c[i].inverse() * T_i0_i1 * calib.T_i_c[tcido.cam_id];
+              getPoseStateWithLin(tcidl.frame_id).getPose().inverse() * getPoseStateWithLin(tcido.frame_id).getPose();
+          SE3 T_0_1 = calib.T_i_c[i].inverse() * T_i0_i1 * calib.T_i_c[tcido.cam_id];
 
-          if (T_0_1.translation().squaredNorm() < min_triang_distance2)
-            continue;
+          if (T_0_1.translation().squaredNorm() < min_triang_distance2) continue;
 
-          Vec4 p0_triangulated = triangulate(p0_3d.template head<3>(),
-                                             p1_3d.template head<3>(), T_0_1);
+          Vec4 p0_triangulated = triangulate(p0_3d.template head<3>(), p1_3d.template head<3>(), T_0_1);
 
-          if (p0_triangulated.array().isFinite().all() &&
-              p0_triangulated[3] > 0 && p0_triangulated[3] < 3.0) {
+          if (p0_triangulated.array().isFinite().all() && p0_triangulated[3] > 0 && p0_triangulated[3] < 3.0) {
             Keypoint<Scalar> kpt_pos;
             kpt_pos.host_kf_id = tcidl;
-            kpt_pos.direction =
-                StereographicParam<Scalar>::project(p0_triangulated);
+            kpt_pos.direction = StereographicParam<Scalar>::project(p0_triangulated);
             kpt_pos.inv_dist = p0_triangulated[3];
             lmdb.addLandmark(lm_id, kpt_pos);
 
@@ -489,8 +454,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     for (const auto& kv : lmdb.getLandmarks()) {
       bool connected = false;
       for (size_t i = 0; i < opt_flow_meas->observations.size(); i++) {
-        if (opt_flow_meas->observations[i].count(kv.first) > 0)
-          connected = true;
+        if (opt_flow_meas->observations[i].count(kv.first) > 0) connected = true;
       }
       if (!connected) {
         lost_landmaks.emplace(kv.first);
@@ -499,14 +463,12 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   }
   opt_flow_meas->input_images->addTime("landmarks_updated");
 
-  optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
-                    lost_landmaks);
+  optimize_and_marg(opt_flow_meas->input_images, num_points_connected, lost_landmaks);
 
   size_t num_cams = opt_flow_meas->observations.size();
   bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
   bool avg_depth_needed =
-      opt_flow_depth_guess_queue && config.optical_flow_matching_guess_type ==
-                                        MatchingGuessType::REPROJ_AVG_DEPTH;
+      opt_flow_depth_guess_queue && config.optical_flow_matching_guess_type == MatchingGuessType::REPROJ_AVG_DEPTH;
 
   using Projections = std::vector<Eigen::aligned_vector<Eigen::Vector4d>>;
   std::shared_ptr<Projections> projections = nullptr;
@@ -518,8 +480,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
 
-    typename PoseVelBiasState<double>::Ptr data(
-        new PoseVelBiasState<double>(p.getState().template cast<double>()));
+    typename PoseVelBiasState<double>::Ptr data(new PoseVelBiasState<double>(p.getState().template cast<double>()));
 
     data->input_images = opt_flow_meas->input_images;
     data->input_images->addTime("pose_produced");
@@ -542,8 +503,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     if (features_ext) {
       for (size_t i = 0; i < num_cams; i++) {
         for (const Eigen::Vector4d& v : projections->at(i)) {
-          using Feature =
-              xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
+          using Feature = xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
           Feature lm{};
           lm.id = v.w();
           lm.u = v.x();
@@ -563,8 +523,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     data->t_ns = last_state_t_ns;
 
     for (const auto& kv : frame_states) {
-      data->states.emplace_back(
-          kv.second.getState().T_w_i.template cast<double>());
+      data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
     }
 
     for (const auto& kv : frame_poses) {
@@ -602,20 +561,17 @@ void SqrtKeypointVioEstimator<Scalar_>::logMargNullspace() {
 
 template <class Scalar_>
 Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargNullspace() const {
-  return checkNullspace(nullspace_marg_data, frame_states, frame_poses,
-                        config.vio_debug);
+  return checkNullspace(nullspace_marg_data, frame_states, frame_poses, config.vio_debug);
 }
 
 template <class Scalar_>
-Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues()
-    const {
+Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues() const {
   return checkEigenvalues(nullspace_marg_data, false);
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::marginalize(
-    const std::map<int64_t, int>& num_points_connected,
-    const std::unordered_set<KeypointId>& lost_landmaks) {
+void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>& num_points_connected,
+                                                    const std::unordered_set<KeypointId>& lost_landmaks) {
   if (!opt_started) return;
 
   Timer t_total;
@@ -639,8 +595,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
       if (kf_ids.count(kv.first) == 0) poses_to_marg.emplace(kv.first);
 
       // Check that we have the same order as marginalization
-      BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) ==
-                    aom.abs_order_map.at(kv.first));
+      BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
 
       aom.total_size += POSE_SIZE;
       aom.items++;
@@ -659,13 +614,11 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
         }
       }
 
-      aom.abs_order_map[kv.first] =
-          std::make_pair(aom.total_size, POSE_VEL_BIAS_SIZE);
+      aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_VEL_BIAS_SIZE);
 
       // Check that we have the same order as marginalization
       if (aom.items < marg_data.order.abs_order_map.size())
-        BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) ==
-                      aom.abs_order_map.at(kv.first));
+        BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
 
       aom.total_size += POSE_VEL_BIAS_SIZE;
       aom.items++;
@@ -685,8 +638,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
 
         for (auto it = kf_ids.begin(); it != end_minus_2; ++it) {
           if (num_points_connected.count(*it) == 0 ||
-              (num_points_connected.at(*it) /
-                   static_cast<float>(num_points_kf.at(*it)) <
+              (num_points_connected.at(*it) / static_cast<float>(num_points_kf.at(*it)) <
                config.vio_kf_marg_feature_ratio)) {
             id_to_marg = *it;
             break;
@@ -711,19 +663,17 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
           // small distance to other keyframes --> higher score
           Scalar denom = 0;
           for (auto it2 = kf_ids.begin(); it2 != end_minus_2; ++it2) {
-            denom += 1 / ((frame_poses.at(*it1).getPose().translation() -
-                           frame_poses.at(*it2).getPose().translation())
-                              .norm() +
-                          Scalar(1e-5));
+            denom +=
+                1 /
+                ((frame_poses.at(*it1).getPose().translation() - frame_poses.at(*it2).getPose().translation()).norm() +
+                 Scalar(1e-5));
           }
 
           // small distance to latest kf --> lower score
-          Scalar score =
-              std::sqrt(
-                  (frame_poses.at(*it1).getPose().translation() -
-                   frame_states.at(last_kf).getState().T_w_i.translation())
-                      .norm()) *
-              denom;
+          Scalar score = std::sqrt((frame_poses.at(*it1).getPose().translation() -
+                                    frame_states.at(last_kf).getState().T_w_i.translation())
+                                       .norm()) *
+                         denom;
 
           if (score < min_score) {
             min_score_id = *it1;
@@ -752,10 +702,8 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
     if (config.vio_debug) {
       std::cout << "states_to_remove " << states_to_remove << std::endl;
       std::cout << "poses_to_marg.size() " << poses_to_marg.size() << std::endl;
-      std::cout << "states_to_marg.size() " << states_to_marg_all.size()
-                << std::endl;
-      std::cout << "state_to_marg_vel_bias.size() "
-                << states_to_marg_vel_bias.size() << std::endl;
+      std::cout << "states_to_marg.size() " << states_to_marg_all.size() << std::endl;
+      std::cout << "state_to_marg_vel_bias.size() " << states_to_marg_vel_bias.size() << std::endl;
       std::cout << "kfs_to_marg.size() " << kfs_to_marg.size() << std::endl;
     }
 
@@ -776,23 +724,19 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
       lqr_options.lb_options.obs_std_dev = obs_std_dev;
       lqr_options.linearization_type = config.vio_linearization_type;
 
-      ImuLinData<Scalar> ild = {
-          g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
+      ImuLinData<Scalar> ild = {g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
 
       for (const auto& kv : imu_meas) {
         int64_t start_t = kv.second.get_start_t_ns();
         int64_t end_t = kv.second.get_start_t_ns() + kv.second.get_dt_ns();
 
-        if (aom.abs_order_map.count(start_t) == 0 ||
-            aom.abs_order_map.count(end_t) == 0)
-          continue;
+        if (aom.abs_order_map.count(start_t) == 0 || aom.abs_order_map.count(end_t) == 0) continue;
 
         ild.imu_meas[kv.first] = &kv.second;
       }
 
-      auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(
-          this, aom, lqr_options, &marg_data, &ild, &kfs_to_marg,
-          &lost_landmaks, last_state_to_marg);
+      auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &marg_data, &ild, &kfs_to_marg,
+                                                              &lost_landmaks, last_state_to_marg);
 
       lqr->linearizeProblem();
       lqr->performQR();
@@ -822,8 +766,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
         m->aom = aom;
 
         if (is_lin_sqrt && marg_data.is_sqrt) {
-          m->abs_H =
-              (Q2Jp_or_H.transpose() * Q2Jp_or_H).template cast<double>();
+          m->abs_H = (Q2Jp_or_H.transpose() * Q2Jp_or_H).template cast<double>();
           m->abs_b = (Q2Jp_or_H.transpose() * Q2r_or_b).template cast<double>();
         } else {
           m->abs_H = Q2Jp_or_H.template cast<double>();
@@ -850,38 +793,31 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
       if (kv.second.second == POSE_SIZE) {
         int start_idx = kv.second.first;
         if (poses_to_marg.count(kv.first) == 0) {
-          for (size_t i = 0; i < POSE_SIZE; i++)
-            idx_to_keep.emplace(start_idx + i);
+          for (size_t i = 0; i < POSE_SIZE; i++) idx_to_keep.emplace(start_idx + i);
         } else {
-          for (size_t i = 0; i < POSE_SIZE; i++)
-            idx_to_marg.emplace(start_idx + i);
+          for (size_t i = 0; i < POSE_SIZE; i++) idx_to_marg.emplace(start_idx + i);
         }
       } else {
         BASALT_ASSERT(kv.second.second == POSE_VEL_BIAS_SIZE);
         // state
         int start_idx = kv.second.first;
         if (states_to_marg_all.count(kv.first) > 0) {
-          for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++)
-            idx_to_marg.emplace(start_idx + i);
+          for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++) idx_to_marg.emplace(start_idx + i);
         } else if (states_to_marg_vel_bias.count(kv.first) > 0) {
-          for (size_t i = 0; i < POSE_SIZE; i++)
-            idx_to_keep.emplace(start_idx + i);
-          for (size_t i = POSE_SIZE; i < POSE_VEL_BIAS_SIZE; i++)
-            idx_to_marg.emplace(start_idx + i);
+          for (size_t i = 0; i < POSE_SIZE; i++) idx_to_keep.emplace(start_idx + i);
+          for (size_t i = POSE_SIZE; i < POSE_VEL_BIAS_SIZE; i++) idx_to_marg.emplace(start_idx + i);
         } else {
           BASALT_ASSERT(kv.first == last_state_to_marg);
-          for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++)
-            idx_to_keep.emplace(start_idx + i);
+          for (size_t i = 0; i < POSE_VEL_BIAS_SIZE; i++) idx_to_keep.emplace(start_idx + i);
         }
       }
     }
 
     if (config.vio_debug) {
-      std::cout << "keeping " << idx_to_keep.size() << " marg "
-                << idx_to_marg.size() << " total " << asize << std::endl;
-      std::cout << "last_state_to_marg " << last_state_to_marg
-                << " frame_poses " << frame_poses.size() << " frame_states "
-                << frame_states.size() << std::endl;
+      std::cout << "keeping " << idx_to_keep.size() << " marg " << idx_to_marg.size() << " total " << asize
+                << std::endl;
+      std::cout << "last_state_to_marg " << last_state_to_marg << " frame_poses " << frame_poses.size()
+                << " frame_states " << frame_states.size() << std::endl;
     }
 
     if (config.vio_debug || config.vio_extended_logging) {
@@ -895,23 +831,19 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
 
       nullspace_marg_data.order = marg_data.order;
 
-      ImuLinData<Scalar> ild = {
-          g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
+      ImuLinData<Scalar> ild = {g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
 
       for (const auto& kv : imu_meas) {
         int64_t start_t = kv.second.get_start_t_ns();
         int64_t end_t = kv.second.get_start_t_ns() + kv.second.get_dt_ns();
 
-        if (aom.abs_order_map.count(start_t) == 0 ||
-            aom.abs_order_map.count(end_t) == 0)
-          continue;
+        if (aom.abs_order_map.count(start_t) == 0 || aom.abs_order_map.count(end_t) == 0) continue;
 
         ild.imu_meas[kv.first] = &kv.second;
       }
 
-      auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(
-          this, aom, lqr_options, &nullspace_marg_data, &ild, &kfs_to_marg,
-          &lost_landmaks, last_state_to_marg);
+      auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &nullspace_marg_data, &ild,
+                                                              &kfs_to_marg, &lost_landmaks, last_state_to_marg);
 
       lqr->linearizeProblem();
       lqr->performQR();
@@ -926,17 +858,14 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
       VecX nullspace_sqrt_b_new;
 
       if (is_lin_sqrt && marg_data.is_sqrt) {
-        MargHelper<Scalar>::marginalizeHelperSqrtToSqrt(
-            Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep, idx_to_marg,
-            nullspace_sqrt_H_new, nullspace_sqrt_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqrtToSqrt(Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep,
+                                                        idx_to_marg, nullspace_sqrt_H_new, nullspace_sqrt_b_new);
       } else if (marg_data.is_sqrt) {
-        MargHelper<Scalar>::marginalizeHelperSqToSqrt(
-            Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep, idx_to_marg,
-            nullspace_sqrt_H_new, nullspace_sqrt_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqToSqrt(Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep, idx_to_marg,
+                                                      nullspace_sqrt_H_new, nullspace_sqrt_b_new);
       } else {
-        MargHelper<Scalar>::marginalizeHelperSqToSq(
-            Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep, idx_to_marg,
-            nullspace_sqrt_H_new, nullspace_sqrt_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqToSq(Q2Jp_or_H_nullspace, Q2r_or_b_nullspace, idx_to_keep, idx_to_marg,
+                                                    nullspace_sqrt_H_new, nullspace_sqrt_b_new);
       }
 
       nullspace_marg_data.H = nullspace_sqrt_H_new;
@@ -949,25 +878,21 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
     {
       Timer t;
       if (is_lin_sqrt && marg_data.is_sqrt) {
-        MargHelper<Scalar>::marginalizeHelperSqrtToSqrt(
-            Q2Jp_or_H, Q2r_or_b, idx_to_keep, idx_to_marg, marg_H_new,
-            marg_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqrtToSqrt(Q2Jp_or_H, Q2r_or_b, idx_to_keep, idx_to_marg, marg_H_new,
+                                                        marg_b_new);
       } else if (marg_data.is_sqrt) {
-        MargHelper<Scalar>::marginalizeHelperSqToSqrt(Q2Jp_or_H, Q2r_or_b,
-                                                      idx_to_keep, idx_to_marg,
-                                                      marg_H_new, marg_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqToSqrt(Q2Jp_or_H, Q2r_or_b, idx_to_keep, idx_to_marg, marg_H_new,
+                                                      marg_b_new);
       } else {
-        MargHelper<Scalar>::marginalizeHelperSqToSq(Q2Jp_or_H, Q2r_or_b,
-                                                    idx_to_keep, idx_to_marg,
-                                                    marg_H_new, marg_b_new);
+        MargHelper<Scalar>::marginalizeHelperSqToSq(Q2Jp_or_H, Q2r_or_b, idx_to_keep, idx_to_marg, marg_H_new,
+                                                    marg_b_new);
       }
 
       stats_sums_.add("marg_helper", t.elapsed()).format("ms");
     }
 
     {
-      BASALT_ASSERT(frame_states.at(last_state_to_marg).isLinearized() ==
-                    false);
+      BASALT_ASSERT(frame_states.at(last_state_to_marg).isLinearized() == false);
       frame_states.at(last_state_to_marg).setLinTrue();
     }
 
@@ -1000,16 +925,14 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
     AbsOrderMap marg_order_new;
 
     for (const auto& kv : frame_poses) {
-      marg_order_new.abs_order_map[kv.first] =
-          std::make_pair(marg_order_new.total_size, POSE_SIZE);
+      marg_order_new.abs_order_map[kv.first] = std::make_pair(marg_order_new.total_size, POSE_SIZE);
 
       marg_order_new.total_size += POSE_SIZE;
       marg_order_new.items++;
     }
 
     {
-      marg_order_new.abs_order_map[last_state_to_marg] =
-          std::make_pair(marg_order_new.total_size, POSE_VEL_BIAS_SIZE);
+      marg_order_new.abs_order_map[last_state_to_marg] = std::make_pair(marg_order_new.total_size, POSE_VEL_BIAS_SIZE);
       marg_order_new.total_size += POSE_VEL_BIAS_SIZE;
       marg_order_new.items++;
     }
@@ -1098,21 +1021,18 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_SIZE);
 
       // Check that we have the same order as marginalization
-      BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) ==
-                    aom.abs_order_map.at(kv.first));
+      BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
 
       aom.total_size += POSE_SIZE;
       aom.items++;
     }
 
     for (const auto& kv : frame_states) {
-      aom.abs_order_map[kv.first] =
-          std::make_pair(aom.total_size, POSE_VEL_BIAS_SIZE);
+      aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_VEL_BIAS_SIZE);
 
       // Check that we have the same order as marginalization
       if (aom.items < marg_data.order.abs_order_map.size())
-        BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) ==
-                      aom.abs_order_map.at(kv.first));
+        BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
 
       aom.total_size += POSE_VEL_BIAS_SIZE;
       aom.items++;
@@ -1138,16 +1058,14 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
     std::unique_ptr<LinearizationBase<Scalar, POSE_SIZE>> lqr;
 
-    ImuLinData<Scalar> ild = {
-        g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
+    ImuLinData<Scalar> ild = {g, gyro_bias_sqrt_weight, accel_bias_sqrt_weight, {}};
     for (const auto& kv : imu_meas) {
       ild.imu_meas[kv.first] = &kv.second;
     }
 
     {
       Timer t;
-      lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options,
-                                                         &marg_data, &ild);
+      lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &marg_data, &ild);
       stats.add("allocateLMB", t.reset()).format("ms");
       lqr->log_problem_stats(stats);
     }
@@ -1174,9 +1092,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         // linearize residuals
         bool numerically_valid;
         error_total = lqr->linearizeProblem(&numerically_valid);
-        BASALT_ASSERT_STREAM(
-            numerically_valid,
-            "did not expect numerical failure during linearization");
+        BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
         stats.add("linearizeProblem", t.reset()).format("ms");
 
         //        // compute pose jacobian norm squared for Jacobian scaling
@@ -1198,8 +1114,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
       if (config.vio_debug) {
         // TODO: num_points debug output missing
-        std::cout << "[LINEARIZE] Error: " << error_total << " num points "
-                  << std::endl;
+        std::cout << "[LINEARIZE] Error: " << error_total << " num points " << std::endl;
         std::cout << "Iteration " << it << " " << error_total << std::endl;
       }
 
@@ -1291,8 +1206,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           }
 
           if (!inc_valid) {
-            std::cerr << "Still invalid inc after " << max_num_iter
-                      << " iterations." << std::endl;
+            std::cerr << "Still invalid inc after " << max_num_iter << " iterations." << std::endl;
           }
         }
 
@@ -1338,21 +1252,17 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           computeError(after_update_vision_and_inertial_error);
           computeMargPriorError(marg_data, after_update_marg_prior_error);
 
-          Scalar after_update_imu_error = 0, after_bg_error = 0,
-                 after_ba_error = 0;
+          Scalar after_update_imu_error = 0, after_bg_error = 0, after_ba_error = 0;
           ScBundleAdjustmentBase<Scalar>::computeImuError(
-              aom, after_update_imu_error, after_bg_error, after_ba_error,
-              frame_states, imu_meas, gyro_bias_sqrt_weight.array().square(),
-              accel_bias_sqrt_weight.array().square(), g);
+              aom, after_update_imu_error, after_bg_error, after_ba_error, frame_states, imu_meas,
+              gyro_bias_sqrt_weight.array().square(), accel_bias_sqrt_weight.array().square(), g);
 
-          after_update_vision_and_inertial_error +=
-              after_update_imu_error + after_bg_error + after_ba_error;
+          after_update_vision_and_inertial_error += after_update_imu_error + after_bg_error + after_ba_error;
 
           stats.add("computerError2", t.reset()).format("ms");
         }
 
-        Scalar after_error_total = after_update_vision_and_inertial_error +
-                                   after_update_marg_prior_error;
+        Scalar after_error_total = after_update_vision_and_inertial_error + after_update_marg_prior_error;
 
         // check cost decrease compared to quadratic model cost
         Scalar f_diff;
@@ -1367,9 +1277,8 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
           if (config.vio_debug) {
             std::cout << "\t[EVAL] error: {:.4e}, f_diff {:.4e} l_diff {:.4e} "
-                         "step_quality {:.2e} step_size {:.2e}\n"_format(
-                             after_error_total, f_diff, l_diff,
-                             relative_decrease, step_norminf);
+                         "step_quality {:.2e} step_size {:.2e}\n"_format(after_error_total, f_diff, l_diff,
+                                                                         relative_decrease, step_norminf);
           }
 
           // TODO: consider to remove assert. For now we want to test if we
@@ -1407,13 +1316,10 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
             std::cout << "\t[ACCEPTED] error: {:.4e}, lambda: {:.1e}, it_time: "
                          "{:.3f}s, total_time: {:.3f}s\n"
-                         ""_format(after_error_total, lambda, iteration_time,
-                                   cumulative_time);
+                         ""_format(after_error_total, lambda, iteration_time, cumulative_time);
           }
 
-          lambda *= std::max<Scalar>(
-              Scalar(1.0) / 3,
-              1 - std::pow<Scalar>(2 * relative_decrease - 1, 3));
+          lambda *= std::max<Scalar>(Scalar(1.0) / 3, 1 - std::pow<Scalar>(2 * relative_decrease - 1, 3));
           lambda = std::max(min_lambda, lambda);
 
           lambda_vee = initial_vee;
@@ -1421,8 +1327,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           it++;
 
           // check function and parameter tolerance
-          if ((f_diff > 0 && f_diff < Scalar(1e-6)) ||
-              step_norminf < Scalar(1e-4)) {
+          if ((f_diff > 0 && f_diff < Scalar(1e-6)) || step_norminf < Scalar(1e-4)) {
             converged = true;
             terminated = true;
           }
@@ -1439,8 +1344,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
             std::cout << "\t[{}] error: {}, lambda: {:.1e}, it_time:"
                          "{:.3f}s, total_time: {:.3f}s\n"
-                         ""_format(reason, after_error_total, lambda,
-                                   iteration_time, cumulative_time);
+                         ""_format(reason, after_error_total, lambda, iteration_time, cumulative_time);
           }
 
           lambda = lambda_vee * lambda;
@@ -1455,8 +1359,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
           if (lambda > max_lambda) {
             terminated = true;
-            message =
-                "Solver did not converge and reached maximum damping lambda";
+            message = "Solver did not converge and reached maximum damping lambda";
           }
         }
       }
@@ -1474,12 +1377,9 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
     if (config.vio_debug) {
       if (!converged) {
         if (terminated) {
-          std::cout << "Solver terminated early after {} iterations: {}"_format(
-              it, message);
+          std::cout << "Solver terminated early after {} iterations: {}"_format(it, message);
         } else {
-          std::cout
-              << "Solver did not converge after maximum number of {} iterations"_format(
-                     it);
+          std::cout << "Solver did not converge after maximum number of {} iterations"_format(it);
         }
       }
 
@@ -1491,10 +1391,9 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(
-    const OpticalFlowInput::Ptr& input_images,
-    const std::map<int64_t, int>& num_points_connected,
-    const std::unordered_set<KeypointId>& lost_landmaks) {
+void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(const OpticalFlowInput::Ptr& input_images,
+                                                          const std::map<int64_t, int>& num_points_connected,
+                                                          const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
   input_images->addTime("optimized");
   marginalize(num_points_connected, lost_landmaks);

@@ -70,8 +70,7 @@ pangolin::Var<int> webp_quality("ui.webp_quality", 90, 0, 101);
 pangolin::Var<int> skip_frames("ui.skip_frames", 1, 1, 10);
 pangolin::Var<float> exposure("ui.exposure", 5.0, 1, 20);
 
-tbb::concurrent_bounded_queue<basalt::OpticalFlowInput::Ptr> image_data_queue,
-    image_data_queue2;
+tbb::concurrent_bounded_queue<basalt::OpticalFlowInput::Ptr> image_data_queue, image_data_queue2;
 tbb::concurrent_bounded_queue<basalt::ImuData<double>::Ptr> imu_data_queue;
 tbb::concurrent_bounded_queue<basalt::RsPoseData> pose_data_queue;
 
@@ -86,8 +85,7 @@ static constexpr int NUM_WORKERS = 8;
 std::ofstream cam_data[NUM_CAMS], exposure_data[NUM_CAMS], imu0_data, pose_data;
 
 std::vector<std::thread> worker_threads;
-std::thread imu_worker_thread, pose_worker_thread, exposure_save_thread,
-    stop_recording_thread;
+std::thread imu_worker_thread, pose_worker_thread, exposure_save_thread, stop_recording_thread;
 
 #if CV_MAJOR_VERSION >= 3
 std::string file_extension = ".webp";
@@ -103,12 +101,9 @@ void exposure_save_worker() {
   while (!stop_workers) {
     if (image_data_queue.try_pop(img)) {
       for (size_t cam_id = 0; cam_id < NUM_CAMS; ++cam_id) {
-        cam_data[cam_id] << img->t_ns << "," << img->t_ns << file_extension
-                         << std::endl;
+        cam_data[cam_id] << img->t_ns << "," << img->t_ns << file_extension << std::endl;
 
-        exposure_data[cam_id] << img->t_ns << ","
-                              << int64_t(img->img_data[cam_id].exposure * 1e9)
-                              << std::endl;
+        exposure_data[cam_id] << img->t_ns << "," << int64_t(img->img_data[cam_id].exposure * 1e9) << std::endl;
       }
 
       image_data_queue2.push(img);
@@ -124,8 +119,7 @@ void image_save_worker() {
   while (!stop_workers) {
     if (image_data_queue2.try_pop(img)) {
       for (size_t cam_id = 0; cam_id < NUM_CAMS; ++cam_id) {
-        basalt::ManagedImage<uint16_t>::Ptr image_raw =
-            img->img_data[cam_id].img;
+        basalt::ManagedImage<uint16_t>::Ptr image_raw = img->img_data[cam_id].img;
 
         if (!image_raw.get()) continue;
 
@@ -139,20 +133,16 @@ void image_save_worker() {
         }
 
 #if CV_MAJOR_VERSION >= 3
-        std::string filename = dataset_dir + "mav0/cam" +
-                               std::to_string(cam_id) + "/data/" +
-                               std::to_string(img->t_ns) + ".webp";
+        std::string filename =
+            dataset_dir + "mav0/cam" + std::to_string(cam_id) + "/data/" + std::to_string(img->t_ns) + ".webp";
 
-        std::vector<int> compression_params = {cv::IMWRITE_WEBP_QUALITY,
-                                               webp_quality};
+        std::vector<int> compression_params = {cv::IMWRITE_WEBP_QUALITY, webp_quality};
         cv::imwrite(filename, image, compression_params);
 #else
-        std::string filename = dataset_dir + "mav0/cam" +
-                               std::to_string(cam_id) + "/data/" +
-                               std::to_string(img->t_ns) + ".jpg";
+        std::string filename =
+            dataset_dir + "mav0/cam" + std::to_string(cam_id) + "/data/" + std::to_string(img->t_ns) + ".jpg";
 
-        std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY,
-                                               webp_quality};
+        std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY, webp_quality};
         cv::imwrite(filename, image, compression_params);
 #endif
       }
@@ -168,13 +158,11 @@ void imu_save_worker() {
 
   while (!stop_workers) {
     if (imu_data_queue.try_pop(data)) {
-      if (imu_log.get())
-        imu_log->Log(data->accel[0], data->accel[1], data->accel[2]);
+      if (imu_log.get()) imu_log->Log(data->accel[0], data->accel[1], data->accel[2]);
 
       if (recording) {
-        imu0_data << data->t_ns << "," << data->gyro[0] << "," << data->gyro[1]
-                  << "," << data->gyro[2] << "," << data->accel[0] << ","
-                  << data->accel[1] << "," << data->accel[2] << "\n";
+        imu0_data << data->t_ns << "," << data->gyro[0] << "," << data->gyro[1] << "," << data->gyro[2] << ","
+                  << data->accel[0] << "," << data->accel[1] << "," << data->accel[2] << "\n";
       }
 
     } else {
@@ -189,12 +177,9 @@ void pose_save_worker() {
   while (!stop_workers) {
     if (pose_data_queue.try_pop(data)) {
       if (recording) {
-        pose_data << data.t_ns << "," << data.data.translation().x() << ","
-                  << data.data.translation().y() << ","
-                  << data.data.translation().z() << ","
-                  << data.data.unit_quaternion().w() << ","
-                  << data.data.unit_quaternion().x() << ","
-                  << data.data.unit_quaternion().y() << ","
+        pose_data << data.t_ns << "," << data.data.translation().x() << "," << data.data.translation().y() << ","
+                  << data.data.translation().z() << "," << data.data.unit_quaternion().w() << ","
+                  << data.data.unit_quaternion().x() << "," << data.data.unit_quaternion().y() << ","
                   << data.data.unit_quaternion().z() << std::endl;
       }
 
@@ -286,8 +271,8 @@ void stopRecording() {
       t265_device->pose_data_queue = nullptr;
       t265_device->image_data_queue = nullptr;
 
-      while (!image_data_queue.empty() || !image_data_queue2.empty() ||
-             !imu_data_queue.empty() || !pose_data_queue.empty()) {
+      while (!image_data_queue.empty() || !image_data_queue2.empty() || !imu_data_queue.empty() ||
+             !pose_data_queue.empty()) {
         std::cout << "Waiting until the data from the queues is written to the "
                      "hard drive."
                   << std::endl;
@@ -325,10 +310,8 @@ int main(int argc, char *argv[]) {
   basalt::RsD455Config d455{};
 
   app.add_option("--dataset-path", dataset_path, "Path to dataset");
-  app.add_flag("--manual-exposure", manual_exposure,
-               "If set will enable manual exposure.");
-  app.add_flag("--is-d455", is_d455,
-               "If set will work on a D455 (probably on a D435 too)");
+  app.add_flag("--manual-exposure", manual_exposure, "If set will enable manual exposure.");
+  app.add_flag("--is-d455", is_d455, "If set will work on a D455 (probably on a D435 too)");
   app.add_option("--d455-video-width", d455.video_width, "Frame width");
   app.add_option("--d455-video-height", d455.video_height, "Frame height");
   app.add_option("--d455-video-fps", d455.video_fps, "Video FPS");
@@ -364,8 +347,7 @@ int main(int argc, char *argv[]) {
   pose_data_queue.set_capacity(10000);
 
   // realsense
-  t265_device.reset(new basalt::RsT265Device(
-      is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
+  t265_device.reset(new basalt::RsT265Device(is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
 
   t265_device->start();
   imu_log.reset(new pangolin::DataLog);
@@ -373,26 +355,22 @@ int main(int argc, char *argv[]) {
   if (show_gui) {
     pangolin::CreateWindowAndBind("Record RealSense T265", 1200, 800);
 
-    pangolin::Var<std::function<void(void)>> record_btn(
-        "ui.record", [&] { return toggleRecording(dataset_path); });
-    pangolin::Var<std::function<void(void)>> export_calibration(
-        "ui.export_calib", [&] { return save_calibration(t265_device); });
+    pangolin::Var<std::function<void(void)>> record_btn("ui.record", [&] { return toggleRecording(dataset_path); });
+    pangolin::Var<std::function<void(void)>> export_calibration("ui.export_calib",
+                                                                [&] { return save_calibration(t265_device); });
 
     std::atomic<int64_t> record_t_ns;
     record_t_ns = 0;
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View &img_view_display =
-        pangolin::CreateDisplay()
-            .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0)
-            .SetLayout(pangolin::LayoutEqual);
+    pangolin::View &img_view_display = pangolin::CreateDisplay()
+                                           .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0)
+                                           .SetLayout(pangolin::LayoutEqual);
 
-    pangolin::View &plot_display = pangolin::CreateDisplay().SetBounds(
-        0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    pangolin::View &plot_display = pangolin::CreateDisplay().SetBounds(0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0,
-                                          pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < basalt::RsT265Device::NUM_CAMS) {
@@ -409,14 +387,11 @@ int main(int argc, char *argv[]) {
 
         if (t265_device->last_img_data.get())
           pangolin::GlFont::I()
-              .Text("Exposure: %.3f ms.",
-                    t265_device->last_img_data->img_data[idx].exposure * 1000.0)
+              .Text("Exposure: %.3f ms.", t265_device->last_img_data->img_data[idx].exposure * 1000.0)
               .Draw(30, 30);
 
         if (idx == 0) {
-          pangolin::GlFont::I()
-              .Text("Queue: %d.", image_data_queue2.size())
-              .Draw(30, 60);
+          pangolin::GlFont::I().Text("Queue: %d.", image_data_queue2.size()).Draw(30, 60);
         }
 
         if (idx == 0 && recording) {
@@ -424,18 +399,15 @@ int main(int argc, char *argv[]) {
         }
       };
 
-      iv->OnSelectionCallback =
-          [&](pangolin::ImageView::OnSelectionEventData o) {
-            UNUSED(o);
+      iv->OnSelectionCallback = [&](pangolin::ImageView::OnSelectionEventData o) {
+        UNUSED(o);
 
-            int64_t curr_t_ns = std::chrono::high_resolution_clock::now()
-                                    .time_since_epoch()
-                                    .count();
-            if (std::abs(record_t_ns - curr_t_ns) > int64_t(2e9)) {
-              toggleRecording(dataset_path);
-              record_t_ns = curr_t_ns;
-            }
-          };
+        int64_t curr_t_ns = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        if (std::abs(record_t_ns - curr_t_ns) > int64_t(2e9)) {
+          toggleRecording(dataset_path);
+          record_t_ns = curr_t_ns;
+        }
+      };
 
       img_view.push_back(iv);
       img_view_display.AddDisplay(*iv);
@@ -449,20 +421,16 @@ int main(int argc, char *argv[]) {
     labels.push_back(std::string("accel z"));
     imu_log->SetLabels(labels);
 
-    pangolin::Plotter plotter(imu_log.get(), 0.0f, 2000.0f, -15.0f, 15.0f, 0.1f,
-                              0.1f);
+    pangolin::Plotter plotter(imu_log.get(), 0.0f, 2000.0f, -15.0f, 15.0f, 0.1f, 0.1f);
     plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
     plotter.Track("$i");
 
     plot_display.AddDisplay(plotter);
 
     plotter.ClearSeries();
-    plotter.AddSeries("$i", "$0", pangolin::DrawingModeLine,
-                      pangolin::Colour::Red(), "accel x");
-    plotter.AddSeries("$i", "$1", pangolin::DrawingModeLine,
-                      pangolin::Colour::Green(), "accel y");
-    plotter.AddSeries("$i", "$2", pangolin::DrawingModeLine,
-                      pangolin::Colour::Blue(), "accel z");
+    plotter.AddSeries("$i", "$0", pangolin::DrawingModeLine, pangolin::Colour::Red(), "accel x");
+    plotter.AddSeries("$i", "$1", pangolin::DrawingModeLine, pangolin::Colour::Green(), "accel y");
+    plotter.AddSeries("$i", "$2", pangolin::DrawingModeLine, pangolin::Colour::Blue(), "accel z");
 
     while (!pangolin::ShouldQuit()) {
       {
@@ -472,14 +440,12 @@ int main(int argc, char *argv[]) {
         fmt.scalable_internal_format = GL_LUMINANCE16;
 
         if (t265_device->last_img_data.get())
-          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
-               cam_id++) {
+          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS; cam_id++) {
             if (t265_device->last_img_data->img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  t265_device->last_img_data->img_data[cam_id].img->ptr,
-                  t265_device->last_img_data->img_data[cam_id].img->w,
-                  t265_device->last_img_data->img_data[cam_id].img->h,
-                  t265_device->last_img_data->img_data[cam_id].img->pitch, fmt);
+              img_view[cam_id]->SetImage(t265_device->last_img_data->img_data[cam_id].img->ptr,
+                                         t265_device->last_img_data->img_data[cam_id].img->w,
+                                         t265_device->last_img_data->img_data[cam_id].img->h,
+                                         t265_device->last_img_data->img_data[cam_id].img->pitch, fmt);
           }
       }
 

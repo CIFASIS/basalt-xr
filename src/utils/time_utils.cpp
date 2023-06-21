@@ -32,8 +32,7 @@ Scalar variance(const Eigen::Matrix<Scalar, N, 1>& vec) {
   return centered.squaredNorm() / Scalar(vec.size());
 }
 
-ExecutionStats::Meta& ExecutionStats::add(const std::string& name,
-                                          double value) {
+ExecutionStats::Meta& ExecutionStats::add(const std::string& name, double value) {
   auto [it, new_item] = stats_.try_emplace(name);
   if (new_item) {
     order_.push_back(name);
@@ -43,8 +42,7 @@ ExecutionStats::Meta& ExecutionStats::add(const std::string& name,
   return it->second;
 }
 
-ExecutionStats::Meta& ExecutionStats::add(const std::string& name,
-                                          const Eigen::VectorXd& value) {
+ExecutionStats::Meta& ExecutionStats::add(const std::string& name, const Eigen::VectorXd& value) {
   auto [it, new_item] = stats_.try_emplace(name);
   if (new_item) {
     order_.push_back(name);
@@ -54,8 +52,7 @@ ExecutionStats::Meta& ExecutionStats::add(const std::string& name,
   return it->second;
 }
 
-ExecutionStats::Meta& ExecutionStats::add(const std::string& name,
-                                          const Eigen::VectorXf& value) {
+ExecutionStats::Meta& ExecutionStats::add(const std::string& name, const Eigen::VectorXf& value) {
   Eigen::VectorXd x = value.cast<double>();
   return add(name, x);
 }
@@ -90,8 +87,7 @@ void ExecutionStats::merge_sums(const ExecutionStats& other) {
   for (const auto& name : other.order_) {
     const auto& meta = other.stats_.at(name);
     std::visit(overload{[&](const std::vector<double>& data) {
-                          Eigen::Map<const Eigen::VectorXd> map(data.data(),
-                                                                data.size());
+                          Eigen::Map<const Eigen::VectorXd> map(data.data(), data.size());
                           add(name, map.sum());
                         },
                         [&](const std::vector<Eigen::VectorXd>& data) {
@@ -107,42 +103,39 @@ void ExecutionStats::print() const {
   for (const auto& name : order_) {
     const auto& meta = stats_.at(name);
 
-    std::visit(
-        overload{
-            [&](const std::vector<double>& data) {
-              Eigen::Map<const Eigen::VectorXd> map(data.data(), data.size());
+    std::visit(overload{[&](const std::vector<double>& data) {
+                          Eigen::Map<const Eigen::VectorXd> map(data.data(), data.size());
 
-              // create a copy for median computation
-              Eigen::VectorXd vec = map;
+                          // create a copy for median computation
+                          Eigen::VectorXd vec = map;
 
-              if (meta.format_ == "ms") {
-                // convert seconds to milliseconds
-                vec *= 1000;
-              }
+                          if (meta.format_ == "ms") {
+                            // convert seconds to milliseconds
+                            vec *= 1000;
+                          }
 
-              int count = vec.size();
-              // double sum = vec.sum();
-              double mean = vec.mean();
-              double stddev = std::sqrt(variance(vec));
-              double max = vec.maxCoeff();
-              double min = vec.minCoeff();
+                          int count = vec.size();
+                          // double sum = vec.sum();
+                          double mean = vec.mean();
+                          double stddev = std::sqrt(variance(vec));
+                          double max = vec.maxCoeff();
+                          double min = vec.minCoeff();
 
-              // double median = median_non_const(vec);
+                          // double median = median_non_const(vec);
 
-              if (meta.format_ == "count") {
-                std::cout << "{:20} ({:>4}):{: 8.1f}+-{:.1f} [{}, {}]\n"_format(
-                    name, count, mean, stddev, min, max);
-              } else if (meta.format_ != "none") {
-                std::cout
-                    << "{:20} ({:>4}):{: 8.2f}+-{:.2f} [{:.2f}, {:.2f}]\n"_format(
-                           name, count, mean, stddev, min, max);
-              }
-            },
-            [&](const std::vector<Eigen::VectorXd>& data) {
-              int count = data.size();
-              std::cout << "{:20} ({:>4})\n"_format(name, count);
-            }},
-        meta.data_);
+                          if (meta.format_ == "count") {
+                            std::cout << "{:20} ({:>4}):{: 8.1f}+-{:.1f} [{}, {}]\n"_format(name, count, mean, stddev,
+                                                                                            min, max);
+                          } else if (meta.format_ != "none") {
+                            std::cout << "{:20} ({:>4}):{: 8.2f}+-{:.2f} [{:.2f}, {:.2f}]\n"_format(name, count, mean,
+                                                                                                    stddev, min, max);
+                          }
+                        },
+                        [&](const std::vector<Eigen::VectorXd>& data) {
+                          int count = data.size();
+                          std::cout << "{:20} ({:>4})\n"_format(name, count);
+                        }},
+               meta.data_);
   }
 }
 
@@ -153,21 +146,20 @@ bool ExecutionStats::save_json(const std::string& path) const {
   for (const auto& name : order_) {
     const auto& meta = stats_.at(name);
 
-    std::visit(
-        overload{[&](const std::vector<double>& data) { result[name] = data; },
-                 [&](const std::vector<Eigen::VectorXd>& data) {
-                   std::vector<int> indices;
-                   std::vector<double> values;
-                   for (const auto& v : data) {
-                     indices.push_back(int(values.size()));
-                     values.insert(values.end(), v.begin(), v.end());
-                   }
-                   std::string name_values = std::string(name) + "__values";
-                   std::string name_indices = std::string(name) + "__index";
-                   result[name_indices] = indices;
-                   result[name_values] = values;
-                 }},
-        meta.data_);
+    std::visit(overload{[&](const std::vector<double>& data) { result[name] = data; },
+                        [&](const std::vector<Eigen::VectorXd>& data) {
+                          std::vector<int> indices;
+                          std::vector<double> values;
+                          for (const auto& v : data) {
+                            indices.push_back(int(values.size()));
+                            values.insert(values.end(), v.begin(), v.end());
+                          }
+                          std::string name_values = std::string(name) + "__values";
+                          std::string name_indices = std::string(name) + "__index";
+                          result[name_indices] = indices;
+                          result[name_values] = values;
+                        }},
+               meta.data_);
   }
 
   constexpr bool save_as_json = false;
@@ -190,8 +182,7 @@ bool ExecutionStats::save_json(const std::string& path) const {
 
   // save ubjson
   if (save_as_ubjson) {
-    std::string ubjson_path =
-        path.substr(0, path.find_last_of('.')) + ".ubjson";
+    std::string ubjson_path = path.substr(0, path.find_last_of('.')) + ".ubjson";
     std::ofstream ofs(ubjson_path, std::ios_base::binary);
 
     if (!ofs.is_open()) {

@@ -41,8 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
-DatasetIoInterfacePtr DatasetIoFactory::getDatasetIo(
-    const std::string &dataset_type, bool load_mocap_as_gt) {
+DatasetIoInterfacePtr DatasetIoFactory::getDatasetIo(const std::string &dataset_type, bool load_mocap_as_gt) {
   if (dataset_type == "euroc") {
     // return DatasetIoInterfacePtr();
     return DatasetIoInterfacePtr(new EurocIO(load_mocap_as_gt));
@@ -53,8 +52,7 @@ DatasetIoInterfacePtr DatasetIoFactory::getDatasetIo(
   } else if (dataset_type == "kitti") {
     return DatasetIoInterfacePtr(new KittiIO);
   } else {
-    std::cerr << "Dataset type " << dataset_type << " is not supported"
-              << std::endl;
+    std::cerr << "Dataset type " << dataset_type << " is not supported" << std::endl;
     std::abort();
   }
 }

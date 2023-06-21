@@ -15,17 +15,14 @@ struct SmoothFunction {
   }
 
   template <typename Scalar>
-  Eigen::Matrix<Scalar, 3, 1> interpGrad(
-      const Eigen::Matrix<Scalar, 2, 1>& p) const {
-    return Eigen::Matrix<Scalar, 3, 1>(sin(p[0] / 100.0 + p[1] / 20.0),
-                                       cos(p[0] / 100.0 + p[1] / 20.0) / 100.0,
+  Eigen::Matrix<Scalar, 3, 1> interpGrad(const Eigen::Matrix<Scalar, 2, 1>& p) const {
+    return Eigen::Matrix<Scalar, 3, 1>(sin(p[0] / 100.0 + p[1] / 20.0), cos(p[0] / 100.0 + p[1] / 20.0) / 100.0,
                                        cos(p[0] / 100.0 + p[1] / 20.0) / 20.0);
   }
 
   template <typename Derived>
-  BASALT_HOST_DEVICE inline bool InBounds(
-      const Eigen::MatrixBase<Derived>& p,
-      const typename Derived::Scalar border) const {
+  BASALT_HOST_DEVICE inline bool InBounds(const Eigen::MatrixBase<Derived>& p,
+                                          const typename Derived::Scalar border) const {
     UNUSED(p);
     UNUSED(border);
     return true;
@@ -44,9 +41,7 @@ TEST(Patch, ImageInterpolateGrad) {
 
   test_jacobian(
       "d_res_d_x", J_x,
-      [&](const Eigen::Vector2d& x) {
-        return Eigen::Matrix<double, 1, 1>(img.interp<double>(pd + x));
-      },
+      [&](const Eigen::Vector2d& x) { return Eigen::Matrix<double, 1, 1>(img.interp<double>(pd + x)); },
       Eigen::Vector2d::Zero(), 1);
 }
 
@@ -65,11 +60,9 @@ TEST(Patch, PatchSe2Jac) {
   PatchT::VectorP data, data2;
   PatchT::MatrixP3 J_se2;
 
-  basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setDataJacSe2(
-      img_view, pd, mean, data, J_se2);
+  basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setDataJacSe2(img_view, pd, mean, data, J_se2);
 
-  basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setData(
-      img_view, pd, mean2, data2);
+  basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setData(img_view, pd, mean2, data2);
 
   EXPECT_NEAR(mean, mean2, 1e-8);
   EXPECT_TRUE(data.isApprox(data2));
@@ -82,8 +75,7 @@ TEST(Patch, PatchSe2Jac) {
         double mean3;
         PatchT::VectorP data3;
 
-        basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setData(
-            img_view, pd, mean3, data3, &transform);
+        basalt::OpticalFlowPatch<double, basalt::Pattern52<double>>::setData(img_view, pd, mean3, data3, &transform);
 
         return data3;
       },

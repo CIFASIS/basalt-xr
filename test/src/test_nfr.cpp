@@ -25,8 +25,7 @@ TEST(PreIntegrationTestSuite, RelPoseTest) {
   Sophus::SE3d T_w_i = Sophus::se3_expd(Sophus::Vector6d::Random());
   Sophus::SE3d T_w_j = Sophus::se3_expd(Sophus::Vector6d::Random());
 
-  Sophus::SE3d T_i_j = Sophus::se3_expd(Sophus::Vector6d::Random() / 100) *
-                       T_w_i.inverse() * T_w_j;
+  Sophus::SE3d T_i_j = Sophus::se3_expd(Sophus::Vector6d::Random() / 100) * T_w_i.inverse() * T_w_j;
 
   Sophus::Matrix6d d_res_d_T_w_i, d_res_d_T_w_j;
   basalt::relPoseError(T_i_j, T_w_i, T_w_j, &d_res_d_T_w_i, &d_res_d_T_w_j);
@@ -86,8 +85,7 @@ TEST(PreIntegrationTestSuite, AbsPositionTest) {
 TEST(PreIntegrationTestSuite, YawTest) {
   Sophus::SE3d T_w_i = Sophus::se3_expd(Sophus::Vector6d::Random());
 
-  Eigen::Vector3d yaw_dir_body =
-      T_w_i.so3().inverse() * Eigen::Vector3d::UnitX();
+  Eigen::Vector3d yaw_dir_body = T_w_i.so3().inverse() * Eigen::Vector3d::UnitX();
 
   T_w_i = Sophus::se3_expd(Sophus::Vector6d::Random() / 100) * T_w_i;
 

@@ -36,7 +36,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include <memory>
-#include <thread>
 
 #include <sophus/se2.hpp>
 #include "basalt/imu/imu_types.h"
@@ -52,7 +51,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/optical_flow/patch.h>
 
-#include <basalt/image/image_pyr.h>
 #include <basalt/utils/keypoints.h>
 
 namespace basalt {
@@ -62,75 +60,66 @@ namespace basalt {
 /// While it might cause more drift of the patch location, it leads to longer
 /// tracks in practice.
 template <typename Scalar, template <typename> typename Pattern>
-class FrameToFrameOpticalFlow : public OpticalFlowBase {
+class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
  public:
-  typedef OpticalFlowPatch<Scalar, Pattern<Scalar>> PatchT;
+  using Vector3d = Eigen::Matrix<double, 3, 1>;
 
-  typedef Eigen::Matrix<Scalar, 2, 1> Vector2;
-  typedef Eigen::Matrix<Scalar, 2, 2> Matrix2;
+  using typename OpticalFlowTyped<Scalar, Pattern>::PatchT;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Vector2;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Matrix2;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Vector3;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Matrix3;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Vector4;
+  using typename OpticalFlowTyped<Scalar, Pattern>::Matrix4;
+  using typename OpticalFlowTyped<Scalar, Pattern>::SE2;
+  using typename OpticalFlowTyped<Scalar, Pattern>::SE3;
+  using OpticalFlowTyped<Scalar, Pattern>::getNumCams;
+  using OpticalFlowTyped<Scalar, Pattern>::calib;
+  using OpticalFlowTyped<Scalar, Pattern>::E;
 
-  typedef Eigen::Matrix<Scalar, 3, 1> Vector3;
-  typedef Eigen::Matrix<double, 3, 1> Vector3d;
-  typedef Eigen::Matrix<Scalar, 3, 3> Matrix3;
+  using OpticalFlowBase::config;
+  using OpticalFlowBase::depth_guess;
+  using OpticalFlowBase::first_state_arrived;
+  using OpticalFlowBase::frame_counter;
+  using OpticalFlowBase::input_depth_queue;
+  using OpticalFlowBase::input_img_queue;
+  using OpticalFlowBase::input_imu_queue;
+  using OpticalFlowBase::input_state_queue;
+  using OpticalFlowBase::last_keypoint_id;
+  using OpticalFlowBase::latest_state;
+  using OpticalFlowBase::old_pyramid;
+  using OpticalFlowBase::output_queue;
+  using OpticalFlowBase::patch_coord;
+  using OpticalFlowBase::predicted_state;
+  using OpticalFlowBase::processing_thread;
+  using OpticalFlowBase::pyramid;
+  using OpticalFlowBase::show_gui;
+  using OpticalFlowBase::t_ns;
+  using OpticalFlowBase::transforms;
 
-  typedef Eigen::Matrix<Scalar, 4, 1> Vector4;
-  typedef Eigen::Matrix<Scalar, 4, 4> Matrix4;
-
-  typedef Sophus::SE2<Scalar> SE2;
-  typedef Sophus::SE3<Scalar> SE3;
-
-  FrameToFrameOpticalFlow(const VioConfig& config,
-                          const basalt::Calibration<double>& calib)
-      : t_ns(-1),
-        frame_counter(0),
-        last_keypoint_id(0),
-        config(config),
-        accel_cov(calib.dicrete_time_accel_noise_std()
-                      .template cast<double>()
-                      .array()
-                      .square()),
-        gyro_cov(calib.dicrete_time_gyro_noise_std()
-                     .template cast<double>()
-                     .array()
-                     .square()) {
-    input_queue.set_capacity(10);
-    input_imu_queue.set_capacity(300);
-
-    this->calib = calib.cast<Scalar>();
-
-    patch_coord = PatchT::pattern2.template cast<float>();
-    depth_guess = config.optical_flow_matching_default_depth;
+  FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
+      : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
+        accel_cov(cal.dicrete_time_accel_noise_std().array().square()),
+        gyro_cov(cal.dicrete_time_gyro_noise_std().array().square()) {
     latest_state = std::make_shared<PoseVelBiasState<double>>();
     predicted_state = std::make_shared<PoseVelBiasState<double>>();
-
-    if (calib.intrinsics.size() > 1) {
-      Eigen::Matrix4d Ed;
-      Sophus::SE3d T_i_j = calib.T_i_c[0].inverse() * calib.T_i_c[1];
-      computeEssential(T_i_j, Ed);
-      E = Ed.cast<Scalar>();
-    }
-
-    processing_thread.reset(
-        new std::thread(&FrameToFrameOpticalFlow::processingLoop, this));
   }
 
-  ~FrameToFrameOpticalFlow() { processing_thread->join(); }
-
-  void processingLoop() {
+  void processingLoop() override {
     using std::make_shared;
-    OpticalFlowInput::Ptr input_ptr;
+    OpticalFlowInput::Ptr img;
 
     while (true) {
-      input_queue.pop(input_ptr);
+      input_img_queue.pop(img);
 
-      if (input_ptr == nullptr) {
+      if (img == nullptr) {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
-      input_ptr->addTime("frames_received");
+      img->addTime("frames_received");
 
       while (input_depth_queue.try_pop(depth_guess)) continue;
-      if (show_gui) input_ptr->depth_guess = depth_guess;
+      if (show_gui) img->depth_guess = depth_guess;
 
       if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
@@ -140,17 +129,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       }
 
       if (first_state_arrived) {
-        auto pim = processImu(input_ptr->t_ns);
+        auto pim = processImu(img->t_ns);
         pim.predictState(*latest_state, constants::g, *predicted_state);
       }
 
-      processFrame(input_ptr->t_ns, input_ptr);
+      processFrame(img->t_ns, img);
     }
   }
 
   IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
-    using Vector3d = Eigen::Matrix<double, 3, 1>;
-
     int64_t prev_t_ns = t_ns;
     Vector3d bg = latest_state->bias_gyro;
     Vector3d ba = latest_state->bias_accel;
@@ -163,10 +150,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (data == nullptr) return false;
 
       // Calibrate sample
-      Vector3 a =
-          calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
-      Vector3 g =
-          calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
+      Vector3 a = calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
+      Vector3 g = calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
       data->accel = a.template cast<double>();
       data->gyro = g.template cast<double>();
       return true;
@@ -198,28 +183,25 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (!v.img.get()) return;
     }
 
-    size_t NUM_CAMS = calib.intrinsics.size();
+    const size_t num_cams = getNumCams();
 
     if (t_ns < 0) {
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(NUM_CAMS);
-      transforms->tracking_guesses.resize(NUM_CAMS);
-      transforms->matching_guesses.resize(NUM_CAMS);
+      transforms->observations.resize(num_cams);
+      transforms->tracking_guesses.resize(num_cams);
+      transforms->matching_guesses.resize(num_cams);
       transforms->t_ns = t_ns;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
-      pyramid->resize(NUM_CAMS);
+      pyramid.reset(new std::vector<ManagedImagePyr<uint16_t>>);
+      pyramid->resize(num_cams);
 
-      tbb::parallel_for(tbb::blocked_range<size_t>(0, NUM_CAMS),
-                        [&](const tbb::blocked_range<size_t>& r) {
-                          for (size_t i = r.begin(); i != r.end(); ++i) {
-                            pyramid->at(i).setFromImage(
-                                *new_img_vec->img_data[i].img,
-                                config.optical_flow_levels);
-                          }
-                        });
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, num_cams), [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img, config.optical_flow_levels);
+        }
+      });
 
       transforms->input_images = new_img_vec;
 
@@ -230,35 +212,31 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       old_pyramid = pyramid;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
-      pyramid->resize(NUM_CAMS);
-      tbb::parallel_for(tbb::blocked_range<size_t>(0, NUM_CAMS),
-                        [&](const tbb::blocked_range<size_t>& r) {
-                          for (size_t i = r.begin(); i != r.end(); ++i) {
-                            pyramid->at(i).setFromImage(
-                                *new_img_vec->img_data[i].img,
-                                config.optical_flow_levels);
-                          }
-                        });
+      pyramid.reset(new std::vector<ManagedImagePyr<uint16_t>>);
+      pyramid->resize(num_cams);
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, num_cams), [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img, config.optical_flow_levels);
+        }
+      });
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(NUM_CAMS);
-      new_transforms->tracking_guesses.resize(NUM_CAMS);
-      new_transforms->matching_guesses.resize(NUM_CAMS);
+      new_transforms->observations.resize(num_cams);
+      new_transforms->tracking_guesses.resize(num_cams);
+      new_transforms->matching_guesses.resize(num_cams);
       new_transforms->t_ns = t_ns;
 
-      SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
-      SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
-      for (size_t i = 0; i < NUM_CAMS; i++) {
+      SE3 T_i1 = latest_state->T_w_i.template cast<Scalar>();
+      SE3 T_i2 = predicted_state->T_w_i.template cast<Scalar>();
+      for (size_t i = 0; i < num_cams; i++) {
         SE3 T_c1 = T_i1 * calib.T_i_c[i];
         SE3 T_c2 = T_i2 * calib.T_i_c[i];
         SE3 T_c1_c2 = T_c1.inverse() * T_c2;
-        trackPoints(
-            old_pyramid->at(i), pyramid->at(i),  //
-            transforms->observations[i], new_transforms->observations[i],
-            new_transforms->tracking_guesses[i],  //
-            new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
+        trackPoints(old_pyramid->at(i), pyramid->at(i),  //
+                    transforms->observations[i], new_transforms->observations[i],
+                    new_transforms->tracking_guesses[i],  //
+                    new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
 
       transforms = new_transforms;
@@ -276,11 +254,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     frame_counter++;
   }
 
-  void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-                   const basalt::ManagedImagePyr<uint16_t>& pyr_2,
-                   const Keypoints& transform_map_1, Keypoints& transform_map_2,
-                   Keypoints& guesses, const Masks& masks1, const Masks& masks2,
-                   const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
+  void trackPoints(const ManagedImagePyr<uint16_t>& pyr_1, const ManagedImagePyr<uint16_t>& pyr_2,
+                   const Keypoints& transform_map_1, Keypoints& transform_map_2, Keypoints& guesses,
+                   const Masks& masks1, const Masks& masks2, const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -294,9 +270,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       init_vec.push_back(kv.second);
     }
 
-    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
-                                  std::hash<KeypointId>>
-        result, guesses_tbb;
+    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f, std::hash<KeypointId>> result, guesses_tbb;
 
     bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
@@ -334,8 +308,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
           guesses_tbb[id] = transform_2;
         }
 
-        valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
-                t2(1) < pyr_2.lvl(0).h;
+        valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w && t2(1) < pyr_2.lvl(0).h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
@@ -368,16 +341,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
   }
 
-  inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
-                         const basalt::ManagedImagePyr<uint16_t>& pyr,
-                         const Eigen::AffineCompact2f& old_transform,
-                         Eigen::AffineCompact2f& transform) const {
+  inline bool trackPoint(const ManagedImagePyr<uint16_t>& old_pyr, const ManagedImagePyr<uint16_t>& pyr,
+                         const Eigen::AffineCompact2f& old_transform, Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
     transform.linear().setIdentity();
 
-    for (int level = config.optical_flow_levels; level >= 0 && patch_valid;
-         level--) {
+    for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
       const Scalar scale = 1 << level;
 
       transform.translation() /= scale;
@@ -398,18 +368,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2,
-                                const PatchT& dp,
+  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2, const PatchT& dp,
                                 Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
-    for (int iteration = 0;
-         patch_valid && iteration < config.optical_flow_max_iterations;
-         iteration++) {
+    for (int iteration = 0; patch_valid && iteration < config.optical_flow_max_iterations; iteration++) {
       typename PatchT::VectorP res;
 
-      typename PatchT::Matrix2P transformed_pat =
-          transform.linear().matrix() * PatchT::pattern2;
+      typename PatchT::Matrix2P transformed_pat = transform.linear().matrix() * PatchT::pattern2;
       transformed_pat.colwise() += transform.translation();
 
       patch_valid &= dp.residual(img_2, transformed_pat, res);
@@ -439,16 +405,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
     for (const auto& kv : transforms->observations.at(cam_id)) {
-      pts.emplace_back(kv.second.translation().cast<double>());
+      pts.emplace_back(kv.second.translation().template cast<double>());
     }
 
     KeypointsData kd;  // Detected new points
-    detectKeypoints(pyramid->at(cam_id).lvl(0), kd,
-                    config.optical_flow_detection_grid_size,
-                    config.optical_flow_detection_num_points_cell,
-                    config.optical_flow_detection_min_threshold,
-                    config.optical_flow_detection_max_threshold,
-                    transforms->input_images->masks.at(cam_id), pts);
+    detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
+                    config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
+                    config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
 
     Keypoints new_poses;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
@@ -489,10 +452,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         Vector2 ci_uv{x, y};
         Vector2 c0_uv;
         Scalar _;
-        bool projected =
-            calib.projectBetweenCams(ci_uv, depth_guess, c0_uv, _, cam_id, 0);
-        bool in_bounds =
-            c0_uv.x() >= 0 && c0_uv.x() < w && c0_uv.y() >= 0 && c0_uv.y() < h;
+        bool projected = calib.projectBetweenCams(ci_uv, depth_guess, c0_uv, _, cam_id, 0);
+        bool in_bounds = c0_uv.x() >= 0 && c0_uv.x() < w && c0_uv.y() >= 0 && c0_uv.y() < h;
         bool valid = projected && in_bounds;
         if (valid) {
           Rect cell_mask(x - C / 2, y - C / 2, C, C);
@@ -507,8 +468,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     Masks& ms0 = transforms->input_images->masks.at(0);
     Keypoints kps0 = addPointsForCamera(0);
 
-    const int NUM_CAMS = calib.intrinsics.size();
-    for (int i = 1; i < NUM_CAMS; i++) {
+    for (size_t i = 1; i < getNumCams(); i++) {
       Masks& ms = transforms->input_images->masks.at(i);
       Keypoints& mgs = transforms->matching_guesses.at(i);
 
@@ -528,7 +488,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void filterPointsForCam(int cam_id) {
-    if (calib.intrinsics.size() < 2) return;
+    if (getNumCams() < 2) return;
 
     std::set<KeypointId> lm_to_remove;
 
@@ -553,8 +513,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     for (size_t i = 0; i < p3d0_success.size(); i++) {
       if (p3d0_success[i] && p3d1_success[i]) {
-        const double epipolar_error =
-            std::abs(p3d0[i].transpose() * E * p3d1[i]);
+        const double epipolar_error = std::abs(p3d0[i].transpose() * E[cam_id] * p3d1[i]);
 
         if (epipolar_error > config.optical_flow_epipolar_error) {
           lm_to_remove.emplace(kpid[i]);
@@ -570,32 +529,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void filterPoints() {
-    const int NUM_CAMS = calib.intrinsics.size();
-    for (int i = 1; i < NUM_CAMS; i++) {
+    for (size_t i = 1; i < getNumCams(); i++) {
       filterPointsForCam(i);
     }
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
-  int64_t t_ns;
-
-  size_t frame_counter;
-
-  KeypointId last_keypoint_id;
-
-  VioConfig config;
-  basalt::Calibration<Scalar> calib;
-
-  OpticalFlowResult::Ptr transforms;
-  std::shared_ptr<std::vector<basalt::ManagedImagePyr<uint16_t>>> old_pyramid,
-      pyramid;
-
-  Matrix4 E;
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
-
-  std::shared_ptr<std::thread> processing_thread;
 };
 
 }  // namespace basalt

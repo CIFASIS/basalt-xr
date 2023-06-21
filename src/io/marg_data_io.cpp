@@ -117,8 +117,7 @@ MargDataSaver::MargDataSaver(const std::string& path) {
 MargDataLoader::MargDataLoader() : out_marg_queue(nullptr) {}
 
 void MargDataLoader::start(const std::string& path) {
-  if (!fs::exists(path))
-    std::cerr << "No marg. data found in " << path << std::endl;
+  if (!fs::exists(path)) std::cerr << "No marg. data found in " << path << std::endl;
 
   auto func = [&, path]() {
     std::string img_path = path + "/images/";

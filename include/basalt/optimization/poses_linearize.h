@@ -63,8 +63,7 @@ struct LinearizePosesOpt : public LinearizeBase<Scalar> {
   typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> VectorX;
   typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> MatrixX;
 
-  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator
-      AprilgridCornersDataIter;
+  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator AprilgridCornersDataIter;
 
   typedef typename LinearizeBase<Scalar>::CalibCommonData CalibCommonData;
 
@@ -77,10 +76,8 @@ struct LinearizePosesOpt : public LinearizeBase<Scalar> {
 
   const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose;
 
-  LinearizePosesOpt(
-      size_t opt_size,
-      const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose,
-      const CalibCommonData& common_data)
+  LinearizePosesOpt(size_t opt_size, const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose,
+                    const CalibCommonData& common_data)
       : opt_size(opt_size), timestam_to_pose(timestam_to_pose) {
     this->common_data = common_data;
     accum.reset(opt_size);
@@ -101,14 +98,11 @@ struct LinearizePosesOpt : public LinearizeBase<Scalar> {
     for (const AprilgridCornersData& acd : r) {
       std::visit(
           [&](const auto& cam) {
-            constexpr int INTRINSICS_SIZE =
-                std::remove_reference<decltype(cam)>::type::N;
-            typename LinearizeBase<Scalar>::template PoseCalibH<INTRINSICS_SIZE>
-                cph;
+            constexpr int INTRINSICS_SIZE = std::remove_reference<decltype(cam)>::type::N;
+            typename LinearizeBase<Scalar>::template PoseCalibH<INTRINSICS_SIZE> cph;
 
             SE3 T_w_i = timestam_to_pose.at(acd.timestamp_ns);
-            SE3 T_w_c =
-                T_w_i * this->common_data.calibration->T_i_c[acd.cam_id];
+            SE3 T_w_c = T_w_i * this->common_data.calibration->T_i_c[acd.cam_id];
             SE3 T_c_w = T_w_c.inverse();
             Eigen::Matrix4d T_c_w_m = T_c_w.matrix();
 
@@ -117,8 +111,7 @@ struct LinearizePosesOpt : public LinearizeBase<Scalar> {
             int num_inliers = 0;
 
             for (size_t i = 0; i < acd.corner_pos.size(); i++) {
-              this->linearize_point(acd.corner_pos[i], acd.corner_id[i],
-                                    T_c_w_m, cam, &cph, err, num_inliers,
+              this->linearize_point(acd.corner_pos[i], acd.corner_id[i], T_c_w_m, cam, &cph, err, num_inliers,
                                     reproj_err);
             }
 
@@ -126,41 +119,28 @@ struct LinearizePosesOpt : public LinearizeBase<Scalar> {
             reprojection_error += reproj_err;
             num_points += num_inliers;
 
-            const Matrix6 Adj =
-                -this->common_data.calibration->T_i_c[acd.cam_id]
-                     .inverse()
-                     .Adj();
+            const Matrix6 Adj = -this->common_data.calibration->T_i_c[acd.cam_id].inverse().Adj();
 
-            const size_t po =
-                this->common_data.offset_poses->at(acd.timestamp_ns);
+            const size_t po = this->common_data.offset_poses->at(acd.timestamp_ns);
             const size_t co = this->common_data.offset_T_i_c->at(acd.cam_id);
-            const size_t io =
-                this->common_data.offset_intrinsics->at(acd.cam_id);
+            const size_t io = this->common_data.offset_intrinsics->at(acd.cam_id);
 
-            accum.template addH<POSE_SIZE, POSE_SIZE>(
-                po, po, Adj.transpose() * cph.H_pose_accum * Adj);
-            accum.template addB<POSE_SIZE>(po,
-                                           Adj.transpose() * cph.b_pose_accum);
+            accum.template addH<POSE_SIZE, POSE_SIZE>(po, po, Adj.transpose() * cph.H_pose_accum * Adj);
+            accum.template addB<POSE_SIZE>(po, Adj.transpose() * cph.b_pose_accum);
 
             if (acd.cam_id > 0) {
-              accum.template addH<POSE_SIZE, POSE_SIZE>(
-                  co, po, -cph.H_pose_accum * Adj);
-              accum.template addH<POSE_SIZE, POSE_SIZE>(co, co,
-                                                        cph.H_pose_accum);
+              accum.template addH<POSE_SIZE, POSE_SIZE>(co, po, -cph.H_pose_accum * Adj);
+              accum.template addH<POSE_SIZE, POSE_SIZE>(co, co, cph.H_pose_accum);
 
               accum.template addB<POSE_SIZE>(co, -cph.b_pose_accum);
             }
 
             if (this->common_data.opt_intrinsics) {
-              accum.template addH<INTRINSICS_SIZE, POSE_SIZE>(
-                  io, po, cph.H_intr_pose_accum * Adj);
+              accum.template addH<INTRINSICS_SIZE, POSE_SIZE>(io, po, cph.H_intr_pose_accum * Adj);
 
-              if (acd.cam_id > 0)
-                accum.template addH<INTRINSICS_SIZE, POSE_SIZE>(
-                    io, co, -cph.H_intr_pose_accum);
+              if (acd.cam_id > 0) accum.template addH<INTRINSICS_SIZE, POSE_SIZE>(io, co, -cph.H_intr_pose_accum);
 
-              accum.template addH<INTRINSICS_SIZE, INTRINSICS_SIZE>(
-                  io, io, cph.H_intr_accum);
+              accum.template addH<INTRINSICS_SIZE, INTRINSICS_SIZE>(io, io, cph.H_intr_accum);
               accum.template addB<INTRINSICS_SIZE>(io, cph.b_intr_accum);
             }
           },
@@ -192,8 +172,7 @@ struct ComputeErrorPosesOpt : public LinearizeBase<Scalar> {
   typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> VectorX;
   typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> MatrixX;
 
-  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator
-      AprilgridCornersDataIter;
+  typedef typename Eigen::aligned_vector<AprilgridCornersData>::const_iterator AprilgridCornersDataIter;
 
   typedef typename LinearizeBase<Scalar>::CalibCommonData CalibCommonData;
 
@@ -205,10 +184,8 @@ struct ComputeErrorPosesOpt : public LinearizeBase<Scalar> {
 
   const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose;
 
-  ComputeErrorPosesOpt(
-      size_t opt_size,
-      const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose,
-      const CalibCommonData& common_data)
+  ComputeErrorPosesOpt(size_t opt_size, const Eigen::aligned_unordered_map<int64_t, SE3>& timestam_to_pose,
+                       const CalibCommonData& common_data)
       : opt_size(opt_size), timestam_to_pose(timestam_to_pose) {
     this->common_data = common_data;
     error = 0;
@@ -229,8 +206,7 @@ struct ComputeErrorPosesOpt : public LinearizeBase<Scalar> {
       std::visit(
           [&](const auto& cam) {
             SE3 T_w_i = timestam_to_pose.at(acd.timestamp_ns);
-            SE3 T_w_c =
-                T_w_i * this->common_data.calibration->T_i_c[acd.cam_id];
+            SE3 T_w_c = T_w_i * this->common_data.calibration->T_i_c[acd.cam_id];
             SE3 T_c_w = T_w_c.inverse();
             Eigen::Matrix4d T_c_w_m = T_c_w.matrix();
 
@@ -239,8 +215,7 @@ struct ComputeErrorPosesOpt : public LinearizeBase<Scalar> {
             int num_inliers = 0;
 
             for (size_t i = 0; i < acd.corner_pos.size(); i++) {
-              this->linearize_point(acd.corner_pos[i], acd.corner_id[i],
-                                    T_c_w_m, cam, nullptr, err, num_inliers,
+              this->linearize_point(acd.corner_pos[i], acd.corner_id[i], T_c_w_m, cam, nullptr, err, num_inliers,
                                     reproj_err);
             }
 

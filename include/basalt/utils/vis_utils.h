@@ -48,28 +48,26 @@ const uint8_t gt_color[3]{0, 171, 47};
 const float MIN_DEPTH_COLOR[3] = {0.27, 0.79, 1};  // blue
 const float MAX_DEPTH_COLOR[3] = {1, 0.1, 0.42};   // pink
 
-inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth,
-                          const uint8_t* color, float sizeFactor) {
+inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const uint8_t* color, float sizeFactor) {
   const float sz = sizeFactor;
   const float width = 640, height = 480, fx = 500, fy = 500, cx = 320, cy = 240;
 
-  const Eigen::aligned_vector<Eigen::Vector3f> lines = {
-      {0, 0, 0},
-      {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-      {0, 0, 0},
-      {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {0, 0, 0},
-      {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {0, 0, 0},
-      {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
-      {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
-      {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-      {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-      {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-      {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz}};
+  const Eigen::aligned_vector<Eigen::Vector3f> lines = {{0, 0, 0},
+                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                        {0, 0, 0},
+                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {0, 0, 0},
+                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {0, 0, 0},
+                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz}};
 
   glPushMatrix();
   glMultMatrixd(T_w_c.data());
@@ -108,10 +106,9 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
     b = 1.0f - (x - 5);
 }
 
-inline std::tuple<float, float, float> color_lerp(
-    float t,                               //
-    const float min[3] = MIN_DEPTH_COLOR,  //
-    const float max[3] = MAX_DEPTH_COLOR   //
+inline std::tuple<float, float, float> color_lerp(float t,                               //
+                                                  const float min[3] = MIN_DEPTH_COLOR,  //
+                                                  const float max[3] = MAX_DEPTH_COLOR   //
 ) {
   return {min[0] + t * (max[0] - min[0]),  //
           min[1] + t * (max[1] - min[1]),  //
@@ -119,11 +116,8 @@ inline std::tuple<float, float, float> color_lerp(
 }
 
 template <typename P, int N, class Allocator>
-void glDrawCirclePerimeters(
-    const std::vector<Eigen::Matrix<P, N, 1>, Allocator>& points,
-    float radius = 5.0) {
+void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>& points, float radius = 5.0) {
   for (auto& p : points) {
-    pangolin::glDrawCirclePerimeter((GLfloat)p(0), (GLfloat)p(1),
-                                    (GLfloat)radius);
+    pangolin::glDrawCirclePerimeter((GLfloat)p(0), (GLfloat)p(1), (GLfloat)radius);
   }
 }

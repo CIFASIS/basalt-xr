@@ -62,29 +62,20 @@ class NfrMapper : public ScBundleAdjustmentBase<double> {
   using Ptr = std::shared_ptr<NfrMapper>;
 
   template <class AccumT>
-  struct MapperLinearizeAbsReduce
-      : public ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT> {
-    using RollPitchFactorConstIter =
-        Eigen::aligned_vector<RollPitchFactor>::const_iterator;
-    using RelPoseFactorConstIter =
-        Eigen::aligned_vector<RelPoseFactor>::const_iterator;
-    using RelLinDataConstIter =
-        Eigen::aligned_vector<RelLinData>::const_iterator;
+  struct MapperLinearizeAbsReduce : public ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT> {
+    using RollPitchFactorConstIter = Eigen::aligned_vector<RollPitchFactor>::const_iterator;
+    using RelPoseFactorConstIter = Eigen::aligned_vector<RelPoseFactor>::const_iterator;
+    using RelLinDataConstIter = Eigen::aligned_vector<RelLinData>::const_iterator;
 
-    MapperLinearizeAbsReduce(
-        AbsOrderMap& aom,
-        const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>*
-            frame_poses)
-        : ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT>(aom),
-          frame_poses(frame_poses) {
+    MapperLinearizeAbsReduce(AbsOrderMap& aom, const Eigen::aligned_map<int64_t, PoseStateWithLin<Scalar>>* frame_poses)
+        : ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT>(aom), frame_poses(frame_poses) {
       this->accum.reset(aom.total_size);
       roll_pitch_error = 0;
       rel_error = 0;
     }
 
     MapperLinearizeAbsReduce(const MapperLinearizeAbsReduce& other, tbb::split)
-        : ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT>(other.aom),
-          frame_poses(other.frame_poses) {
+        : ScBundleAdjustmentBase<Scalar>::LinearizeAbsReduce<AccumT>(other.aom), frame_poses(other.frame_poses) {
       this->accum.reset(this->aom.total_size);
       roll_pitch_error = 0;
       rel_error = 0;
@@ -115,10 +106,8 @@ class NfrMapper : public ScBundleAdjustmentBase<double> {
         Eigen::Matrix<double, 2, POSE_SIZE> J;
         Sophus::Vector2d res = basalt::rollPitchError(pose, rpf.R_w_i_meas, &J);
 
-        this->accum.template addH<POSE_SIZE, POSE_SIZE>(
-            idx, idx, J.transpose() * rpf.cov_inv * J);
-        this->accum.template addB<POSE_SIZE>(idx,
-                                             J.transpose() * rpf.cov_inv * res);
+        this->accum.template addH<POSE_SIZE, POSE_SIZE>(idx, idx, J.transpose() * rpf.cov_inv * J);
+        this->accum.template addB<POSE_SIZE>(idx, J.transpose() * rpf.cov_inv * res);
 
         roll_pitch_error += res.transpose() * rpf.cov_inv * res;
       }
@@ -133,22 +122,15 @@ class NfrMapper : public ScBundleAdjustmentBase<double> {
         int idx_j = this->aom.abs_order_map.at(rpf.t_j_ns).first;
 
         Sophus::Matrix6d Ji, Jj;
-        Sophus::Vector6d res =
-            basalt::relPoseError(rpf.T_i_j, pose_i, pose_j, &Ji, &Jj);
+        Sophus::Vector6d res = basalt::relPoseError(rpf.T_i_j, pose_i, pose_j, &Ji, &Jj);
 
-        this->accum.template addH<POSE_SIZE, POSE_SIZE>(
-            idx_i, idx_i, Ji.transpose() * rpf.cov_inv * Ji);
-        this->accum.template addH<POSE_SIZE, POSE_SIZE>(
-            idx_i, idx_j, Ji.transpose() * rpf.cov_inv * Jj);
-        this->accum.template addH<POSE_SIZE, POSE_SIZE>(
-            idx_j, idx_i, Jj.transpose() * rpf.cov_inv * Ji);
-        this->accum.template addH<POSE_SIZE, POSE_SIZE>(
-            idx_j, idx_j, Jj.transpose() * rpf.cov_inv * Jj);
+        this->accum.template addH<POSE_SIZE, POSE_SIZE>(idx_i, idx_i, Ji.transpose() * rpf.cov_inv * Ji);
+        this->accum.template addH<POSE_SIZE, POSE_SIZE>(idx_i, idx_j, Ji.transpose() * rpf.cov_inv * Jj);
+        this->accum.template addH<POSE_SIZE, POSE_SIZE>(idx_j, idx_i, Jj.transpose() * rpf.cov_inv * Ji);
+        this->accum.template addH<POSE_SIZE, POSE_SIZE>(idx_j, idx_j, Jj.transpose() * rpf.cov_inv * Jj);
 
-        this->accum.template addB<POSE_SIZE>(
-            idx_i, Ji.transpose() * rpf.cov_inv * res);
-        this->accum.template addB<POSE_SIZE>(
-            idx_j, Jj.transpose() * rpf.cov_inv * res);
+        this->accum.template addB<POSE_SIZE>(idx_i, Ji.transpose() * rpf.cov_inv * res);
+        this->accum.template addB<POSE_SIZE>(idx_j, Jj.transpose() * rpf.cov_inv * res);
 
         rel_error += res.transpose() * rpf.cov_inv * res;
       }

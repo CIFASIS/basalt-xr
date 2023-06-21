@@ -55,26 +55,18 @@ int main(int argc, char **argv) {
   CLI::App app{"Calibrate IMU"};
 
   app.add_option("--dataset-path", dataset_path, "Path to dataset")->required();
-  app.add_option("--result-path", result_path, "Path to result folder")
-      ->required();
-  app.add_option("--dataset-type", dataset_type, "Dataset type (euroc, bag)")
-      ->required();
+  app.add_option("--result-path", result_path, "Path to result folder")->required();
+  app.add_option("--dataset-type", dataset_type, "Dataset type (euroc, bag)")->required();
 
-  app.add_option("--aprilgrid", aprilgrid_path,
-                 "Path to Aprilgrid config file)")
-      ->required();
+  app.add_option("--aprilgrid", aprilgrid_path, "Path to Aprilgrid config file)")->required();
 
   app.add_option("--gyro-noise-std", gyro_noise_std, "Gyroscope noise std");
-  app.add_option("--accel-noise-std", accel_noise_std,
-                 "Accelerometer noise std");
+  app.add_option("--accel-noise-std", accel_noise_std, "Accelerometer noise std");
 
-  app.add_option("--gyro-bias-std", gyro_bias_std,
-                 "Gyroscope bias random walk std");
-  app.add_option("--accel-bias-std", accel_bias_std,
-                 "Accelerometer bias random walk std");
+  app.add_option("--gyro-bias-std", gyro_bias_std, "Gyroscope bias random walk std");
+  app.add_option("--accel-bias-std", accel_bias_std, "Accelerometer bias random walk std");
 
-  app.add_option("--cache-name", cache_dataset_name,
-                 "Name to save cached files");
+  app.add_option("--cache-name", cache_dataset_name, "Name to save cached files");
 
   app.add_option("--skip-images", skip_images, "Number of images to skip");
 
@@ -84,10 +76,8 @@ int main(int argc, char **argv) {
     return app.exit(e);
   }
 
-  basalt::CamImuCalib cv(
-      dataset_path, dataset_type, aprilgrid_path, result_path,
-      cache_dataset_name, skip_images,
-      {accel_noise_std, gyro_noise_std, accel_bias_std, gyro_bias_std});
+  basalt::CamImuCalib cv(dataset_path, dataset_type, aprilgrid_path, result_path, cache_dataset_name, skip_images,
+                         {accel_noise_std, gyro_noise_std, accel_bias_std, gyro_bias_std});
 
   cv.renderingLoop();
 

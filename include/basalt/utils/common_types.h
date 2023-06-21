@@ -62,8 +62,7 @@ using CamId = std::size_t;
 struct TimeCamId {
   TimeCamId() : frame_id(0), cam_id(0) {}
 
-  TimeCamId(const FrameId& frame_id, const CamId& cam_id)
-      : frame_id(frame_id), cam_id(cam_id) {}
+  TimeCamId(const FrameId& frame_id, const CamId& cam_id) : frame_id(frame_id), cam_id(cam_id) {}
 
   FrameId frame_id;
   CamId cam_id;
@@ -94,8 +93,7 @@ using HashBowVector = std::vector<std::pair<FeatureHash, double>>;
 /// keypoint positions and descriptors for an image
 struct KeypointsData {
   /// collection of 2d corner points (indexed by FeatureId)
-  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-      corners;
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> corners;
   /// collection of feature orientation (in radian) with same index as `corners`
   /// (indexed by FeatureId)
   std::vector<double> corner_angles;
@@ -110,8 +108,7 @@ struct KeypointsData {
 };
 
 /// feature corners is a collection of { imageId => KeypointsData }
-using Corners = tbb::concurrent_unordered_map<TimeCamId, KeypointsData,
-                                              std::hash<TimeCamId>>;
+using Corners = tbb::concurrent_unordered_map<TimeCamId, KeypointsData, std::hash<TimeCamId>>;
 
 /// feature matches for an image pair
 struct MatchData {
@@ -128,11 +125,9 @@ struct MatchData {
 
 /// feature matches is a collection of { (imageId, imageId) => MatchData }
 using Matches = tbb::concurrent_unordered_map<
-    std::pair<TimeCamId, TimeCamId>, MatchData,
-    std::hash<std::pair<TimeCamId, TimeCamId>>,
+    std::pair<TimeCamId, TimeCamId>, MatchData, std::hash<std::pair<TimeCamId, TimeCamId>>,
     std::equal_to<std::pair<TimeCamId, TimeCamId>>,
-    Eigen::aligned_allocator<
-        std::pair<const std::pair<TimeCamId, TimeCamId>, MatchData>>>;
+    Eigen::aligned_allocator<std::pair<const std::pair<TimeCamId, TimeCamId>, MatchData>>>;
 
 /// pair of image and feature indices
 using ImageFeaturePair = std::pair<TimeCamId, FeatureId>;
@@ -173,8 +168,7 @@ struct Landmark {
 
 /// collection {imageId => Camera} for all cameras in the map
 using Cameras =
-    std::map<TimeCamId, Camera, std::less<TimeCamId>,
-             Eigen::aligned_allocator<std::pair<const TimeCamId, Camera>>>;
+    std::map<TimeCamId, Camera, std::less<TimeCamId>, Eigen::aligned_allocator<std::pair<const TimeCamId, Camera>>>;
 
 /// collection {trackId => Landmark} for all landmarks in the map.
 /// trackIds correspond to feature_tracks
@@ -194,14 +188,7 @@ struct CameraCandidate {
 
 /// list of current candidates and some book keeping for the different stages
 struct CameraCandidates {
-  enum Stage {
-    ComputeCandidates,
-    AddCameras,
-    AddLandmarks,
-    Optimize,
-    RemoveOutliers,
-    Done
-  };
+  enum Stage { ComputeCandidates, AddCameras, AddLandmarks, Optimize, RemoveOutliers, Done };
 
   std::vector<CameraCandidate> cameras;
   Stage current_stage = ComputeCandidates;
@@ -267,8 +254,7 @@ struct ImageProjection {
 using ImageProjections = std::map<TimeCamId, ImageProjection>;
 
 /// inlier projections indexed per track
-using TrackProjections =
-    std::unordered_map<TrackId, std::map<TimeCamId, ProjectedLandmarkConstPtr>>;
+using TrackProjections = std::unordered_map<TrackId, std::map<TimeCamId, ProjectedLandmarkConstPtr>>;
 
 }  // namespace basalt
 
@@ -305,8 +291,7 @@ struct hash<basalt::TimeCamId> {
 
 template <>
 struct hash<std::pair<basalt::TimeCamId, basalt::TimeCamId>> {
-  size_t operator()(
-      const std::pair<basalt::TimeCamId, basalt::TimeCamId>& x) const {
+  size_t operator()(const std::pair<basalt::TimeCamId, basalt::TimeCamId>& x) const {
     size_t seed = 0;
     basalt::hash_combine(seed, x.first.frame_id);
     basalt::hash_combine(seed, x.first.cam_id);

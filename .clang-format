@@ -3,4 +3,5 @@ Language:       Cpp
 BasedOnStyle:   Google
 IndentWidth:    2
 IncludeBlocks:  Preserve
+ColumnLimit:    120
 ...

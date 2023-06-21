@@ -41,14 +41,11 @@ class LinearizationRelSC : public LinearizationBase<Scalar_, POSE_SIZE_> {
 
   using typename Base::Options;
 
-  LinearizationRelSC(
-      BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom,
-      const Options& options,
-      const MargLinData<Scalar>* marg_lin_data = nullptr,
-      const ImuLinData<Scalar>* imu_lin_data = nullptr,
-      const std::set<FrameId>* used_frames = nullptr,
-      const std::unordered_set<KeypointId>* lost_landmarks = nullptr,
-      int64_t last_state_to_marg = std::numeric_limits<int64_t>::max());
+  LinearizationRelSC(BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom, const Options& options,
+                     const MargLinData<Scalar>* marg_lin_data = nullptr,
+                     const ImuLinData<Scalar>* imu_lin_data = nullptr, const std::set<FrameId>* used_frames = nullptr,
+                     const std::unordered_set<KeypointId>* lost_landmarks = nullptr,
+                     int64_t last_state_to_marg = std::numeric_limits<int64_t>::max());
 
   // destructor defined in cpp b/c of unique_ptr destructor (ImuBlock)
   // copy/move constructor/assignment-operator for rule-of-five
@@ -83,19 +80,15 @@ class LinearizationRelSC : public LinearizationBase<Scalar_, POSE_SIZE_> {
   void get_dense_H_b(MatX& H, VecX& b) const override;
 
  protected:  // types
-  using PoseLinMapType =
-      Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>,
-                                   RelPoseLin<Scalar>>;
+  using PoseLinMapType = Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>, RelPoseLin<Scalar>>;
   using PoseLinMapTypeConstIter = typename PoseLinMapType::const_iterator;
 
-  using HostLandmarkMapType =
-      std::unordered_map<TimeCamId, std::vector<const LandmarkBlock<Scalar>*>>;
+  using HostLandmarkMapType = std::unordered_map<TimeCamId, std::vector<const LandmarkBlock<Scalar>*>>;
 
  protected:  //  helper
   void get_dense_Q2Jp_Q2r_pose_damping(MatX& Q2Jp, size_t start_idx) const;
 
-  void get_dense_Q2Jp_Q2r_marg_prior(MatX& Q2Jp, VecX& Q2r,
-                                     size_t start_idx) const;
+  void get_dense_Q2Jp_Q2r_marg_prior(MatX& Q2Jp, VecX& Q2r, size_t start_idx) const;
 
   void add_dense_H_b_pose_damping(MatX& H) const;
 
@@ -106,10 +99,9 @@ class LinearizationRelSC : public LinearizationBase<Scalar_, POSE_SIZE_> {
   void add_dense_H_b_imu(MatX& H, VecX& b) const;
 
   // Transform to abs
-  static void accumulate_dense_H_b_rel_to_abs(
-      const MatX& rel_H, const VecX& rel_b,
-      const std::vector<PoseLinMapTypeConstIter>& rpph, const AbsOrderMap& aom,
-      DenseAccumulator<Scalar>& accum);
+  static void accumulate_dense_H_b_rel_to_abs(const MatX& rel_H, const VecX& rel_b,
+                                              const std::vector<PoseLinMapTypeConstIter>& rpph, const AbsOrderMap& aom,
+                                              DenseAccumulator<Scalar>& accum);
 
  protected:
   Options options_;
