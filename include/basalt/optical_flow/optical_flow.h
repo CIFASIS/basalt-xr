@@ -59,11 +59,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
-using Keypoint = Eigen::AffineCompact2f;
+// Front-end representation of keypoints
+// Probably should be renamed to "Feature" since it has descriptors
+struct Keypoint {
+  Eigen::AffineCompact2f pose;
+  std::bitset<256> descriptor;
+  bool tracked_by_opt_flow = false;
+};
+
 using KeypointId = size_t;
 using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
 using KeypointLevels = std::map<KeypointId, size_t>;
 using xrt::auxiliary::tracking::slam::timestats;
+using Poses = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
@@ -93,8 +101,8 @@ struct OpticalFlowResult {
 
   int64_t t_ns;
   std::vector<Keypoints> keypoints;
-  std::vector<Keypoints> tracking_guesses;
-  std::vector<Keypoints> matching_guesses;
+  std::vector<Poses> tracking_guesses;
+  std::vector<Poses> matching_guesses;
 
   std::vector<KeypointLevels> pyramid_levels;
 

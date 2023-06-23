@@ -839,15 +839,15 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     const Keypoints& kp_map = curr_vis_data->opt_flow_res->keypoints[cam_id];
 
     for (const auto& kv : kp_map) {
-      Eigen::MatrixXf transformed_patch = kv.second.linear() * opt_flow_ptr->patch_coord;
-      transformed_patch.colwise() += kv.second.translation();
+      Eigen::MatrixXf transformed_patch = kv.second.pose.linear() * opt_flow_ptr->patch_coord;
+      transformed_patch.colwise() += kv.second.pose.translation();
 
       for (int i = 0; i < transformed_patch.cols(); i++) {
         const Eigen::Vector2f c = transformed_patch.col(i);
         pangolin::glDrawCirclePerimeter(c[0], c[1], 0.5f);
       }
 
-      const Eigen::Vector2f c = kv.second.translation();
+      const Eigen::Vector2f c = kv.second.pose.translation();
 
       if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
     }
@@ -891,8 +891,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
       if (prev_kpts.count(kpid) == 0) continue;
       if (guess_obs.count(kpid) == 0) continue;
 
-      auto n = kpt.translation();
-      auto p = prev_kpts.at(kpid).translation();
+      auto n = kpt.pose.translation();
+      auto p = prev_kpts.at(kpid).pose.translation();
       auto g = guess_obs.at(kpid).translation();
 
       now_points.emplace_back(n);
@@ -944,8 +944,8 @@ out_show_tracking_guess:
       if (cam0_kpts.count(kpid) == 0) continue;
       if (guess_obs.count(kpid) == 0) continue;
 
-      auto n = kpt.translation();
-      auto c = cam0_kpts.at(kpid).translation();
+      auto n = kpt.pose.translation();
+      auto c = cam0_kpts.at(kpid).pose.translation();
       auto g = guess_obs.at(kpid).translation();
 
       now_points.emplace_back(n);
