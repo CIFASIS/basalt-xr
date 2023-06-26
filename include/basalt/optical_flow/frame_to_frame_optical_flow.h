@@ -42,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "basalt/imu/preintegration.h"
 #include "basalt/utils/common_types.h"
 #include "basalt/utils/imu_types.h"
+#include "basalt/vi_estimator/landmark_database.h"
 #include "sophus/se3.hpp"
 
 #include <tbb/blocked_range.h>
@@ -96,6 +97,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   using OpticalFlowBase::show_gui;
   using OpticalFlowBase::t_ns;
   using OpticalFlowBase::transforms;
+  using OpticalFlowBase::matches_counter;
 
   FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
       : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
@@ -192,6 +194,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms->keypoints.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
+      transforms->projections.resize(num_cams);
+      transforms->recall_matches.resize(num_cams);
+      transforms->new_detections.resize(num_cams);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<ManagedImagePyr<uint16_t>>);
@@ -225,6 +230,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       new_transforms->keypoints.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
+      new_transforms->projections.resize(num_cams);
+      new_transforms->recall_matches.resize(num_cams);
+      new_transforms->new_detections.resize(num_cams);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.template cast<Scalar>();
@@ -242,6 +250,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms = new_transforms;
       transforms->input_images = new_img_vec;
 
+      recallPoints();
       addPoints();
       filterPoints();
     }
@@ -405,6 +414,113 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
+  void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Landmark<float>>& landmarks,  Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
+    for (const auto& [lm_id, lm] : lmdb_.getLandmarks()) {
+
+      // Skip landmarks that are already tracked by the current frame
+      if (transforms->keypoints.at(cam_id).find(lm_id) != transforms->keypoints.at(cam_id).end()) continue;
+      // Host camera
+      size_t i = lm.host_kf_id.cam_id;
+
+      // Unproject the direction vector
+      Vector4 ci_xyzw = StereographicParam<Scalar>::unproject(lm.direction);
+      ci_xyzw[3] = lm.inv_dist;
+
+      // Get the transformation from the world to the host camera
+      SE3 T_i_ci = calib.T_i_c[i];
+      SE3 T_i0 = lmdb_.getFramePose(lm.host_kf_id.frame_id).template cast<Scalar>();
+      SE3 T_w_ci = T_i0 * T_i_ci;
+
+      Vector4 w_xyzw = T_w_ci * ci_xyzw;
+      Vector3 w_xyz = w_xyzw.template head<3>() / w_xyzw[3];
+
+      SE3 T_i1 = predicted_state->T_w_i.template cast<Scalar>();
+      SE3 T_i_cj = calib.T_i_c[cam_id];
+      SE3 T_cj = T_i1 * T_i_cj;
+      Vector3 cj_xyz = T_cj.inverse() * w_xyz;
+      Vector2 cj_uv;
+      // Project the point to the new frame
+      bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
+
+      const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
+      bool in_bounds = cj_uv.x() >= 0 && cj_uv.x() < img_raw.w && cj_uv.y() >= 0 && cj_uv.y() < img_raw.h;
+      if (valid && in_bounds) {
+        landmarks[lm_id] = lm;
+        projections[lm_id] = cj_uv;
+        std::tuple<int64_t, Vector2> tuple = std::make_tuple(lm_id, cj_uv);
+        transforms->projections.at(cam_id).emplace_back(tuple);
+      }
+    }
+  }
+
+  int getPointCell(int cam_id, Vector2& p) {
+      const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
+      int size = config.optical_flow_detection_grid_size;
+      int cellsPerRow = static_cast<int>(img_raw.w / size);
+      int row = static_cast<int>(p.y() / size);
+      int col = static_cast<int>(p.x() / size);
+      int cellNumber = cellsPerRow * row + col;
+      return cellNumber;
+  }
+
+  void recallPoints() {
+    for (size_t cam_id = 0; cam_id < getNumCams(); cam_id++) {
+      std::vector<KeypointId> new_points_index;
+      std::vector<Descriptor> new_points_descriptors;
+
+      std::vector<std::pair<int, int>> matches;
+
+      KeypointsData kd;
+      Eigen::aligned_vector<Eigen::Vector2d> pts;
+      int points_by_cell = 10;
+      detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
+                      points_by_cell, config.optical_flow_detection_min_threshold,
+                      config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
+      computeAngles(pyramid->at(cam_id).lvl(0), kd, true);
+      computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
+
+      // 2. Project the landmarks into the new frame
+      Eigen::aligned_unordered_map<LandmarkId, Landmark<float>> proj_landmarks;
+      Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+      getProjectedLandmarks(cam_id, proj_landmarks, projections);
+
+      for (const auto& [lm_id, lm] : proj_landmarks) {
+
+        //  3. TODO: Search detected points in nearest cells
+        int cell_id = getPointCell(cam_id, projections.at(lm_id));
+
+        new_points_index.clear();
+        new_points_descriptors.clear();
+        for (size_t i = 0; i < kd.corners.size(); i++) {
+          Vector2 pos = kd.corners[i].cast<Scalar>();
+          if (cell_id == getPointCell(cam_id, pos)) {
+            new_points_index.push_back(i);
+            new_points_descriptors.push_back(kd.corner_descriptors[i]);
+            transforms->new_detections.at(cam_id).emplace_back(pos);
+          }
+        }
+
+        // 4. Match points with landmarks
+        matches.clear();
+        matchDescriptors(new_points_descriptors, {lm.descriptor}, matches, config.mapper_max_hamming_distance, config.mapper_second_best_test_ratio);
+
+        if (!matches.empty()) {
+          size_t match_idx = new_points_index[matches[0].first];
+
+          // 5. Add the keypoint as detected in the current frame
+          auto transform = Eigen::AffineCompact2f::Identity();
+          transform.translation() = kd.corners[match_idx].cast<Scalar>();
+          transforms->keypoints.at(cam_id)[lm_id].pose = transform;
+          transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[match_idx];
+          transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
+          std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, kd.corners[match_idx].cast<Scalar>(), projections.at(lm_id));
+          transforms->recall_matches.at(cam_id).emplace_back(match_pair);
+          matches_counter++;
+        }
+      }
+    }
+  }
+
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
     for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
@@ -542,6 +658,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
  private:
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
+  LandmarkDatabase<Scalar>& lmdb_ = LandmarkDatabase<Scalar>::getInstance();
+  int points_counter_ = 0;
+  int opt_flow_counter_ = 0;
+  int matches_counter_ = 0;
 };
 
 }  // namespace basalt

@@ -361,7 +361,10 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& opt
             lm_pos.host_kf_id = tcidl;
             lm_pos.direction = StereographicParam<Scalar>::project(p0_triangulated);
             lm_pos.inv_dist = p0_triangulated[3];
-            lmdb.addLandmark(lm_id, lm_pos);
+            lm_pos.descriptor = opt_flow_meas->keypoints.at(i).at(lm_id).descriptor;
+
+            const SE3 pos = getPoseStateWithLin(tcidl.frame_id).getPose();
+            lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
 
             num_points_added++;
             valid_kp = true;
