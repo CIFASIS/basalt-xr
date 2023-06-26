@@ -97,6 +97,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   using OpticalFlowBase::show_gui;
   using OpticalFlowBase::t_ns;
   using OpticalFlowBase::transforms;
+  using OpticalFlowBase::matches_counter;
 
   FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
       : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
