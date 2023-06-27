@@ -115,7 +115,7 @@ void ScBundleAdjustmentBase<Scalar_>::updatePoints(const AbsOrderMap& aom, const
     // final negation of inc_l b/c we solve "H (-inc) = b"
     Vec3 inc_l = -(rld.Hllinv.at(lm_idx) * (rld.bl.at(lm_idx) - H_l_p_x));
 
-    Keypoint<Scalar>& kpt = lmdb.getLandmark(lm_idx);
+    Landmark<Scalar>& kpt = lmdb.getLandmark(lm_idx);
     kpt.direction += inc_l.template head<2>();
     kpt.inv_dist += inc_l[2];
 
@@ -207,7 +207,7 @@ void ScBundleAdjustmentBase<Scalar_>::updatePointsAbs(const AbsOrderMap& aom, co
     // final negation of inc_l b/c we solve "H (-inc) = b"
     Vec3 inc_l = -(ald.Hllinv.at(lm_idx) * (ald.bl.at(lm_idx) - H_l_p_x));
 
-    Keypoint<Scalar>& kpt = lmdb.getLandmark(lm_idx);
+    Landmark<Scalar>& kpt = lmdb.getLandmark(lm_idx);
     kpt.direction += inc_l.template head<2>();
     kpt.inv_dist += inc_l[2];
 
@@ -223,7 +223,7 @@ void ScBundleAdjustmentBase<Scalar_>::updatePointsAbs(const AbsOrderMap& aom, co
 template <class Scalar_>
 void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
     Eigen::aligned_vector<RelLinData>& rld_vec,
-    const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+    const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& obs_to_lin,
     const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error) {
   error = 0;
 
@@ -281,15 +281,15 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
 
         std::visit(
             [&](const auto& cam) {
-              for (KeypointId kpt_id : obs_kv.second) {
-                const Keypoint<Scalar>& kpt_pos = ba_base->lmdb.getLandmark(kpt_id);
-                const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
+              for (LandmarkId lm_id : obs_kv.second) {
+                const Landmark<Scalar>& lm_pos = ba_base->lmdb.getLandmark(lm_id);
+                const Vec2& lm_obs = lm_pos.obs.at(tcid_t);
 
                 Vec2 res;
                 Eigen::Matrix<Scalar, 2, POSE_SIZE> d_res_d_xi;
                 Eigen::Matrix<Scalar, 2, 3> d_res_d_p;
 
-                bool valid = linearizePoint(kpt_obs, kpt_pos, T_t_h, cam, res, &d_res_d_xi, &d_res_d_p);
+                bool valid = linearizePoint(lm_obs, lm_pos, T_t_h, cam, res, &d_res_d_xi, &d_res_d_p);
 
                 if (valid) {
                   Scalar e = res.norm();
@@ -298,20 +298,20 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
 
                   rld.error += Scalar(0.5) * (2 - huber_weight) * obs_weight * res.transpose() * res;
 
-                  if (rld.Hll.count(kpt_id) == 0) {
-                    rld.Hll[kpt_id].setZero();
-                    rld.bl[kpt_id].setZero();
+                  if (rld.Hll.count(lm_id) == 0) {
+                    rld.Hll[lm_id].setZero();
+                    rld.bl[lm_id].setZero();
                   }
 
-                  rld.Hll[kpt_id] += obs_weight * d_res_d_p.transpose() * d_res_d_p;
-                  rld.bl[kpt_id] += obs_weight * d_res_d_p.transpose() * res;
+                  rld.Hll[lm_id] += obs_weight * d_res_d_p.transpose() * d_res_d_p;
+                  rld.bl[lm_id] += obs_weight * d_res_d_p.transpose() * res;
 
                   frld.Hpp += obs_weight * d_res_d_xi.transpose() * d_res_d_xi;
                   frld.bp += obs_weight * d_res_d_xi.transpose() * res;
                   frld.Hpl.emplace_back(obs_weight * d_res_d_xi.transpose() * d_res_d_p);
-                  frld.lm_id.emplace_back(kpt_id);
+                  frld.lm_id.emplace_back(lm_id);
 
-                  rld.lm_to_obs[kpt_id].emplace_back(rld.Hpppl.size(), frld.lm_id.size() - 1);
+                  rld.lm_to_obs[lm_id].emplace_back(rld.Hpppl.size(), frld.lm_id.size() - 1);
                 }
               }
             },
@@ -330,7 +330,7 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperStatic(
 template <class Scalar_>
 void ScBundleAdjustmentBase<Scalar_>::linearizeHelperAbsStatic(
     Eigen::aligned_vector<AbsLinData>& ald_vec,
-    const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& obs_to_lin,
+    const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& obs_to_lin,
     const BundleAdjustmentBase<Scalar>* ba_base, Scalar& error) {
   error = 0;
 
@@ -385,8 +385,8 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperAbsStatic(
         std::visit(
             [&](const auto& cam) {
               for (KeypointId kpt_id : obs_kv.second) {
-                const Keypoint<Scalar>& kpt_pos = ba_base->lmdb.getLandmark(kpt_id);
-                const Vec2& kpt_obs = kpt_pos.obs.at(tcid_t);
+                const Landmark<Scalar>& lm_pos = ba_base->lmdb.getLandmark(kpt_id);
+                const Vec2& lm_obs = lm_pos.obs.at(tcid_t);
 
                 Vec2 res;
                 Eigen::Matrix<Scalar, 2, POSE_SIZE> d_res_d_xi_h, d_res_d_xi_t;
@@ -396,7 +396,7 @@ void ScBundleAdjustmentBase<Scalar_>::linearizeHelperAbsStatic(
                 {
                   Eigen::Matrix<Scalar, 2, POSE_SIZE> d_res_d_xi;
 
-                  valid = linearizePoint(kpt_obs, kpt_pos, T_t_h, cam, res, &d_res_d_xi, &d_res_d_p);
+                  valid = linearizePoint(lm_obs, lm_pos, T_t_h, cam, res, &d_res_d_xi, &d_res_d_p);
 
                   d_res_d_xi_h = d_res_d_xi * d_rel_d_h;
                   d_res_d_xi_t = d_res_d_xi * d_rel_d_t;

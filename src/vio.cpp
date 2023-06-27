@@ -836,8 +836,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    const Eigen::aligned_map<basalt::KeypointId, Eigen::AffineCompact2f>& kp_map =
-        curr_vis_data->opt_flow_res->observations[cam_id];
+    const Keypoints& kp_map = curr_vis_data->opt_flow_res->keypoints[cam_id];
 
     for (const auto& kv : kp_map) {
       Eigen::MatrixXf transformed_patch = kv.second.linear() * opt_flow_ptr->patch_coord;
@@ -869,8 +868,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     auto end_it = vis_map.end();
     if (now_it == end_it || prev_it == end_it) goto out_show_tracking_guess;
 
-    auto now_obs = now_it->second->opt_flow_res->observations[cam_id];
-    auto prev_obs = prev_it->second->opt_flow_res->observations[cam_id];
+    auto new_kpts = now_it->second->opt_flow_res->keypoints[cam_id];
+    auto prev_kpts = prev_it->second->opt_flow_res->keypoints[cam_id];
     auto guess_obs = now_it->second->opt_flow_res->tracking_guesses[cam_id];
 
     std::vector<Vector2f> prev_lines;
@@ -879,21 +878,21 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     std::vector<Vector2f> guess_points;
     std::vector<Vector2f> now_points;
 
-    prev_lines.reserve(now_obs.size());
-    prev_points.reserve(now_obs.size());
-    guess_lines.reserve(now_obs.size());
-    guess_points.reserve(now_obs.size());
-    now_points.reserve(now_obs.size());
+    prev_lines.reserve(new_kpts.size());
+    prev_points.reserve(new_kpts.size());
+    guess_lines.reserve(new_kpts.size());
+    guess_points.reserve(new_kpts.size());
+    now_points.reserve(new_kpts.size());
 
     float radius = 3.0f;
 
     // Draw tracked features in previous frame
-    for (auto& [kpid, affine] : now_obs) {
-      if (prev_obs.count(kpid) == 0) continue;
+    for (auto& [kpid, kpt] : new_kpts) {
+      if (prev_kpts.count(kpid) == 0) continue;
       if (guess_obs.count(kpid) == 0) continue;
 
-      auto n = affine.translation();
-      auto p = prev_obs.at(kpid).translation();
+      auto n = kpt.translation();
+      auto p = prev_kpts.at(kpid).translation();
       auto g = guess_obs.at(kpid).translation();
 
       now_points.emplace_back(n);
@@ -922,8 +921,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 out_show_tracking_guess:
 
   if (show_matching_guess) {
-    auto now_obs = curr_vis_data->opt_flow_res->observations[cam_id];
-    auto cam0_obs = curr_vis_data->opt_flow_res->observations[0];
+    auto new_kpts = curr_vis_data->opt_flow_res->keypoints[cam_id];
+    auto cam0_kpts = curr_vis_data->opt_flow_res->keypoints[0];
     auto guess_obs = curr_vis_data->opt_flow_res->matching_guesses[cam_id];
 
     std::vector<Vector2f> cam0_lines;
@@ -932,21 +931,21 @@ out_show_tracking_guess:
     std::vector<Vector2f> guess_points;
     std::vector<Vector2f> now_points;
 
-    cam0_lines.reserve(now_obs.size());
-    cam0_points.reserve(now_obs.size());
-    guess_lines.reserve(now_obs.size());
-    guess_points.reserve(now_obs.size());
-    now_points.reserve(now_obs.size());
+    cam0_lines.reserve(new_kpts.size());
+    cam0_points.reserve(new_kpts.size());
+    guess_lines.reserve(new_kpts.size());
+    guess_points.reserve(new_kpts.size());
+    now_points.reserve(new_kpts.size());
 
     float radius = 3.0f;
 
     // Draw tracked features in previous frame
-    for (auto& [kpid, affine] : now_obs) {
-      if (cam0_obs.count(kpid) == 0) continue;
+    for (auto& [kpid, kpt] : new_kpts) {
+      if (cam0_kpts.count(kpid) == 0) continue;
       if (guess_obs.count(kpid) == 0) continue;
 
-      auto n = affine.translation();
-      auto c = cam0_obs.at(kpid).translation();
+      auto n = kpt.translation();
+      auto c = cam0_kpts.at(kpid).translation();
       auto g = guess_obs.at(kpid).translation();
 
       now_points.emplace_back(n);

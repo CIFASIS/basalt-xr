@@ -59,8 +59,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
+using Keypoint = Eigen::AffineCompact2f;
 using KeypointId = size_t;
-using Keypoints = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
+using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
 using KeypointLevels = std::map<KeypointId, size_t>;
 using xrt::auxiliary::tracking::slam::timestats;
 
@@ -91,7 +92,7 @@ struct OpticalFlowResult {
   using Ptr = std::shared_ptr<OpticalFlowResult>;
 
   int64_t t_ns;
-  std::vector<Keypoints> observations;
+  std::vector<Keypoints> keypoints;
   std::vector<Keypoints> tracking_guesses;
   std::vector<Keypoints> matching_guesses;
 

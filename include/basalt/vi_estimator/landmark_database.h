@@ -39,6 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
+using LandmarkId = KeypointId;
 template <class Scalar_>
 struct KeypointObservation {
   using Scalar = Scalar_;
@@ -51,7 +52,7 @@ struct KeypointObservation {
 
 // keypoint position defined relative to some frame
 template <class Scalar_>
-struct Keypoint {
+struct Landmark {
   using Scalar = Scalar_;
   using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
 
@@ -89,7 +90,7 @@ class LandmarkDatabase {
   using Scalar = Scalar_;
 
   // Non-const
-  void addLandmark(KeypointId lm_id, const Keypoint<Scalar>& pos);
+  void addLandmark(LandmarkId lm_id, const Landmark<Scalar>& pos);
 
   void removeFrame(const FrameId& frame);
 
@@ -98,18 +99,18 @@ class LandmarkDatabase {
 
   void addObservation(const TimeCamId& tcid_target, const KeypointObservation<Scalar>& o);
 
-  Keypoint<Scalar>& getLandmark(KeypointId lm_id);
+  Landmark<Scalar>& getLandmark(LandmarkId lm_id);
 
   // Const
-  const Keypoint<Scalar>& getLandmark(KeypointId lm_id) const;
+  const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;
 
   std::vector<TimeCamId> getHostKfs() const;
 
-  std::vector<const Keypoint<Scalar>*> getLandmarksForHost(const TimeCamId& tcid) const;
+  std::vector<const Landmark<Scalar>*> getLandmarksForHost(const TimeCamId& tcid) const;
 
-  const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>>& getObservations() const;
+  const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& getObservations() const;
 
-  const Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>>& getLandmarks() const;
+  const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>>& getLandmarks() const;
 
   bool landmarkExists(int lm_id) const;
 
@@ -117,11 +118,11 @@ class LandmarkDatabase {
 
   int numObservations() const;
 
-  int numObservations(KeypointId lm_id) const;
+  int numObservations(LandmarkId lm_id) const;
 
-  void removeLandmark(KeypointId lm_id);
+  void removeLandmark(LandmarkId lm_id);
 
-  void removeObservations(KeypointId lm_id, const std::set<TimeCamId>& obs);
+  void removeObservations(LandmarkId lm_id, const std::set<TimeCamId>& obs);
 
   inline void backup() {
     for (auto& kv : kpts) kv.second.backup();
@@ -132,14 +133,14 @@ class LandmarkDatabase {
   }
 
  private:
-  using MapIter = typename Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>>::iterator;
+  using MapIter = typename Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>>::iterator;
   MapIter removeLandmarkHelper(MapIter it);
-  typename Keypoint<Scalar>::MapIter removeLandmarkObservationHelper(MapIter it,
-                                                                     typename Keypoint<Scalar>::MapIter it2);
+  typename Landmark<Scalar>::MapIter removeLandmarkObservationHelper(MapIter it,
+                                                                     typename Landmark<Scalar>::MapIter it2);
 
-  Eigen::aligned_unordered_map<KeypointId, Keypoint<Scalar>> kpts;
+  Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> kpts;
 
-  std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<KeypointId>>> observations;
+  std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> observations;
 
   static constexpr int min_num_obs = 2;
 };

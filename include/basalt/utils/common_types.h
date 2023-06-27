@@ -153,7 +153,7 @@ struct Camera {
 };
 
 /// landmarks in the map
-struct Landmark {
+struct Landmark_ {
   /// 3d position in world coordinates
   Eigen::Vector3d p;
 
@@ -172,7 +172,7 @@ using Cameras =
 
 /// collection {trackId => Landmark} for all landmarks in the map.
 /// trackIds correspond to feature_tracks
-using Landmarks = std::unordered_map<TrackId, Landmark>;
+using Landmarks = std::unordered_map<TrackId, Landmark_>;
 
 /// camera candidate to be added to map
 struct CameraCandidate {

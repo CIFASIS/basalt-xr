@@ -223,14 +223,14 @@ int main(int argc, char** argv) {
       data->t_ns = gt_frame_t_ns[i];
 
       for (size_t j = 0; j < calib.T_i_c.size(); j++) {
-        data->observations.emplace_back();
+        data->keypoints.emplace_back();
         basalt::TimeCamId tcid(data->t_ns, j);
         const basalt::SimObservations& obs = noisy_observations.at(tcid);
         for (size_t k = 0; k < obs.pos.size(); k++) {
           Eigen::AffineCompact2f t;
           t.setIdentity();
           t.translation() = obs.pos[k].cast<float>();
-          data->observations.back()[obs.id[k]] = t;
+          data->keypoints.back()[obs.id[k]] = t;
         }
       }
 

@@ -184,7 +184,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(num_cams);
+      transforms->keypoints.resize(num_cams);
       transforms->pyramid_levels.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
@@ -218,7 +218,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(num_cams);
+      new_transforms->keypoints.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
       new_transforms->pyramid_levels.resize(num_cams);
@@ -230,10 +230,10 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
         SE3 T_c1 = T_i1 * calib.T_i_c[i];
         SE3 T_c2 = T_i2 * calib.T_i_c[i];
         SE3 T_c1_c2 = T_c1.inverse() * T_c2;
-        trackPoints(old_pyramid->at(i), pyramid->at(i),                                  //
-                    transforms->observations[i], transforms->pyramid_levels[i],          //
-                    new_transforms->observations[i], new_transforms->pyramid_levels[i],  //
-                    new_transforms->tracking_guesses[i],                                 //
+        trackPoints(old_pyramid->at(i), pyramid->at(i),                               //
+                    transforms->keypoints[i], transforms->pyramid_levels[i],          //
+                    new_transforms->keypoints[i], new_transforms->pyramid_levels[i],  //
+                    new_transforms->tracking_guesses[i],                              //
                     new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
 
@@ -253,27 +253,27 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
   }
 
   void trackPoints(const ManagedImagePyr<uint16_t>& pyr_1, const ManagedImagePyr<uint16_t>& pyr_2,  //
-                   const Keypoints& transform_map_1, const KeypointLevels& pyramid_levels_1,        //
-                   Keypoints& transform_map_2, KeypointLevels& pyramid_levels_2,                    //
+                   const Keypoints& keypoint_map_1, const KeypointLevels& pyramid_levels_1,         //
+                   Keypoints& keypoint_map_2, KeypointLevels& pyramid_levels_2,                     //
                    Keypoints& guesses, const Masks& masks1, const Masks& masks2, const SE3& T_c1_c2, size_t cam1,
                    size_t cam2) const {
-    size_t num_points = transform_map_1.size();
+    size_t num_points = keypoint_map_1.size();
 
     std::vector<KeypointId> ids;
-    Eigen::aligned_vector<Eigen::AffineCompact2f> init_vec;
+    Eigen::aligned_vector<Keypoint> init_vec;
     std::vector<size_t> pyramid_level;
 
     ids.reserve(num_points);
     init_vec.reserve(num_points);
     pyramid_level.reserve(num_points);
 
-    for (const auto& [kpid, affine] : transform_map_1) {
+    for (const auto& [kpid, affine] : keypoint_map_1) {
       ids.push_back(kpid);
       init_vec.push_back(affine);
       pyramid_level.push_back(pyramid_levels_1.at(kpid));
     }
 
-    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f, std::hash<KeypointId>> result, guesses_tbb;
+    tbb::concurrent_unordered_map<KeypointId, Keypoint, std::hash<KeypointId>> result, guesses_tbb;
     tbb::concurrent_unordered_map<KeypointId, size_t, std::hash<KeypointId>> pyrlvls_tbb;
 
     bool tracking = cam1 == cam2;
@@ -340,8 +340,8 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
     tbb::blocked_range<size_t> range(0, num_points);
     tbb::parallel_for(range, compute_func);
 
-    transform_map_2.clear();
-    transform_map_2.insert(result.begin(), result.end());
+    keypoint_map_2.clear();
+    keypoint_map_2.insert(result.begin(), result.end());
     guesses.clear();
     guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
     pyramid_levels_2.clear();
@@ -422,7 +422,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
 
   std::pair<Keypoints, KeypointLevels> addPointsForCamera(size_t cam_id, ssize_t level) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
-    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
+    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
       const ssize_t point_level = transforms->pyramid_levels.at(cam_id).at(kpid);
       if (point_level >= level - 1 && point_level <= level + 1) {  // Use the point on adjacent levels too
         const Scalar pt_scale = 1 << point_level;
@@ -440,21 +440,21 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
     //! @note Using static grid size for all levels. Scaling it made feature
     //! count increase 2x but ATE/RTE scores were just slightly worse/better.
 
-    Keypoints new_poses;
+    Keypoints new_kpts;
     KeypointLevels new_pyramid_levels;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>() * scale;
 
-      transforms->observations.at(cam_id)[last_keypoint_id] = transform;
+      transforms->keypoints.at(cam_id)[last_keypoint_id] = transform;
       transforms->pyramid_levels.at(cam_id)[last_keypoint_id] = level;
-      new_poses[last_keypoint_id] = transform;
+      new_kpts[last_keypoint_id] = transform;
       new_pyramid_levels[last_keypoint_id] = level;
 
       last_keypoint_id++;
     }
 
-    return std::make_pair(new_poses, new_pyramid_levels);
+    return std::make_pair(new_kpts, new_pyramid_levels);
   }
 
   Masks cam0OverlapCellsMasksForCam(size_t cam_id) {
@@ -498,7 +498,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
     //! ATE/RTE scores got slight worse.
     for (int level = 0; level < config.optical_flow_levels - 1; level++) {
       Masks& ms0 = transforms->input_images->masks.at(0);
-      auto [kps0, lvls0] = addPointsForCamera(0, level);
+      auto [kpts0, lvls0] = addPointsForCamera(0, level);
 
       for (size_t i = 1; i < getNumCams(); i++) {
         Masks& ms = transforms->input_images->masks.at(i);
@@ -507,11 +507,11 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
         // Match features on areas that overlap with cam0 using optical flow
         auto& pyr0 = pyramid->at(0);
         auto& pyri = pyramid->at(i);
-        Keypoints kps;
+        Keypoints kpts;
         KeypointLevels lvls;
         SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
-        trackPoints(pyr0, pyri, kps0, lvls0, kps, lvls, mgs, ms0, ms, T_c0_ci, 0, i);
-        transforms->observations.at(i).insert(kps.begin(), kps.end());
+        trackPoints(pyr0, pyri, kpts0, lvls0, kpts, lvls, mgs, ms0, ms, T_c0_ci, 0, i);
+        transforms->keypoints.at(i).insert(kpts.begin(), kpts.end());
         transforms->pyramid_levels.at(i).insert(lvls.begin(), lvls.end());
       }
     }
@@ -526,15 +526,15 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
   }
 
   void filterPointsForCam(int cam_id) {
-    std::set<KeypointId> lm_to_remove;
+    std::set<KeypointId> kp_to_remove;
 
     std::vector<KeypointId> kpids;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
-      auto it = transforms->observations.at(0).find(kpid);
+    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
+      auto it = transforms->keypoints.at(0).find(kpid);
 
-      if (it != transforms->observations.at(0).end()) {
+      if (it != transforms->keypoints.at(0).end()) {
         proj0.emplace_back(it->second.translation());
         proj1.emplace_back(affine.translation());
         kpids.emplace_back(kpid);
@@ -553,15 +553,15 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
 
         const Scalar scale = 1 << transforms->pyramid_levels.at(cam_id).at(kpids[i]);
         if (epipolar_error > config.optical_flow_epipolar_error * scale) {
-          lm_to_remove.emplace(kpids[i]);
+          kp_to_remove.emplace(kpids[i]);
         }
       } else {
-        lm_to_remove.emplace(kpids[i]);
+        kp_to_remove.emplace(kpids[i]);
       }
     }
 
-    for (int id : lm_to_remove) {
-      transforms->observations.at(cam_id).erase(id);
+    for (int id : kp_to_remove) {
+      transforms->keypoints.at(cam_id).erase(id);
     }
   }
 

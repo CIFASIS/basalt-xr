@@ -78,7 +78,7 @@ Sophus::SE3<Scalar> computeRelPose(const Sophus::SE3<Scalar>& T_w_i_h, const Sop
 }
 
 template <class Scalar, class CamT>
-inline bool linearizePoint(const Eigen::Matrix<Scalar, 2, 1>& kpt_obs, const Keypoint<Scalar>& kpt_pos,
+inline bool linearizePoint(const Eigen::Matrix<Scalar, 2, 1>& kpt_obs, const Landmark<Scalar>& kpt_pos,
                            const Eigen::Matrix<Scalar, 4, 4>& T_t_h, const CamT& cam, Eigen::Matrix<Scalar, 2, 1>& res,
                            Eigen::Matrix<Scalar, 2, POSE_SIZE>* d_res_d_xi = nullptr,
                            Eigen::Matrix<Scalar, 2, 3>* d_res_d_p = nullptr,

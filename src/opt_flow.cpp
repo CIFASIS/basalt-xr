@@ -121,8 +121,8 @@ void read_result() {
 
     observations.emplace(res->t_ns, res);
 
-    for (size_t i = 0; i < res->observations.size(); i++)
-      for (const auto& kv : res->observations.at(i)) {
+    for (size_t i = 0; i < res->keypoints.size(); i++)
+      for (const auto& kv : res->keypoints.at(i)) {
         if (keypoint_stats.count(kv.first) == 0) {
           keypoint_stats[kv.first] = 1;
         } else {
@@ -279,8 +279,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (observations.count(t_ns) > 0) {
-      const Eigen::aligned_map<basalt::KeypointId, Eigen::AffineCompact2f>& kp_map =
-          observations.at(t_ns)->observations[cam_id];
+      const basalt::Keypoints& kp_map = observations.at(t_ns)->keypoints[cam_id];
 
       for (const auto& kv : kp_map) {
         Eigen::MatrixXf transformed_patch = kv.second.linear() * opt_flow_ptr->patch_coord;

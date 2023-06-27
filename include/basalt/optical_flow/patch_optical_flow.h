@@ -185,7 +185,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(num_cams);
+      transforms->keypoints.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
       transforms->t_ns = t_ns;
@@ -218,7 +218,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(num_cams);
+      new_transforms->keypoints.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
       new_transforms->t_ns = t_ns;
@@ -230,7 +230,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         SE3 T_c2 = T_i2 * calib.T_i_c[i];
         SE3 T_c1_c2 = T_c1.inverse() * T_c2;
         trackPoints(old_pyramid->at(i), pyramid->at(i),  //
-                    transforms->observations[i], new_transforms->observations[i],
+                    transforms->keypoints[i], new_transforms->keypoints[i],
                     new_transforms->tracking_guesses[i],  //
                     new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
@@ -250,23 +250,23 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     frame_counter++;
   }
 
-  void trackPoints(const ManagedImagePyr<uint16_t>& pyr_1, const ManagedImagePyr<uint16_t>& pyr_2,
-                   const Keypoints& transform_map_1, Keypoints& transform_map_2, Keypoints& guesses,
+  void trackPoints(const ManagedImagePyr<uint16_t>& pyr_1, const ManagedImagePyr<uint16_t>& pyr_2,  //
+                   const Keypoints& keypoint_map_1, Keypoints& keypoint_map_2, Keypoints& guesses,  //
                    const Masks& masks1, const Masks& masks2, const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
-    size_t num_points = transform_map_1.size();
+    size_t num_points = keypoint_map_1.size();
 
     std::vector<KeypointId> ids;
-    Eigen::aligned_vector<Eigen::AffineCompact2f> init_vec;
+    Eigen::aligned_vector<Keypoint> init_vec;
 
     ids.reserve(num_points);
     init_vec.reserve(num_points);
 
-    for (const auto& [kpid, affine] : transform_map_1) {
+    for (const auto& [kpid, affine] : keypoint_map_1) {
       ids.push_back(kpid);
       init_vec.push_back(affine);
     }
 
-    tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f, std::hash<KeypointId>> result, guesses_tbb;
+    tbb::concurrent_unordered_map<KeypointId, Keypoint, std::hash<KeypointId>> result, guesses_tbb;
 
     bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
@@ -335,8 +335,8 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     tbb::blocked_range<size_t> range(0, num_points);
     tbb::parallel_for(range, compute_func);
 
-    transform_map_2.clear();
-    transform_map_2.insert(result.begin(), result.end());
+    keypoint_map_2.clear();
+    keypoint_map_2.insert(result.begin(), result.end());
     guesses.clear();
     guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
   }
@@ -403,7 +403,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
-    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
+    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
       pts.emplace_back(affine.translation().template cast<double>());
     }
 
@@ -412,7 +412,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
                     config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
                     config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
 
-    Keypoints new_poses;
+    Keypoints new_kpts;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
       // Save patch
       Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
@@ -426,13 +426,13 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       Eigen::AffineCompact2f transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>();
 
-      transforms->observations.at(cam_id)[last_keypoint_id] = transform;
-      new_poses[last_keypoint_id] = transform;
+      transforms->keypoints.at(cam_id)[last_keypoint_id] = transform;
+      new_kpts[last_keypoint_id] = transform;
 
       last_keypoint_id++;
     }
 
-    return new_poses;
+    return new_kpts;
   }
 
   Masks cam0OverlapCellsMasksForCam(size_t cam_id) {
@@ -473,7 +473,7 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   void addPoints() {
     Masks& ms0 = transforms->input_images->masks.at(0);
-    Keypoints kps0 = addPointsForCamera(0);
+    Keypoints kpts0 = addPointsForCamera(0);
 
     for (size_t i = 1; i < getNumCams(); i++) {
       Masks& ms = transforms->input_images->masks.at(i);
@@ -482,28 +482,28 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // Match features on areas that overlap with cam0 using optical flow
       auto& pyr0 = pyramid->at(0);
       auto& pyri = pyramid->at(i);
-      Keypoints kps;
+      Keypoints kpts;
       SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
-      trackPoints(pyr0, pyri, kps0, kps, mgs, ms0, ms, T_c0_ci, 0, i);
-      transforms->observations.at(i).insert(kps.begin(), kps.end());
+      trackPoints(pyr0, pyri, kpts0, kpts, mgs, ms0, ms, T_c0_ci, 0, i);
+      transforms->keypoints.at(i).insert(kpts.begin(), kpts.end());
 
       // Update masks and detect features on area not overlapping with cam0
       if (!config.optical_flow_detection_nonoverlap) continue;
       ms += cam0OverlapCellsMasksForCam(i);
-      Keypoints kps_no = addPointsForCamera(i);
+      Keypoints kpts_no = addPointsForCamera(i);
     }
   }
 
   void filterPointsForCam(int cam_id) {
-    std::set<KeypointId> lm_to_remove;
+    std::set<KeypointId> kp_to_remove;
 
     std::vector<KeypointId> kpids;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
-      auto it = transforms->observations.at(0).find(kpid);
+    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
+      auto it = transforms->keypoints.at(0).find(kpid);
 
-      if (it != transforms->observations.at(0).end()) {
+      if (it != transforms->keypoints.at(0).end()) {
         proj0.emplace_back(it->second.translation());
         proj1.emplace_back(affine.translation());
         kpids.emplace_back(kpid);
@@ -521,15 +521,15 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         const double epipolar_error = std::abs(p3d0[i].transpose() * E[cam_id] * p3d1[i]);
 
         if (epipolar_error > config.optical_flow_epipolar_error) {
-          lm_to_remove.emplace(kpids[i]);
+          kp_to_remove.emplace(kpids[i]);
         }
       } else {
-        lm_to_remove.emplace(kpids[i]);
+        kp_to_remove.emplace(kpids[i]);
       }
     }
 
-    for (int id : lm_to_remove) {
-      transforms->observations.at(cam_id).erase(id);
+    for (int id : kp_to_remove) {
+      transforms->keypoints.at(cam_id).erase(id);
     }
   }
 

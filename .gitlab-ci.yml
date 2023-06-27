@@ -9,7 +9,7 @@ stages:
   - release
 
 build-ubuntu-2204:
-  image: $CI_REGISTRY_IMAGE/ubuntu/22.04
+  image: registry.freedesktop.org/mateosss/basalt/ubuntu/22.04
   stage: build
   when: manual
   script:
@@ -28,7 +28,7 @@ build-ubuntu-2204:
 
 release:
   stage: release
-  image: $CI_REGISTRY_IMAGE/ubuntu/22.04
+  image: registry.freedesktop.org/mateosss/basalt/ubuntu/22.04
   when: manual
   script:
     - echo "Releasing artifacts of previous jobs"

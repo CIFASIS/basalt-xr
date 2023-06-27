@@ -42,7 +42,7 @@ void get_vo_estimator(int num_frames, basalt::BundleAdjustmentBase<Scalar>& esti
     for (int j = 0; j < 10; j++) {
       const int kp_idx = 10 * i + j;
       Eigen::Vector3d p3d = points_3d.col(kp_idx);
-      basalt::Keypoint<Scalar> kpt;
+      basalt::Landmark<Scalar> kpt;
 
       Sophus::SE3d T_c_w = estimator.calib.T_i_c[0].inverse() * T_w_i.inverse();
       Eigen::Vector3d p3d_cam = T_c_w * p3d;
