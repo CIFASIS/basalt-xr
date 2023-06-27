@@ -265,9 +265,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     ids.reserve(num_points);
     init_vec.reserve(num_points);
 
-    for (const auto& kv : transform_map_1) {
-      ids.push_back(kv.first);
-      init_vec.push_back(kv.second);
+    for (const auto& [kpid, affine] : transform_map_1) {
+      ids.push_back(kpid);
+      init_vec.push_back(affine);
     }
 
     tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f, std::hash<KeypointId>> result, guesses_tbb;
@@ -404,8 +404,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
-    for (const auto& kv : transforms->observations.at(cam_id)) {
-      pts.emplace_back(kv.second.translation().template cast<double>());
+    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
+      pts.emplace_back(affine.translation().template cast<double>());
     }
 
     KeypointsData kd;  // Detected new points
@@ -415,8 +415,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     Keypoints new_poses;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
-      Eigen::AffineCompact2f transform;
-      transform.setIdentity();
+      auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>();
 
       transforms->observations.at(cam_id)[last_keypoint_id] = transform;
@@ -488,20 +487,18 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   void filterPointsForCam(int cam_id) {
-    if (getNumCams() < 2) return;
-
     std::set<KeypointId> lm_to_remove;
 
-    std::vector<KeypointId> kpid;
+    std::vector<KeypointId> kpids;
     Eigen::aligned_vector<Eigen::Vector2f> proj0, proj1;
 
-    for (const auto& kv : transforms->observations.at(cam_id)) {
-      auto it = transforms->observations.at(0).find(kv.first);
+    for (const auto& [kpid, affine] : transforms->observations.at(cam_id)) {
+      auto it = transforms->observations.at(0).find(kpid);
 
       if (it != transforms->observations.at(0).end()) {
         proj0.emplace_back(it->second.translation());
-        proj1.emplace_back(kv.second.translation());
-        kpid.emplace_back(kv.first);
+        proj1.emplace_back(affine.translation());
+        kpids.emplace_back(kpid);
       }
     }
 
@@ -516,10 +513,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         const double epipolar_error = std::abs(p3d0[i].transpose() * E[cam_id] * p3d1[i]);
 
         if (epipolar_error > config.optical_flow_epipolar_error) {
-          lm_to_remove.emplace(kpid[i]);
+          lm_to_remove.emplace(kpids[i]);
         }
       } else {
-        lm_to_remove.emplace(kpid[i]);
+        lm_to_remove.emplace(kpids[i]);
       }
     }
 

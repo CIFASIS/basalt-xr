@@ -61,6 +61,7 @@ namespace basalt {
 
 using KeypointId = size_t;
 using Keypoints = Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>;
+using KeypointLevels = std::map<KeypointId, size_t>;
 using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
@@ -94,7 +95,7 @@ struct OpticalFlowResult {
   std::vector<Keypoints> tracking_guesses;
   std::vector<Keypoints> matching_guesses;
 
-  std::vector<std::map<KeypointId, size_t>> pyramid_levels;
+  std::vector<KeypointLevels> pyramid_levels;
 
   OpticalFlowInput::Ptr input_images;
 };
