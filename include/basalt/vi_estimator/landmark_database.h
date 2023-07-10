@@ -149,11 +149,11 @@ class LandmarkDatabase {
   void removeObservations(LandmarkId lm_id, const std::set<TimeCamId>& obs);
 
   inline void backup() {
-    for (auto& kv : kpts) kv.second.backup();
+    for (auto& lm : landmarks) lm.second.backup();
   }
 
   inline void restore() {
-    for (auto& kv : kpts) kv.second.restore();
+    for (auto& lm : landmarks) lm.second.restore();
   }
 
  private:
@@ -165,7 +165,7 @@ class LandmarkDatabase {
   typename Landmark<Scalar>::MapIter removeLandmarkObservationHelper(MapIter it,
                                                                      typename Landmark<Scalar>::MapIter it2);
 
-  Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> kpts;
+  Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> landmarks;
 
   std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> observations;
 

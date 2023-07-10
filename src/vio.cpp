@@ -1174,6 +1174,10 @@ void draw_scene(pangolin::View& view) {
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(it->second->points);
+    if (show_map_3D) {
+      glColor3ubv(state_color);
+      pangolin::glDrawPoints(it->second->landmarks);
+    }
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
