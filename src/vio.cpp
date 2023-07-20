@@ -1209,7 +1209,7 @@ bool next_step() {
 }
 
 bool prev_step() {
-  if (show_frame > 1) {
+  if (show_frame >= 1) {
     show_frame = show_frame - 1;
     show_frame.Meta().gui_changed = true;
     return true;
