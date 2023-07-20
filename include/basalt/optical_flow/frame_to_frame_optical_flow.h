@@ -97,7 +97,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   using OpticalFlowBase::show_gui;
   using OpticalFlowBase::t_ns;
   using OpticalFlowBase::transforms;
-  using OpticalFlowBase::matches_counter;
 
   FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
       : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
@@ -137,6 +136,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       processFrame(img->t_ns, img);
     }
+    showStats();
   }
 
   IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
@@ -245,6 +245,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
                     transforms->keypoints[i], new_transforms->keypoints[i],
                     new_transforms->tracking_guesses[i],  //
                     new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
+        opt_flow_counter_ += new_transforms->keypoints[i].size();
       }
 
       transforms = new_transforms;
@@ -260,6 +261,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       output_queue->push(transforms);
     }
 
+    for (size_t i = 0; i < num_cams; i++) points_counter_ += transforms->keypoints[i].size();
     frame_counter++;
   }
 
@@ -515,7 +517,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
           transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
           std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, kd.corners[match_idx].cast<Scalar>(), projections.at(lm_id));
           transforms->recall_matches.at(cam_id).emplace_back(match_pair);
-          matches_counter++;
+          matches_counter_++;
         }
       }
     }
@@ -652,6 +654,16 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     for (size_t i = 1; i < getNumCams(); i++) {
       filterPointsForCam(i);
     }
+  }
+
+  void showStats() {
+    std::cout << std::endl;
+    std::cout << "==== Front-end stats ====" << std::endl;
+    std::cout << "Total Detected Points: " << points_counter_ << std::endl;
+    std::cout << "OpticalFlow: " << opt_flow_counter_ << std::endl;
+    std::cout << "Recall: " << matches_counter_ << std::endl;
+    std::cout << "AVG Points per Frame: " << points_counter_ / frame_counter << std::endl;
+    std::cout << std::endl;
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

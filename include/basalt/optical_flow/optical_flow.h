@@ -152,7 +152,6 @@ class OpticalFlowBase {
   int64_t t_ns = -1;
   size_t frame_counter = 0;
   KeypointId last_keypoint_id = 0;
-  size_t matches_counter = 0;
 
   VioConfig config;
 
