@@ -339,6 +339,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         kobs.pos = kv_obs.second.pose.translation().cast<Scalar>();
 
         lmdb.addObservation(tcid_target, kobs);
+        persistent_lmdb.addObservation(tcid_target, kobs);
         // obs[tcid_host][tcid_target].push_back(kobs);
 
         if (num_points_connected.count(tcid_host.frame_id) == 0) {
@@ -434,6 +435,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
 
             const SE3 pos = getPoseStateWithLin(tcidl.frame_id).getPose();
             lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
+            persistent_lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
 
             num_points_added++;
             valid_kp = true;
@@ -443,6 +445,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         if (valid_kp) {
           for (const auto& kv_obs : kp_obs) {
             lmdb.addObservation(kv_obs.first, kv_obs.second);
+            persistent_lmdb.addObservation(kv_obs.first, kv_obs.second);
           }
         }
       }
@@ -540,11 +543,11 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
 
     data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
 
-    for (const auto& [lm_id, lm] : lmdb.getLandmarks()) {
+    for (const auto& [lm_id, lm] : persistent_lmdb.getLandmarks()) {
       Vec4 pt_cam = StereographicParam<Scalar>::unproject(lm.direction);
       pt_cam[3] = lm.inv_dist;
 
-      SE3 T_w_i = lmdb.getFramePose(lm.host_kf_id.frame_id).template cast<Scalar>();
+      SE3 T_w_i = persistent_lmdb.getFramePose(lm.host_kf_id.frame_id).template cast<Scalar>();
       SE3 T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
       SE3 T_w_c = T_w_i * T_i_c;
       Vec4 pt_w = T_w_c * pt_cam;

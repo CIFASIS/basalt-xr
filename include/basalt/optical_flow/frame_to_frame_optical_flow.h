@@ -740,7 +740,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
  private:
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
-  LandmarkDatabase<Scalar>& lmdb_ = LandmarkDatabase<Scalar>::getInstance();
+  LandmarkDatabase<Scalar>& lmdb_ = LandmarkDatabase<Scalar>::getMap();
   int points_counter_ = 0;
   int opt_flow_counter_ = 0;
   int matches_counter_ = 0;

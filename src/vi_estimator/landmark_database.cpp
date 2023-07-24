@@ -42,7 +42,9 @@ namespace basalt {
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Scalar> &pos) {
-  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  if (name_ == "map") {
+    std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  }
   auto &kpt = landmarks[lm_id];
   kpt.direction = pos.direction;
   kpt.inv_dist = pos.inv_dist;
@@ -52,7 +54,9 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &lm_pos, int64_t frame_id, const SE3& pos) {
-  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  if (name_ == "map") {
+    std::lock_guard<std::mutex> lock(mutex_);
+  }
   auto &kpt = landmarks[lm_id];
   kpt.direction = lm_pos.direction;
   kpt.inv_dist = lm_pos.inv_dist;
@@ -125,7 +129,9 @@ std::vector<const Landmark<Scalar_> *> LandmarkDatabase<Scalar_>::getLandmarksFo
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, const KeypointObservation<Scalar> &o) {
-  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  if (name_ == "map") {
+    std::lock_guard<std::mutex> lock(mutex_);
+  }
   auto it = landmarks.find(o.kpt_id);
   BASALT_ASSERT(it != landmarks.end());
 
@@ -136,7 +142,9 @@ void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, con
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3& pos) {
-  std::unique_lock<std::mutex> lock(mutex_);  // Lock the mutex
+  if (name_ == "map") {
+    std::unique_lock<std::mutex> lock(mutex_);  // Lock the mutex
+  }
 
   frame_poses_[frame_id] = pos;
 }
@@ -165,7 +173,9 @@ const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>
 
 template <class Scalar_>
 const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar_>> &LandmarkDatabase<Scalar_>::getLandmarks() const {
-  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  if (name_ == "map") {
+    std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+  }
   return landmarks;
 }
 

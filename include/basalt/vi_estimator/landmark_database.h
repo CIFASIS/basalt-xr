@@ -98,9 +98,15 @@ class LandmarkDatabase {
   using SE3 = Sophus::SE3<Scalar>;
 
   // TODO: unify
-  static LandmarkDatabase<Scalar>& getInstance() {
+  static LandmarkDatabase<Scalar>& getOriginalInstance() {
       static LandmarkDatabase<Scalar> lmdb;
+      lmdb.name_ = "lmbd";
       return lmdb;
+  }
+  static LandmarkDatabase<Scalar>& getMap() {
+      static LandmarkDatabase<Scalar> persistent_lmdb;
+      persistent_lmdb.name_ = "map";
+      return persistent_lmdb;
   }
 
   // The copy constructor and copy assignment operator are deleted to prevent copying of the class.
@@ -170,6 +176,10 @@ class LandmarkDatabase {
   std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> observations;
 
   Eigen::aligned_map<FrameId, SE3> frame_poses_;
+
+  // Name just to identify between original lmdb and map lmdb
+  // TODO: remove
+  std::string name_;
 
   mutable std::mutex mutex_;
   std::condition_variable cv_;
