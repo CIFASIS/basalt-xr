@@ -416,6 +416,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
+  /**
+   * @brief Project the landmarks into the current frame.
+   * Returns the landmarks that are in the frame along with their corresponding 2D projections.
+   *
+   * @param[in] cam_id: The camera id of the current frame.
+   * @param[out] landmarks: A reference where landmarks will be returned.
+   * @param[out] projections: A reference where the landmark's projections will be returned.
+  */
   void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Landmark<float>>& landmarks,  Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
     for (const auto& [lm_id, lm] : lmdb_.getLandmarks()) {
 
@@ -444,17 +452,25 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // Project the point to the new frame
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
 
+      // Check if the point is in the bounds of the frame
       const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
       bool in_bounds = cj_uv.x() >= 0 && cj_uv.x() < img_raw.w && cj_uv.y() >= 0 && cj_uv.y() < img_raw.h;
       if (valid && in_bounds) {
         landmarks[lm_id] = lm;
         projections[lm_id] = cj_uv;
-        std::tuple<int64_t, Vector2> tuple = std::make_tuple(lm_id, cj_uv);
-        transforms->projections.at(cam_id).emplace_back(tuple);
+        transforms->projections.at(cam_id).emplace_back(std::make_tuple(lm_id, cj_uv));
       }
     }
   }
 
+  /**
+   * @brief Given a 2D point returns the cell ID.
+   *
+   * @param[in] cam_id: The camera id of the current frame.
+   * @param[in] p: 2D point.
+   *
+   * @return The cell ID.
+  */
   int getPointCell(int cam_id, Vector2& p) {
       const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
       int size = config.optical_flow_detection_grid_size;
@@ -465,6 +481,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       return cellNumber;
   }
 
+  /**
+   *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the map.
+   *
+   *  Algorithm Steps:
+   *  1. Detect keypoints in the new frame using FAST.
+   *  2. Project the landmarks from the map into the new frame to obtain their projections.
+   *  3. Group the landmarks' projections by cells and search for detected points in the nearest cells.
+   *  4. Match the descriptors of newly detected points with the descriptor of each landmark.
+   *  5. If a match is found, associate the detected keypoint with landmark ID and store the information.
+   *
+  */
   void recallPoints() {
     for (size_t cam_id = 0; cam_id < getNumCams(); cam_id++) {
       std::vector<KeypointId> new_points_index;
@@ -472,23 +499,25 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       std::vector<std::pair<int, int>> matches;
 
+      // 1. Detect keypoints in the new frame using FAST.
       KeypointsData kd;
       Eigen::aligned_vector<Eigen::Vector2d> pts;
-      int points_by_cell = 10;
       detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
-                      points_by_cell, config.optical_flow_detection_min_threshold,
+                      config.recall_detection_num_points_cell, config.optical_flow_detection_min_threshold,
                       config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
       computeAngles(pyramid->at(cam_id).lvl(0), kd, true);
       computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
 
-      // 2. Project the landmarks into the new frame
+      // 2. Project the landmarks from the map into the new frame to obtain their projections.
       Eigen::aligned_unordered_map<LandmarkId, Landmark<float>> proj_landmarks;
       Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
       getProjectedLandmarks(cam_id, proj_landmarks, projections);
 
+      // 3. Group the landmark's projections by cells and search for detected points in the their cells.
+      // TODO: this could be done in parallel
+      // TODO: group the landmarks by cell
       for (const auto& [lm_id, lm] : proj_landmarks) {
 
-        //  3. TODO: Search detected points in nearest cells
         int cell_id = getPointCell(cam_id, projections.at(lm_id));
 
         new_points_index.clear();
@@ -502,14 +531,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
           }
         }
 
-        // 4. Match points with landmarks
+        // 4. Match the descriptors of newly detected points with the descriptor of each landmark.
         matches.clear();
         matchDescriptors(new_points_descriptors, {lm.descriptor}, matches, config.mapper_max_hamming_distance, config.mapper_second_best_test_ratio);
 
+        // 5. If a match is found, associate the detected keypoint with landmark ID and store the information.
         if (!matches.empty()) {
           size_t match_idx = new_points_index[matches[0].first];
 
-          // 5. Add the keypoint as detected in the current frame
           auto transform = Eigen::AffineCompact2f::Identity();
           transform.translation() = kd.corners[match_idx].cast<Scalar>();
           transforms->keypoints.at(cam_id)[lm_id].pose = transform;
