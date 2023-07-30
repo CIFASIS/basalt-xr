@@ -464,21 +464,51 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   /**
-   * @brief Given a 2D point returns the cell ID.
+   * @brief Given a 2D point calculates in which cell of the grid the point lies.
    *
-   * @param[in] cam_id: The camera id of the current frame.
    * @param[in] p: 2D point.
    *
    * @return The cell ID.
   */
-  int getPointCell(int cam_id, Vector2& p) {
-      const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
+  int getPointCell(Vector2& p) {
+      const basalt::Image<const uint16_t>& img_raw = pyramid->at(0).lvl(0);
+
+      // size of the cell side
       int size = config.optical_flow_detection_grid_size;
+
+      // Determine the number of cells in each row and column.
       int cellsPerRow = static_cast<int>(img_raw.w / size);
-      int row = static_cast<int>(p.y() / size);
-      int col = static_cast<int>(p.x() / size);
-      int cellNumber = cellsPerRow * row + col;
-      return cellNumber;
+      int cellsPerCol = static_cast<int>(img_raw.h / size);
+
+      // Calculate the extra width and height due to the non-multiple of SIZE frame dimensions.
+      // These extra dimensions will be split between the border cells, making the first and last
+      // row and column of cells slightly bigger than the rest.
+      float extraWidth = (img_raw.w - cellsPerRow * size) / 2;
+      float extraHeight = (img_raw.h - cellsPerCol * size) / 2;
+
+      // Calculate the adjusted coordinates of the point to account for the extra border cells.
+      float new_x = p.x() - extraWidth > 0 ? p.x() - extraWidth : 0;
+      float new_y = p.y() - extraHeight > 0 ? p.y() - extraHeight : 0;
+
+      // Calculate the row and column index of the cell in which the point resides.
+      // If the adjusted coordinates fall outside the last cell, they will be capped to the maximum
+      // row and column index, ensuring the point is assigned to the last cell in such cases.
+      int row = static_cast<int>(new_y / size) > cellsPerCol - 1 ? cellsPerCol - 1 : static_cast<int>(new_y / size);
+      int col = static_cast<int>(new_x / size) > cellsPerRow - 1 ? cellsPerRow - 1 : static_cast<int>(new_x / size);
+      return cellsPerRow * row + col;
+  }
+
+  /**
+   * @brief returns the number of cells of the grid.
+   *
+   * @return The cell ID.
+  */
+  int getNumCells() {
+    const basalt::Image<const uint16_t>& img_raw = pyramid->at(0).lvl(0);
+    int size = config.optical_flow_detection_grid_size;
+    int cellsPerRow = static_cast<int>(img_raw.w / size);
+    int cellsPerCol = static_cast<int>(img_raw.h / size);
+    return cellsPerRow * cellsPerCol;
   }
 
   /**
@@ -496,6 +526,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     for (size_t cam_id = 0; cam_id < getNumCams(); cam_id++) {
       std::vector<KeypointId> new_points_index;
       std::vector<Descriptor> new_points_descriptors;
+      std::vector<KeypointId> landmarks_ids;
+      std::vector<Descriptor> landmarks_descriptors;
 
       std::vector<std::pair<int, int>> matches;
 
@@ -515,36 +547,44 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       // 3. Group the landmark's projections by cells and search for detected points in the their cells.
       // TODO: this could be done in parallel
-      // TODO: group the landmarks by cell
-      for (const auto& [lm_id, lm] : proj_landmarks) {
-
-        int cell_id = getPointCell(cam_id, projections.at(lm_id));
+      for (int cell_id = 0; cell_id < getNumCells(); cell_id++) {
 
         new_points_index.clear();
         new_points_descriptors.clear();
         for (size_t i = 0; i < kd.corners.size(); i++) {
           Vector2 pos = kd.corners[i].cast<Scalar>();
-          if (cell_id == getPointCell(cam_id, pos)) {
+          if (getPointCell(pos) == cell_id) {
             new_points_index.push_back(i);
             new_points_descriptors.push_back(kd.corner_descriptors[i]);
             transforms->new_detections.at(cam_id).emplace_back(pos);
           }
         }
 
+        landmarks_ids.clear();
+        landmarks_descriptors.clear();
+        for (const auto& [lm_id, lm] : proj_landmarks) {
+          Vector2 pos = projections.at(lm_id);
+          if (getPointCell(pos) == cell_id) {
+            landmarks_ids.push_back(lm_id);
+            landmarks_descriptors.push_back(lm.descriptor);
+          }
+        }
+
         // 4. Match the descriptors of newly detected points with the descriptor of each landmark.
         matches.clear();
-        matchDescriptors(new_points_descriptors, {lm.descriptor}, matches, config.mapper_max_hamming_distance, config.mapper_second_best_test_ratio);
+        matchDescriptors(new_points_descriptors, landmarks_descriptors, matches, config.mapper_max_hamming_distance, config.mapper_second_best_test_ratio);
 
         // 5. If a match is found, associate the detected keypoint with landmark ID and store the information.
-        if (!matches.empty()) {
-          size_t match_idx = new_points_index[matches[0].first];
+        for (auto & match : matches) {
+          size_t point_idx = new_points_index[match.first];
+          size_t lm_id = landmarks_ids[match.second];
 
           auto transform = Eigen::AffineCompact2f::Identity();
-          transform.translation() = kd.corners[match_idx].cast<Scalar>();
+          transform.translation() = kd.corners[point_idx].cast<Scalar>();
           transforms->keypoints.at(cam_id)[lm_id].pose = transform;
-          transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[match_idx];
+          transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[point_idx];
           transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
-          std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, kd.corners[match_idx].cast<Scalar>(), projections.at(lm_id));
+          std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, kd.corners[point_idx].cast<Scalar>(), projections.at(lm_id));
           transforms->recall_matches.at(cam_id).emplace_back(match_pair);
           matches_counter_++;
         }
