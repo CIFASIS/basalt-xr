@@ -262,6 +262,8 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
     finished = true;
 
     std::cout << "Finished VIOFilter " << std::endl;
+    std::cout << "Total Landmarks " << persistent_lmdb.numLandmarks() << std::endl;
+    std::cout << "Total Observations " << persistent_lmdb.numObservations() << std::endl;
   };
 
   processing_thread.reset(new std::thread(proc_func));
@@ -331,14 +333,16 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     for (const auto& kv_obs : opt_flow_meas->keypoints[i]) {
       int kpt_id = kv_obs.first;
 
-      if (lmdb.landmarkExists(kpt_id)) {
-        const TimeCamId& tcid_host = lmdb.getLandmark(kpt_id).host_kf_id;
+      if (persistent_lmdb.landmarkExists(kpt_id)) {
+        const TimeCamId& tcid_host = persistent_lmdb.getLandmark(kpt_id).host_kf_id;
 
         KeypointObservation<Scalar> kobs;
         kobs.kpt_id = kpt_id;
         kobs.pos = kv_obs.second.pose.translation().cast<Scalar>();
 
-        lmdb.addObservation(tcid_target, kobs);
+        if (lmdb.landmarkExists(kpt_id)) {
+          lmdb.addObservation(tcid_target, kobs);
+        }
         persistent_lmdb.addObservation(tcid_target, kobs);
         // obs[tcid_host][tcid_target].push_back(kobs);
 
@@ -377,7 +381,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       TimeCamId tcidl(opt_flow_meas->t_ns, i);
 
       for (int lm_id : unconnected_obs[i]) {
-        if (lmdb.landmarkExists(lm_id)) continue;
+        if (persistent_lmdb.landmarkExists(lm_id)) continue;
         // Find all observations
         std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
 
