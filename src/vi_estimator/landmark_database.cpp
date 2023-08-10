@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
+/// TODO: deprecated
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Scalar> &pos) {
   if (name_ == "map") {
@@ -52,6 +53,7 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
   kpt.descriptor = pos.descriptor;
 }
 
+/// TODO: rename to addLandmark
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &lm_pos, int64_t frame_id, const SE3& pos) {
   if (name_ == "map") {
@@ -63,6 +65,10 @@ void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Land
   kpt.host_kf_id = lm_pos.host_kf_id;
   kpt.descriptor = lm_pos.descriptor;
   frame_poses_[frame_id] = pos;
+  if (name_ == "map" && !isWithinWindow(frame_id)){
+    keyframes_window.push_back(frame_id);
+    std::cout << "Frame added, window size: " << keyframes_window.size() << std::endl;
+  }
 }
 
 template <class Scalar_>
@@ -87,22 +93,36 @@ template <class Scalar_>
 void LandmarkDatabase<Scalar_>::removeKeyframes(const std::set<FrameId> &kfs_to_marg,
                                                 const std::set<FrameId> &poses_to_marg,
                                                 const std::set<FrameId> &states_to_marg_all) {
-  for (auto it = landmarks.begin(); it != landmarks.end();) {
-    if (kfs_to_marg.count(it->second.host_kf_id.frame_id) > 0) {
-      it = removeLandmarkHelper(it);
-    } else {
-      for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
-        FrameId fid = it2->first.frame_id;
-        if (poses_to_marg.count(fid) > 0 || states_to_marg_all.count(fid) > 0 || kfs_to_marg.count(fid) > 0)
-          it2 = removeLandmarkObservationHelper(it, it2);
-        else
-          it2++;
+  if (name_ == "map") {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const FrameId& keyframe : kfs_to_marg) {
+      // Remove keyframe from the keyframes_window
+      auto it = std::find(keyframes_window.begin(), keyframes_window.end(), keyframe);
+      if (it != keyframes_window.end()) {
+        keyframes_window.erase(it);
+        std::cout << "Frame removed, window size: " << keyframes_window.size() << std::endl;
       }
-
-      if (it->second.obs.size() < min_num_obs) {
+    }
+  }
+  else {
+    // original lmdb
+    for (auto it = landmarks.begin(); it != landmarks.end();) {
+      if (kfs_to_marg.count(it->second.host_kf_id.frame_id) > 0) {
         it = removeLandmarkHelper(it);
       } else {
-        ++it;
+        for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
+          FrameId fid = it2->first.frame_id;
+          if (poses_to_marg.count(fid) > 0 || states_to_marg_all.count(fid) > 0 || kfs_to_marg.count(fid) > 0)
+            it2 = removeLandmarkObservationHelper(it, it2);
+          else
+            it2++;
+        }
+
+        if (it->second.obs.size() < min_num_obs) {
+          it = removeLandmarkHelper(it);
+        } else {
+          ++it;
+        }
       }
     }
   }
@@ -172,11 +192,48 @@ const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>
 }
 
 template <class Scalar_>
+const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>&
+LandmarkDatabase<Scalar_>::getWindowObservations() const {
+  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+
+  static std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> windowObservations;
+
+  for (const auto& [tcid, targetMap] : observations) {
+    if (isWithinWindow(tcid.frame_id)) {
+      for (const auto& targetPair : targetMap) {
+        const TimeCamId& targetFrameId = targetPair.first;
+        if (isWithinWindow(targetFrameId.frame_id)) {
+          windowObservations[tcid][targetFrameId] = targetPair.second;
+        }
+      }
+    }
+  }
+
+  return windowObservations;
+}
+
+
+template <class Scalar_>
 const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar_>> &LandmarkDatabase<Scalar_>::getLandmarks() const {
   if (name_ == "map") {
     std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
   }
   return landmarks;
+}
+
+template <class Scalar_>
+const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar_>> &LandmarkDatabase<Scalar_>::getWindowLandmarks() const {
+  std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
+
+  static Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> windowLandmarks;
+
+  for (const auto& [lm_id, lm] : landmarks) {
+    if (isWithinWindow(lm.host_kf_id.frame_id)) {
+      windowLandmarks[lm_id]= lm;
+    }
+  }
+
+  return windowLandmarks;
 }
 
 template <class Scalar_>
@@ -259,6 +316,15 @@ void LandmarkDatabase<Scalar_>::removeObservations(LandmarkId lm_id, const std::
     removeLandmarkHelper(it);
   }
 }
+
+template <class Scalar_>
+bool LandmarkDatabase<Scalar_>::isWithinWindow(const FrameId& frame) const {
+    return std::any_of(keyframes_window.begin(), keyframes_window.end(),
+      [&frame](const FrameId& keyframe) {
+          return keyframe == frame;
+      });
+}
+
 
 // //////////////////////////////////////////////////////////////////
 // instatiate templates

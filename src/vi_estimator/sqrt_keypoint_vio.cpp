@@ -940,6 +940,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     lmdb.removeKeyframes(kfs_to_marg, poses_to_marg, states_to_marg_all);
+    persistent_lmdb.removeKeyframes(kfs_to_marg, poses_to_marg, states_to_marg_all);
 
     if (config.vio_marg_lost_landmarks) {
       for (const auto& lm_id : lost_landmaks) lmdb.removeLandmark(lm_id);

@@ -106,6 +106,7 @@ class LandmarkDatabase {
   static LandmarkDatabase<Scalar>& getMap() {
       static LandmarkDatabase<Scalar> persistent_lmdb;
       persistent_lmdb.name_ = "map";
+      persistent_lmdb.keyframes_window.resize(10);
       return persistent_lmdb;
   }
 
@@ -140,7 +141,13 @@ class LandmarkDatabase {
 
   const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& getObservations() const;
 
+  const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& getWindowObservations() const;
+
   const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>>& getLandmarks() const;
+
+  const Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>>& getWindowLandmarks() const;
+
+  bool isWithinWindow(const FrameId& frame) const;
 
   bool landmarkExists(int lm_id) const;
 
@@ -176,6 +183,8 @@ class LandmarkDatabase {
   std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> observations;
 
   Eigen::aligned_map<FrameId, SE3> frame_poses_;
+
+  std::vector<FrameId> keyframes_window;
 
   // Name just to identify between original lmdb and map lmdb
   // TODO: remove
