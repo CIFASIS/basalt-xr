@@ -134,7 +134,7 @@ void BundleAdjustmentBase<Scalar_>::computeError(Scalar& error,
                                                  std::map<int, std::vector<std::pair<TimeCamId, Scalar>>>* outliers,
                                                  Scalar outlier_threshold) const {
   std::vector<TimeCamId> host_frames;
-  for (const auto& [tcid, _] : lmdb.getObservations()) {
+  for (const auto& [tcid, _] : persistent_lmdb.getWindowObservations()) {
     host_frames.push_back(tcid);
   }
 
@@ -144,7 +144,7 @@ void BundleAdjustmentBase<Scalar_>::computeError(Scalar& error,
     for (size_t r = range.begin(); r != range.end(); ++r) {
       const TimeCamId& tcid_h = host_frames[r];
 
-      for (const auto& obs_kv : lmdb.getObservations().at(tcid_h)) {
+      for (const auto& obs_kv : persistent_lmdb.getWindowObservations().at(tcid_h)) {
         const TimeCamId& tcid_t = obs_kv.first;
 
         Mat4 T_t_h;
@@ -336,7 +336,7 @@ template <class Scalar_>
 template <class Scalar2>
 void BundleAdjustmentBase<Scalar_>::computeProjections(
     std::vector<Eigen::aligned_vector<Eigen::Matrix<Scalar2, 4, 1>>>& data, FrameId last_state_t_ns) const {
-  for (const auto& kv : lmdb.getObservations()) {
+  for (const auto& kv : persistent_lmdb.getWindowObservations()) {
     const TimeCamId& tcid_h = kv.first;
 
     for (const auto& obs_kv : kv.second) {

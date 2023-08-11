@@ -55,7 +55,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<S
                                                           int64_t last_state_to_marg)
     : options_(options),
       estimator(estimator),
-      lmdb_(estimator->lmdb),
+      lmdb_(estimator->persistent_lmdb),
       frame_poses(estimator->frame_poses),
       calib(estimator->calib),
       aom(aom),
@@ -73,7 +73,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<S
                        "obs_std_dev should be set to the same value");
 
   // Allocate memory for relative pose linearization
-  for (const auto& [tcid_h, target_map] : lmdb_.getObservations()) {
+  for (const auto& [tcid_h, target_map] : lmdb_.getWindowObservations()) {
     // if (used_frames && used_frames->count(tcid_h.frame_id) == 0) continue;
     const size_t host_idx = host_to_idx_.size();
     host_to_idx_.try_emplace(tcid_h, host_idx);
@@ -96,7 +96,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<S
   }
 
   // Populate lookup for relative poses grouped by host-frame
-  for (const auto& [tcid_h, target_map] : lmdb_.getObservations()) {
+  for (const auto& [tcid_h, target_map] : lmdb_.getWindowObservations()) {
     // if (used_frames && used_frames->count(tcid_h.frame_id) == 0) continue;
     relative_pose_per_host.emplace_back();
 
@@ -185,7 +185,7 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(bool* numerically
   marg_scaling = VecX();
 
   // Linearize relative poses
-  for (const auto& [tcid_h, target_map] : lmdb_.getObservations()) {
+  for (const auto& [tcid_h, target_map] : lmdb_.getWindowObservations()) {
     // if (used_frames && used_frames->count(tcid_h.frame_id) == 0) continue;
 
     for (const auto& [tcid_t, _] : target_map) {
