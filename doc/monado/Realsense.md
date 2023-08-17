@@ -32,43 +32,22 @@ Set these environment variables:
 - `export RS_SOURCE_INDEX=0`: Indicate that we want to use the first RealSense device connected as data source
 - `export RS_TRACKING=2`: Only try to use "host-slam". See other options
   [here](https://gitlab.freedesktop.org/mateosss/monado/-/blob/64e70e76ad6d47e4bd1a0dfa164bff8597a50ce8/src/xrt/drivers/realsense/rs_prober.c#L33-39).
-- `export SLAM_CONFIG=$bsltdeps/basalt/data/monado/d455.toml`:
+- `export SLAM_CONFIG=/usr/local/etc/basalt/d455.toml`:
   Configuration file for Basalt and the D455.
+- `export SLAM_SUBMIT_FROM_START=true`: Send samples to Basalt from start.
 
-### RealSense-Tracked Qwerty Driver
+### RealSense-Tracked Simulated HMD
 
 You now have a RealSense device that you can use to track another device, for
-example, let's track a keyboard-and-mouse controlled HMD provided by the
-`qwerty` driver.
+example, let's track the `Simulated HMD` that Monado creates by default when no
+physical HMD is present.
 
-Set these environment variables to enable the qwerty driver and stream to the
-SLAM system on start:
-
-```bash
-export QWERTY_ENABLE=true QWERTY_COMBINE=true SLAM_SUBMIT_FROM_START=true
-```
-
-And then modify your tracking overrides in your monado configuration file
-(`~/.config/monado/config_v0.json`) by updating the json object with:
-
-```js
-{
-  "tracking": {
-    "tracking_overrides": [
-      {
-        "target_device_serial": "Qwerty HMD", // Or "Qwerty Left Controller"
-        "tracker_device_serial": "Intel RealSense Host-SLAM",
-        "type": "direct",
-        "offset": {
-          "orientation": { "x": 0, "y": 0, "z": 0, "w": 1 },
-          "position": { "x": 0, "y": 0, "z": 0 }
-        },
-        "xrt_input_name": "XRT_INPUT_GENERIC_TRACKER_POSE"
-      }
-    ],
-  }
-}
-```
+You can create a "tracking override" to track the `Simulated HMD` device with
+the `Intel RealSense Host-SLAM` device. For this open `monado-gui`, then
+`Tracking Overrides`, `Add One`. Selecting `Simulated HMF` as `Target Device`
+and `Intel RealSense Host-SLAM` as `Tracker Device` and pressing `Save`. That
+will add a tracking override section to Monado's config file
+(`~/.config/monado/config_v0.json`).
 
 And that's it! You can now start an OpenXR application with Monado and get your
 view tracked with your D455 camera.
@@ -110,13 +89,15 @@ like this should work:
 
 The particular values you could set here are very dependent on your camera. I
 recommend seeing the values that get output by running the [rs-sensor-control
-example](https://dev.intelrealsense.com/docs/rs-sensor-control) from the
-RealSense API.
+command](https://dev.intelrealsense.com/docs/rs-sensor-control).
 
 ### Configuring Basalt
 
+Sending the calibration of the camera to Basalt has not been automatized yet so
+you need to do the following to get the best tracking results.
+
 As you might've noticed, we set `SLAM_CONFIG` to
-`$bsltdeps/basalt/data/monado/d455.toml` which is [this](data/monado/d455.toml)
+`/usr/local/etc/basalt/d455.toml` which is [this](data/monado/d455.toml)
 config file that I added for the D455. This file points to a [calibration
 file](data/d455_calib.json) and a [VIO configuration
 file](data/euroc_config.json).
