@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pangolin/gl/gldraw.h>
 
+#include <basalt/vi_estimator/vio_estimator.h>
 #include <basalt/utils/sophus_utils.hpp>
 #include <tuple>
 
@@ -121,3 +122,33 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
     pangolin::glDrawCirclePerimeter((GLfloat)p(0), (GLfloat)p(1), (GLfloat)radius);
   }
 }
+
+namespace basalt::vis {
+
+void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const OpticalFlowBase::Ptr& opt_flow,
+               bool show_ids);
+
+void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
+                         const VioVisualizationData::Ptr& prev_vis_data);
+
+void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
+                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map);
+
+void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+
+void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+
+void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, const Calibration<double>& calib);
+
+void show_grid(const VioConfig& config, const Calibration<double>& calib);
+
+void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
+                  const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
+                  bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth);
+
+void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
+              const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
+              bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
+              bool show_depth, bool show_guesses);
+
+}  // namespace basalt::vis

@@ -3,6 +3,16 @@ WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/thirdparty/basalt-headers/include/basalt/*'
 
 CheckOptions:
+  - key:    readability-braces-around-statements.ShortStatementLines
+    value:  2
+  - key:    readability-identifier-length.MinimumVariableNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumParameterNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumLoopCounterNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumExceptionNameLength
+    value:  1
 # Classes, structs, ...
   - key:    readability-identifier-naming.NamespaceCase
     value:  lower_case

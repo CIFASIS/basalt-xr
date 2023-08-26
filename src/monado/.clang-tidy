@@ -6,3 +6,11 @@ CheckOptions:
     value:  lower_case
   - key:    readability-braces-around-statements.ShortStatementLines
     value:  2
+  - key:    readability-identifier-length.MinimumVariableNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumParameterNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumLoopCounterNameLength
+    value:  1
+  - key:    readability-identifier-length.MinimumExceptionNameLength
+    value:  1
