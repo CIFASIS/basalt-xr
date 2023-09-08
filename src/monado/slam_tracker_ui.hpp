@@ -107,6 +107,12 @@ class slam_tracker_ui {
     if (start_t_ns < 0) start_t_ns = t_ns;
     float since_start_ns = t_ns - start_t_ns;
 
+    if (data->input_images->state_reset) {
+      vio_t_ns.clear();
+      vio_t_w_i.clear();
+      vio_data_log.Clear();
+    }
+
     vio_t_ns.emplace_back(t_ns);
     vio_t_w_i.emplace_back(data->T_w_i.translation());
 

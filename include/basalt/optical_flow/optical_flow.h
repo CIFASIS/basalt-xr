@@ -82,6 +82,8 @@ struct OpticalFlowInput {
   // Recorded internal pipeline values for UI playback
   double depth_guess = -1;
 
+  bool state_reset = false;
+
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
@@ -117,6 +119,25 @@ class OpticalFlowBase {
   virtual void processingLoop() = 0;
 
   void start() { processing_thread.reset(new std::thread(&OpticalFlowBase::processingLoop, this)); }
+
+  virtual inline void drain_input_queues() {
+    while (!input_img_queue.empty()) {
+      OpticalFlowInput::Ptr _;
+      input_img_queue.pop(_);
+    }
+    while (!input_imu_queue.empty()) {
+      ImuData<double>::Ptr _;
+      input_imu_queue.pop(_);
+    }
+    while (!input_depth_queue.empty()) {
+      double _;
+      input_depth_queue.try_pop(_);
+    }
+    while (!input_state_queue.empty()) {
+      PoseVelBiasState<double>::Ptr _;
+      input_state_queue.try_pop(_);
+    }
+  }
 
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_img_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;

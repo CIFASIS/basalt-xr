@@ -93,6 +93,10 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   void initialize(int64_t t_ns, const Sophus::SE3d& T_w_i, const Eigen::Vector3d& vel_w_i, const Eigen::Vector3d& bg,
                   const Eigen::Vector3d& ba) override;
 
+  void scheduleResetState() override;
+  bool resetState(typename IntegratedImuMeasurement<Scalar>::Ptr& meas, OpticalFlowResult::Ptr& curr_frame,
+                  OpticalFlowResult::Ptr& prev_frame);
+
   void initialize(const Eigen::Vector3d& bg, const Eigen::Vector3d& ba) override;
 
   virtual ~SqrtKeypointVioEstimator() { maybe_join(); }
@@ -229,6 +233,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
 
   bool initialized;
   bool opt_started;
+  bool schedule_reset;
 
   VioConfig config;
 

@@ -49,8 +49,8 @@ for key, value in timestamps.items():
     print('min time between consecutive msgs', diff.min())
     print('max time between consecutive msgs', diff.max())
     for i, d in enumerate(diff):
-        # Note: 0.001 is just a hacky heuristic, since we have nothing faster than 1000Hz. Should maybe be topic-specific.
-        if d < 0.001:
+        # Note: 0.0009 is just a hacky heuristic, since we have nothing faster than 1000Hz. Should maybe be topic-specific.
+        if d < 0.0009:
             print("ERROR: Difference on consecutive measurements too small: {} - {} = {}".format(times[i + 1], times[i],
                                                                                                  d) + ' in sensor ' + key)
 

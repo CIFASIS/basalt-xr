@@ -94,6 +94,11 @@ class LandmarkDatabase {
 
   void removeFrame(const FrameId& frame);
 
+  void clear() {
+    kpts.clear();
+    observations.clear();
+  }
+
   void removeKeyframes(const std::set<FrameId>& kfs_to_marg, const std::set<FrameId>& poses_to_marg,
                        const std::set<FrameId>& states_to_marg_all);
 

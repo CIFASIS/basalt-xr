@@ -146,12 +146,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     if (input_imu_queue.empty()) return pim;
 
     auto pop_imu = [&](ImuData<double>::Ptr& data) -> bool {
-      input_imu_queue.pop(data);  // Blocking pop
-      if (data == nullptr) return false;
+      ImuData<double>::Ptr sample;
+      input_imu_queue.pop(sample);  // Blocking pop
+      if (sample == nullptr) return false;
 
       // Calibrate sample
-      Vector3 a = calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
-      Vector3 g = calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
+      int64_t t = sample->t_ns;
+      Vector3 a = calib.calib_accel_bias.getCalibrated(sample->accel.cast<Scalar>());
+      Vector3 g = calib.calib_gyro_bias.getCalibrated(sample->gyro.cast<Scalar>());
+
+      data = std::make_shared<ImuData<double>>();
+      data->t_ns = t;
       data->accel = a.template cast<double>();
       data->gyro = g.template cast<double>();
       return true;

@@ -591,6 +591,7 @@ int main(int argc, char** argv) {
   // input threads will abort when vio is finished, but might be stuck in full
   // push to full queue, so drain queue now
   vio->drain_input_queues();
+  opt_flow_ptr->drain_input_queues();
 
   // join input threads
   t1.join();
@@ -871,7 +872,7 @@ void saveTrajectoryButton() {
 
     for (size_t i = 0; i < vio_t_ns.size(); i++) {
       const Sophus::SE3d& pose = vio_T_w_i[i];
-      os << std::scientific << std::setprecision(18) << vio_t_ns[i] << "," << pose.translation().x() << ","
+      os << std::fixed << std::setprecision(10) << vio_t_ns[i] << "," << pose.translation().x() << ","
          << pose.translation().y() << "," << pose.translation().z() << "," << pose.unit_quaternion().w() << ","
          << pose.unit_quaternion().x() << "," << pose.unit_quaternion().y() << "," << pose.unit_quaternion().z()
          << std::endl;

@@ -47,6 +47,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <CLI/CLI.hpp>
 
+double MOCAP_FREQ = 1000;
+
 basalt::Calibration<double> calib;
 basalt::MocapCalibration<double> mocap_calib;
 
@@ -62,9 +64,8 @@ double compute_error(int64_t offset, const std::vector<int64_t> &gyro_timestamps
 
   for (size_t i = 0; i < mocap_rot_vel_timestamps.size(); i++) {
     int64_t corrected_time = mocap_rot_vel_timestamps[i] + offset;
-
-    while (gyro_timestamps[j] < corrected_time) j++;
-    if (j >= gyro_timestamps.size()) break;
+    while (j < gyro_timestamps.size() && gyro_timestamps[j] < corrected_time) j++;
+    if (j == gyro_timestamps.size()) break;
 
     int64_t dist_j = gyro_timestamps[j] - corrected_time;
     int64_t dist_j_m1 = corrected_time - gyro_timestamps[j - 1];
@@ -74,7 +75,7 @@ double compute_error(int64_t offset, const std::vector<int64_t> &gyro_timestamps
 
     int idx = dist_j < dist_j_m1 ? j : j - 1;
 
-    if (std::min(dist_j, dist_j_m1) > 1e9 / 120) continue;
+    if (std::min(dist_j, dist_j_m1) > 1e9 / MOCAP_FREQ) continue;
 
     error += (gyro_data[idx] - mocap_rot_vel_data[i]).norm();
     num_points++;
@@ -193,9 +194,8 @@ int main(int argc, char **argv) {
 
       double dt = (vio_dataset->get_gt_timestamps()[i + 1] - vio_dataset->get_gt_timestamps()[i - 1]) * 1e-9;
 
-      // only compute difference, if measurements are really 2 consecutive
-      // measurements apart (assuming 120 Hz data)
-      if (dt > 2.5 / 120) continue;
+      // only compute difference if measurements are less than a second apart
+      if (dt > 1) continue;
 
       Eigen::Vector3d rot_vel = (p0.so3().inverse() * p1.so3()).log() / dt;
 
