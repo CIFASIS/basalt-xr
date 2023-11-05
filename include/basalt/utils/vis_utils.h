@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <Eigen/Dense>
 
+#include <pangolin/display/image_view.h>
 #include <pangolin/gl/gldraw.h>
 
 #include <basalt/vi_estimator/vio_estimator.h>
@@ -125,8 +126,8 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
 
 namespace basalt::vis {
 
-void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const OpticalFlowBase::Ptr& opt_flow,
-               bool show_ids);
+void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
+               const OpticalFlowBase::Ptr& opt_flow, bool show_ids);
 
 void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
                          const VioVisualizationData::Ptr& prev_vis_data);
@@ -146,9 +147,21 @@ void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data,
                   const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
                   bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth);
 
-void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
-              const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
-              bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
-              bool show_depth, bool show_guesses);
+void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
+              const VioConfig& config, const Calibration<double>& calib, bool show_same_pixel_guess,
+              bool show_reproj_fix_depth_guess, bool show_reproj_avg_depth_guess, bool show_active_guess,
+              double fixed_depth, bool show_ids, bool show_depth, bool show_guesses);
+
+void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v, bool show_block_vals,
+                         bool show_ids);
+
+void draw_blocks_overlay_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
+                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
+                             pangolin::ImageView& v, bool show_block_vals, bool show_ids);
+
+bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
+                   pangolin::Attach UI_WIDTH);
+
+void show_blocks(const VioVisualizationData::Ptr& curr_vis_data, const std::shared_ptr<pangolin::ImageView>& view);
 
 }  // namespace basalt::vis

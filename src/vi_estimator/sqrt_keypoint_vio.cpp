@@ -259,6 +259,11 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
       // Correct camera time offset
       // curr_frame->t_ns += calib.cam_time_offset_ns;
 
+      if (out_vis_queue) {
+        visual_data = std::make_shared<VioVisualizationData>();
+        visual_data->t_ns = curr_frame->t_ns;
+      }
+
       if (!initialized) {
         while (data->t_ns < curr_frame->t_ns) {
           data = popFromImuDataQueue();
@@ -602,25 +607,21 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   }
 
   if (out_vis_queue) {
-    VioVisualizationData::Ptr data(new VioVisualizationData);
-
-    data->t_ns = last_state_t_ns;
-
     for (const auto& kv : frame_states) {
-      data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
+      visual_data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
     }
 
     for (const auto& kv : frame_poses) {
-      data->frames.emplace_back(kv.second.getPose().template cast<double>());
+      visual_data->frames.emplace_back(kv.second.getPose().template cast<double>());
     }
 
-    get_current_points(data->points, data->point_ids);
+    get_current_points(visual_data->points, visual_data->point_ids);
 
-    data->projections = projections;
+    visual_data->projections = projections;
 
-    data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
+    visual_data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
 
-    out_vis_queue->push(data);
+    out_vis_queue->push(visual_data);
   }
 
   last_processed_t_ns = last_state_t_ns;
@@ -1176,6 +1177,9 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         // linearize residuals
         bool numerically_valid;
         error_total = lqr->linearizeProblem(&numerically_valid);
+
+        if (out_vis_queue) visual_data->landmark_blocks = lqr->getUILandmarkBlocks();
+
         BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
         stats.add("linearizeProblem", t.reset()).format("ms");
 

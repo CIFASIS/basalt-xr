@@ -54,6 +54,8 @@ class LinearizationAbsQR : public LinearizationBase<Scalar_, POSE_SIZE_> {
 
   void log_problem_stats(ExecutionStats& stats) const override;
 
+  UILandmarkBlocks::Ptr getUILandmarkBlocks() const override;
+
   Scalar linearizeProblem(bool* numerically_valid = nullptr) override;
 
   void performQR() override;

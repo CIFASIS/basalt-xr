@@ -46,6 +46,7 @@ using std::to_string;
 using std::vector;
 using namespace basalt;
 using namespace Eigen;
+using Button = pangolin::Var<std::function<void(void)>>;
 
 class slam_tracker_ui {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -58,6 +59,14 @@ class slam_tracker_ui {
   thread ui_runner_thread;
   size_t num_cams = 0;
   std::atomic<bool> running = false;
+
+  pangolin::View *img_view_display;
+  pangolin::View *plot_display;
+  pangolin::View *blocks_display;
+  bool show_blocks = false;
+
+  int UI_WIDTH_PIX = 200;
+  const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
 
  public:
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
@@ -131,7 +140,7 @@ class slam_tracker_ui {
     vio_data_log.Log(vals);
   }
 
-  pangolin::Plotter *plotter;
+  std::shared_ptr<pangolin::Plotter> plotter;
   pangolin::DataLog imu_data_log{};
   Calibration<double> calib;
   VioConfig config;
@@ -146,8 +155,6 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_est_ba{"ui.show_est_ba", false, false, true};
 
   void ui_runner(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
-    constexpr int UI_WIDTH = 200;
-
     calib = cal;
     config = conf;
     string window_name = "Basalt 6DoF Tracker for Monado";
@@ -155,16 +162,27 @@ class slam_tracker_ui {
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View &img_view_display = pangolin::CreateDisplay()
-                                           .SetBounds(0.4, 1.0, pangolin::Attach::Pix(UI_WIDTH), 0.4)
-                                           .SetLayout(pangolin::LayoutEqual);
+    img_view_display = &pangolin::CreateDisplay();
+    img_view_display->SetBounds(0.4, 1.0, UI_WIDTH, 0.4);
+    img_view_display->SetLayout(pangolin::LayoutEqual);
 
-    pangolin::View &plot_display = pangolin::CreateDisplay().SetBounds(0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    plotter = std::make_shared<pangolin::Plotter>(&imu_data_log, 0.0, 100, -10.0, 10.0, 0.01, 0.01);
+    plot_display = &pangolin::CreateDisplay();
+    plot_display->SetBounds(0.0, 0.4, UI_WIDTH, 1.0);
+    plot_display->AddDisplay(*plotter);
 
-    plotter = new pangolin::Plotter(&imu_data_log, 0.0, 100, -3.0, 3.0, 0.01, 0.01);
-    plot_display.AddDisplay(*plotter);
+    auto blocks_view = std::make_shared<pangolin::ImageView>();
+    blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
+    blocks_view->extern_draw_function = [this](pangolin::View &v) {
+      vis::draw_blocks_overlay(curr_vis_data, dynamic_cast<pangolin::ImageView &>(v), show_block_vals, show_ids);
+    };
+    const int DEFAULT_W = 480;
+    blocks_display = &pangolin::CreateDisplay();
+    blocks_display->SetBounds(0.0, 0.6, UI_WIDTH, pangolin::Attach::Pix(UI_WIDTH_PIX + DEFAULT_W));
+    blocks_display->AddDisplay(*blocks_view);
+    blocks_display->Show(show_blocks);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, UI_WIDTH);
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
@@ -174,8 +192,10 @@ class slam_tracker_ui {
       size_t idx = img_view.size();
       img_view.push_back(iv);
 
-      img_view_display.AddDisplay(*iv);
-      iv->extern_draw_function = [idx, this](auto &v) { this->draw_image_overlay(v, idx); };
+      img_view_display->AddDisplay(*iv);
+      iv->extern_draw_function = [idx, this](pangolin::View &v) {
+        draw_image_overlay(dynamic_cast<pangolin::ImageView &>(v), idx);
+      };
     }
 
     Eigen::Vector3d cam_p(0.5, -2, -2);
@@ -186,10 +206,10 @@ class slam_tracker_ui {
         pangolin::ProjectionMatrix(640, 480, 400, 400, 320, 240, 0.001, 10000),
         pangolin::ModelViewLookAt(cam_p[0], cam_p[1], cam_p[2], 0, 0, 0, pangolin::AxisZ));
 
-    pangolin::View &display3D = pangolin::CreateDisplay()
-                                    .SetAspect(-640 / 480.0)
-                                    .SetBounds(0.4, 1.0, 0.4, 1.0)
-                                    .SetHandler(new pangolin::Handler3D(camera));
+    pangolin::View &display3D = pangolin::CreateDisplay();
+    display3D.SetAspect(-640 / 480.0);
+    display3D.SetBounds(0.4, 1.0, 0.4, 1.0);
+    display3D.SetHandler(new pangolin::Handler3D(camera));
 
     while (running && !pangolin::ShouldQuit()) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -210,43 +230,43 @@ class slam_tracker_ui {
 
       draw_scene();
 
-      img_view_display.Activate();
+      img_view_display->Activate();
 
       if (fixed_depth.GuiChanged() && opt_flow_depth_queue != nullptr) {
         opt_flow_depth_queue->push(fixed_depth);
       }
       depth_guess = opt_flow->depth_guess;
 
-      {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
+      pangolin::GlPixFormat fmt;
+      fmt.glformat = GL_LUMINANCE;
+      fmt.gltype = GL_UNSIGNED_SHORT;
+      fmt.scalable_internal_format = GL_LUMINANCE16;
 
-        if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
-          auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
+      if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
+        auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
-          for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
-            if (img_data[cam_id].img) {
-              img_view[cam_id]->SetImage(img_data[cam_id].img->ptr, img_data[cam_id].img->w, img_data[cam_id].img->h,
-                                         img_data[cam_id].img->pitch, fmt);
-            }
+        for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
+          if (img_data[cam_id].img) {
+            img_view[cam_id]->SetImage(img_data[cam_id].img->ptr, img_data[cam_id].img->w, img_data[cam_id].img->h,
+                                       img_data[cam_id].img->pitch, fmt);
           }
         }
-
-        draw_plots();
       }
 
-      if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() || show_est_ba.GuiChanged() ||
-          show_est_bg.GuiChanged()) {
-        draw_plots();
-      }
+      draw_plots();
+
+      if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view);
 
       pangolin::FinishFrame();
     }
 
     pangolin::QuitAll();
     cout << "Finished ui_runner\n";
+  }
+
+  bool toggle_blocks() {
+    show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
+    return show_blocks;
   }
 
   pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
@@ -256,6 +276,9 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
+
+  Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
+  pangolin::Var<bool> show_block_vals{"ui.show_block_vals", false, false, true};
 
   pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
   pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
@@ -270,9 +293,7 @@ class slam_tracker_ui {
 
   pangolin::Var<double> depth_guess{"ui.depth_guess", 2, pangolin::META_FLAG_READONLY};
 
-  void draw_image_overlay(pangolin::View &v, size_t cam_id) {
-    UNUSED(v);
-
+  void draw_image_overlay(pangolin::ImageView &v, size_t cam_id) {
     if (!curr_vis_data ||                                               //
         !curr_vis_data->opt_flow_res ||                                 //
         !curr_vis_data->opt_flow_res->input_images ||                   //
@@ -282,11 +303,11 @@ class slam_tracker_ui {
     }
 
     if (show_obs) {
-      vis::show_obs(cam_id, curr_vis_data, config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
+      vis::show_obs(cam_id, curr_vis_data, v, config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
                     show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
     }
 
-    if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow, show_ids);
+    if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow, show_ids);
 
     if (show_tracking_guess) vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data);
 

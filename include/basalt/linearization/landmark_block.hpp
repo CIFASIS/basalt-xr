@@ -21,6 +21,25 @@ struct RelPoseLin {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+struct UILandmarkBlock {
+  using MatrixXfr = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+  std::unique_ptr<MatrixXfr> storage;
+  LandmarkId lmid = -1;
+};
+
+struct UILandmarkBlocks {
+  using Ptr = std::shared_ptr<UILandmarkBlocks>;
+  std::vector<UILandmarkBlock> blocks;
+  AbsOrderMap aom;
+
+  size_t getW() const { return blocks.empty() ? 0 : blocks[0].storage->cols(); }
+  size_t getH() const {
+    size_t h = 0;
+    for (const UILandmarkBlock& lmb : blocks) h += lmb.storage->rows();
+    return h;
+  }
+};
+
 template <typename Scalar>
 class LandmarkBlock {
  public:
@@ -73,6 +92,8 @@ class LandmarkBlock {
   // use_valid_projections_only setting.
   virtual Scalar linearizeLandmark() = 0;
   virtual void performQR() = 0;
+
+  virtual UILandmarkBlock getUILandmarkBlock() const { return {}; };
 
   // Sets damping and maintains upper triangular matrix for landmarks.
   virtual void setLandmarkDamping(Scalar lambda) = 0;

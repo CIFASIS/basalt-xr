@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <iostream>
 #include <thread>
@@ -70,6 +71,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vis_utils.h>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
+#include "basalt/linearization/landmark_block.hpp"
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
@@ -77,23 +79,25 @@ using namespace basalt;
 using namespace Eigen;
 
 // GUI functions
-void draw_image_overlay(pangolin::View& v, size_t cam_id);
+void draw_image_overlay(pangolin::ImageView& v, size_t cam_id);
 void draw_scene(pangolin::View& view);
 void load_data(const std::string& calib_path);
 bool next_step();
 bool prev_step();
+bool toggle_blocks();
 void draw_plots();
 void alignButton();
 void alignDeviceButton();
 void saveTrajectoryButton();
 
 // Pangolin variables
-constexpr int UI_WIDTH = 200;
+constexpr int UI_WIDTH_PIX = 200;
+const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
 
 using Button = pangolin::Var<std::function<void(void)>>;
 
 pangolin::DataLog imu_data_log, vio_data_log, error_data_log;
-pangolin::Plotter* plotter;
+std::shared_ptr<pangolin::Plotter> plotter;
 
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
@@ -103,6 +107,9 @@ pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, 
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
+
+Button toggle_blocks_btn("ui.toggle_blocks", &toggle_blocks);
+pangolin::Var<bool> show_block_vals("ui.show_block_vals", false, false, true);
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
 pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
@@ -119,8 +126,8 @@ pangolin::Var<double> depth_guess{"ui.depth_guess", 2, pangolin::META_FLAG_READO
 
 pangolin::Var<bool> show_est_pos("ui.show_est_pos", true, false, true);
 pangolin::Var<bool> show_est_vel("ui.show_est_vel", false, false, true);
-pangolin::Var<bool> show_est_bg("ui.show_est_bg", false, false, true);
-pangolin::Var<bool> show_est_ba("ui.show_est_ba", false, false, true);
+pangolin::Var<bool> show_est_bg("ui.show_est_bg", true, false, true);
+pangolin::Var<bool> show_est_ba("ui.show_est_ba", true, false, true);
 
 pangolin::Var<bool> show_gt("ui.show_gt", true, false, true);
 
@@ -176,6 +183,10 @@ basalt::VioDatasetPtr vio_dataset;
 basalt::VioConfig vio_config;
 basalt::OpticalFlowBase::Ptr opt_flow_ptr;
 basalt::VioEstimatorBase::Ptr vio;
+pangolin::View* img_view_display;
+pangolin::View* plot_display;
+pangolin::View* blocks_display;
+bool show_blocks = false;
 
 // Feed functions
 void feed_images() {
@@ -432,17 +443,31 @@ int main(int argc, char** argv) {
 
     glEnable(GL_DEPTH_TEST);
 
-    pangolin::View& main_display = pangolin::CreateDisplay().SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    pangolin::View& main_display = pangolin::CreateDisplay();
+    main_display.SetBounds(0.0, 1.0, UI_WIDTH, 1.0);
 
-    pangolin::View& img_view_display =
-        pangolin::CreateDisplay().SetBounds(0.4, 1.0, 0.0, 0.4).SetLayout(pangolin::LayoutEqual);
+    img_view_display = &pangolin::CreateDisplay();
+    img_view_display->SetBounds(0.4, 1.0, 0.0, 0.4);
+    img_view_display->SetLayout(pangolin::LayoutEqual);
 
-    pangolin::View& plot_display = pangolin::CreateDisplay().SetBounds(0.0, 0.4, pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    plotter = std::make_shared<pangolin::Plotter>(&imu_data_log, 0.0, 100, -10.0, 10.0, 0.01, 0.01);
+    plot_display = &pangolin::CreateDisplay();
+    plot_display->SetBounds(0.0, 0.4, UI_WIDTH, 1.0);
+    plot_display->AddDisplay(*plotter);
 
-    plotter = new pangolin::Plotter(&imu_data_log, 0.0, 100, -10.0, 10.0, 0.01f, 0.01f);
-    plot_display.AddDisplay(*plotter);
+    auto blocks_view = std::make_shared<pangolin::ImageView>();
+    blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
+    blocks_view->extern_draw_function = [](pangolin::View& v) {
+      vis::draw_blocks_overlay_vio(show_frame, vio_dataset, vis_map, dynamic_cast<pangolin::ImageView&>(v),
+                                   show_block_vals, show_ids);
+    };
+    const int DEFAULT_W = 480;
+    blocks_display = &pangolin::CreateDisplay();
+    blocks_display->SetBounds(0.0, 0.6, UI_WIDTH, pangolin::Attach::Pix(UI_WIDTH_PIX + DEFAULT_W));
+    blocks_display->AddDisplay(*blocks_view);
+    blocks_display->Show(show_blocks);
 
-    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
+    pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, UI_WIDTH);
 
     std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
@@ -452,8 +477,10 @@ int main(int argc, char** argv) {
       size_t idx = img_view.size();
       img_view.push_back(iv);
 
-      img_view_display.AddDisplay(*iv);
-      iv->extern_draw_function = std::bind(&draw_image_overlay, std::placeholders::_1, idx);
+      img_view_display->AddDisplay(*iv);
+      iv->extern_draw_function = [idx](pangolin::View& v) {
+        return draw_image_overlay(dynamic_cast<pangolin::ImageView&>(v), idx);
+      };
     }
 
     Eigen::Vector3d cam_p(-0.5, -3, -5);
@@ -463,14 +490,14 @@ int main(int argc, char** argv) {
         pangolin::OpenGlRenderState(pangolin::ProjectionMatrix(640, 480, 400, 400, 320, 240, 0.001, 10000),
                                     pangolin::ModelViewLookAt(cam_p[0], cam_p[1], cam_p[2], 0, 0, 0, pangolin::AxisZ));
 
-    pangolin::View& display3D = pangolin::CreateDisplay()
-                                    .SetAspect(-640 / 480.0)
-                                    .SetBounds(0.4, 1.0, 0.4, 1.0)
-                                    .SetHandler(new pangolin::Handler3D(camera));
+    pangolin::View& display3D = pangolin::CreateDisplay();
+    display3D.SetAspect(-640 / 480.0);
+    display3D.SetBounds(0.4, 1.0, 0.4, 1.0);
+    display3D.SetHandler(new pangolin::Handler3D(camera));
 
     display3D.extern_draw_function = draw_scene;
 
-    main_display.AddDisplay(img_view_display);
+    main_display.AddDisplay(*img_view_display);
     main_display.AddDisplay(display3D);
 
     while (!pangolin::ShouldQuit()) {
@@ -496,7 +523,7 @@ int main(int argc, char** argv) {
       display3D.Activate(camera);
       glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-      img_view_display.Activate();
+      img_view_display->Activate();
       if (fixed_depth.GuiChanged() && vio->opt_flow_depth_guess_queue != nullptr) {
         vio->opt_flow_depth_guess_queue->push(fixed_depth);
         depth_guess = fixed_depth;
@@ -520,6 +547,8 @@ int main(int argc, char** argv) {
             img_view[cam_id]->SetImage(img_vec[cam_id].img->ptr, img_vec[cam_id].img->w, img_vec[cam_id].img->h,
                                        img_vec[cam_id].img->pitch, fmt);
         }
+
+        if (show_blocks && it != vis_map.end()) vis::show_blocks(it->second, blocks_view);
 
         draw_plots();
       }
@@ -678,9 +707,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-void draw_image_overlay(pangolin::View& v, size_t cam_id) {
-  UNUSED(v);
-
+void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
   int64_t curr_ts = vio_dataset->get_image_timestamps().at(show_frame);
   auto it = vis_map.find(curr_ts);
   if (it == vis_map.end()) return;
@@ -695,11 +722,11 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
   }
 
   if (show_obs) {
-    vis::show_obs(cam_id, curr_vis_data, vio_config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
+    vis::show_obs(cam_id, curr_vis_data, v, vio_config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
                   show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
   }
 
-  if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow_ptr, show_ids);
+  if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, show_ids);
 
   if (show_tracking_guess) vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
 
@@ -792,6 +819,11 @@ bool prev_step() {
   } else {
     return false;
   }
+}
+
+bool toggle_blocks() {
+  show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
+  return show_blocks;
 }
 
 void draw_plots() {

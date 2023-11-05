@@ -45,6 +45,7 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
   kpt.direction = pos.direction;
   kpt.inv_dist = pos.inv_dist;
   kpt.host_kf_id = pos.host_kf_id;
+  kpt.id = lm_id;
 }
 
 template <class Scalar_>
@@ -130,8 +131,8 @@ const Landmark<Scalar_> &LandmarkDatabase<Scalar_>::getLandmark(LandmarkId lm_id
 }
 
 template <class Scalar_>
-const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>
-    &LandmarkDatabase<Scalar_>::getObservations() const {
+const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> &
+LandmarkDatabase<Scalar_>::getObservations() const {
   return observations;
 }
 

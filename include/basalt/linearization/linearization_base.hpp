@@ -26,6 +26,8 @@ class LinearizationBase {
 
   virtual void log_problem_stats(ExecutionStats& stats) const = 0;
 
+  virtual UILandmarkBlocks::Ptr getUILandmarkBlocks() const { return {}; };
+
   virtual Scalar linearizeProblem(bool* numerically_valid = nullptr) = 0;
 
   virtual void performQR() = 0;

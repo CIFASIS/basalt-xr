@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <memory>
 #include <mutex>
 
 #include <basalt/utils/ba_utils.h>
@@ -194,6 +195,14 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
     }
 
     state = State::Marginalized;
+  }
+
+  virtual inline UILandmarkBlock getUILandmarkBlock() const override {
+    BASALT_ASSERT(state == State::Linearized);
+    size_t w = num_cols;
+    size_t h = num_rows - 3;  // Do not copy damping rows, they are zeroed
+    auto s = std::make_unique<UILandmarkBlock::MatrixXfr>(storage.template block(0, 0, h, w).template cast<float>());
+    return UILandmarkBlock{std::move(s), lm_ptr->id};
   }
 
   // Sets damping and maintains upper triangular matrix for landmarks.

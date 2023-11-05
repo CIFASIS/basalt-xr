@@ -38,6 +38,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/imu_types.h>
+#include <basalt/linearization/landmark_block.hpp>
+#include "basalt/image/image.h"
 
 namespace basalt {
 
@@ -56,6 +58,9 @@ struct VioVisualizationData {
 
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
+  UILandmarkBlocks::Ptr landmark_blocks;
+  std::shared_ptr<ManagedImage<uint8_t>> mat;
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -72,6 +77,8 @@ class VioEstimatorBase {
 
   std::atomic<int64_t> last_processed_t_ns;
   std::atomic<bool> finished;
+
+  VioVisualizationData::Ptr visual_data;
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> vision_data_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> imu_data_queue;

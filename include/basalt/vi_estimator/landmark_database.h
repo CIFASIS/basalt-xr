@@ -67,6 +67,8 @@ struct Landmark {
   TimeCamId host_kf_id;
   ObsMap obs;
 
+  LandmarkId id;
+
   inline void backup() {
     backup_direction = direction;
     backup_inv_dist = inv_dist;

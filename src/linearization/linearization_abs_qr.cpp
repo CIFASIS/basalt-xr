@@ -42,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/ba_utils.h>
 #include <basalt/linearization/imu_block.hpp>
 #include <basalt/utils/cast_utils.hpp>
+#include "basalt/linearization/landmark_block.hpp"
 
 namespace basalt {
 
@@ -175,6 +176,23 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::~LinearizationAbsQR() = default;
 template <typename Scalar_, int POSE_SIZE_>
 void LinearizationAbsQR<Scalar_, POSE_SIZE_>::log_problem_stats(ExecutionStats& stats) const {
   UNUSED(stats);
+}
+
+template <typename Scalar_, int POSE_SIZE_>
+UILandmarkBlocks::Ptr LinearizationAbsQR<Scalar_, POSE_SIZE_>::getUILandmarkBlocks() const {
+  auto uiblocks = std::make_shared<UILandmarkBlocks>();
+  uiblocks->aom = aom;
+  auto& blocks = uiblocks->blocks;
+  blocks.resize(landmark_blocks.size());
+
+  auto body = [&](const tbb::blocked_range<size_t>& range) {
+    for (size_t r = range.begin(); r != range.end(); ++r) blocks[r] = landmark_blocks[r]->getUILandmarkBlock();
+  };
+
+  tbb::blocked_range<size_t> range(0, blocks.size());
+  tbb::parallel_for(range, body);
+
+  return uiblocks;
 }
 
 template <typename Scalar, int POSE_SIZE>
