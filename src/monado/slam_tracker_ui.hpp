@@ -63,6 +63,7 @@ class slam_tracker_ui {
   pangolin::View *img_view_display;
   pangolin::View *plot_display;
   pangolin::View *blocks_display;
+  std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
   bool show_blocks = false;
 
   int UI_WIDTH_PIX = 200;
@@ -106,6 +107,9 @@ class slam_tracker_ui {
       cout << "Finished vis_thread\n";
     });
   }
+
+  vis::Selection highlights{};
+  bool is_highlighted(size_t lmid) const { return vis::is_selected(highlights, lmid); }
 
   int64_t start_t_ns = -1;
   std::vector<int64_t> vio_t_ns;
@@ -174,7 +178,8 @@ class slam_tracker_ui {
     auto blocks_view = std::make_shared<pangolin::ImageView>();
     blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
     blocks_view->extern_draw_function = [this](pangolin::View &v) {
-      vis::draw_blocks_overlay(curr_vis_data, dynamic_cast<pangolin::ImageView &>(v), show_block_vals, show_ids);
+      vis::draw_blocks_overlay(curr_vis_data, dynamic_cast<pangolin::ImageView &>(v), highlights, filter_highlights,
+                               show_highlights, show_block_vals, show_ids);
     };
     const int DEFAULT_W = 480;
     blocks_display = &pangolin::CreateDisplay();
@@ -184,7 +189,6 @@ class slam_tracker_ui {
 
     pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, UI_WIDTH);
 
-    std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
       std::shared_ptr<pangolin::ImageView> iv(new pangolin::ImageView);
       iv->UseNN() = true;  // Disable antialiasing (toggle it back with the N key)
@@ -251,11 +255,21 @@ class slam_tracker_ui {
                                        img_data[cam_id].img->pitch, fmt);
           }
         }
+        if (follow_highlight) vis::follow_highlight(curr_vis_data, img_view, highlights, false);
       }
+
+      if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
+        highlights = vis::parse_selection(highlight_landmarks);
+        filter_highlights = filter_highlights && !highlights.empty();
+        if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
+      }
+
+      if (follow_highlight.GuiChanged())
+        follow_highlight = follow_highlight && highlights.size() == 1 && !highlights[0].is_range;
 
       draw_plots();
 
-      if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view);
+      if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
 
       pangolin::FinishFrame();
     }
@@ -276,6 +290,11 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
+
+  pangolin::Var<std::string> highlight_landmarks{"ui.Highlight", "0, 1, 10-5000"};
+  pangolin::Var<bool> filter_highlights{"ui.filter_highlights", false, false, true};
+  pangolin::Var<bool> show_highlights{"ui.show_highlights", false, false, true};
+  pangolin::Var<bool> follow_highlight{"ui.follow_highlight", false, false, true};
 
   Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
   pangolin::Var<bool> show_block_vals{"ui.show_block_vals", false, false, true};
@@ -303,15 +322,19 @@ class slam_tracker_ui {
     }
 
     if (show_obs) {
-      vis::show_obs(cam_id, curr_vis_data, v, config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
-                    show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
+      vis::show_obs(cam_id, curr_vis_data, v, config, calib, highlights, filter_highlights, show_same_pixel_guess,
+                    show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids,
+                    show_depth, show_guesses);
     }
 
-    if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow, show_ids);
+    if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow, highlights, filter_highlights, show_ids);
 
-    if (show_tracking_guess) vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data);
+    if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
 
-    if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data);
+    if (show_tracking_guess)
+      vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data, highlights, filter_highlights);
+
+    if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
 
     if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
@@ -330,21 +353,53 @@ class slam_tracker_ui {
     Eigen::aligned_vector<Eigen::Vector3d> sub_gt(vio_t_w_i.begin(), vio_t_w_i.end());
     pangolin::glDrawLineStrip(sub_gt);
 
-    if (curr_vis_data) {
-      for (const auto &p : curr_vis_data->states)
-        for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, state_color, 0.1);
+    pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
 
-      for (const auto &p : curr_vis_data->frames)
-        for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, pose_color, 0.1);
+    if (!curr_vis_data) return;
 
-      for (const auto &t_i_c : calib.T_i_c)
-        render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0, cam_color, 0.1);
+    for (const auto &p : curr_vis_data->states)
+      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, state_color, 0.1);
 
-      glColor3ubv(pose_color);
-      pangolin::glDrawPoints(curr_vis_data->points);
+    for (const auto &p : curr_vis_data->frames)
+      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, pose_color, 0.1);
+
+    for (const auto &t_i_c : calib.T_i_c)
+      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0, cam_color, 0.1);
+
+    glColor3ubv(pose_color);
+    if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);
+
+    Eigen::aligned_vector<Eigen::Vector3d> highlighted_points;
+    if (show_highlights || filter_highlights) {
+      for (size_t i = 0; i < curr_vis_data->point_ids.size(); i++) {
+        Vector3d pos = curr_vis_data->points.at(i);
+        int id = curr_vis_data->point_ids.at(i);
+        if (is_highlighted(id)) highlighted_points.push_back(pos);
+      }
     }
 
-    pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
+    if (filter_highlights) pangolin::glDrawPoints(highlighted_points);
+
+    if (show_highlights) {
+      glColor3ubv(vis::GREEN);
+      glPointSize(10);
+      pangolin::glDrawPoints(highlighted_points);
+    }
+
+    glColor3ubv(pose_color);
+    if (show_ids) {
+      for (size_t i = 0; i < curr_vis_data->points.size(); i++) {
+        Vector3d pos = curr_vis_data->points.at(i);
+        int id = curr_vis_data->point_ids.at(i);
+
+        bool highlighted = is_highlighted(id);
+        if (filter_highlights && !highlighted) continue;
+
+        if (show_highlights && highlighted) glColor3ubv(vis::GREEN);
+        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+        if (show_highlights && highlighted) glColor3ubv(pose_color);
+      }
+    }
   }
 
   OpticalFlowInput::Ptr last_img_data{};

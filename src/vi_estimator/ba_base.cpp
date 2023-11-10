@@ -235,14 +235,14 @@ void BundleAdjustmentBase<Scalar_>::get_current_points(Eigen::aligned_vector<Eig
     const Sophus::SE3<Scalar>& T_i_c = calib.T_i_c[tcid_host.cam_id];
     Mat4 T_w_c = (T_w_i * T_i_c).matrix();
 
-    for (const Landmark<Scalar>* lm_pos : lmdb.getLandmarksForHost(tcid_host)) {
+    for (const auto& [lm_id, lm_pos] : lmdb.getLandmarksForHostWithIds(tcid_host)) {
       Vec4 pt_cam = StereographicParam<Scalar>::unproject(lm_pos->direction);
       pt_cam[3] = lm_pos->inv_dist;
 
       Vec4 pt_w = T_w_c * pt_cam;
 
       points.emplace_back((pt_w.template head<3>() / pt_w[3]).template cast<Scalar2>());
-      ids.emplace_back(1);
+      ids.emplace_back(lm_id);
     }
   }
 }

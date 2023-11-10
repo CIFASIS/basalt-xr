@@ -23,7 +23,7 @@ struct RelPoseLin {
 
 struct UILandmarkBlock {
   using MatrixXfr = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-  std::unique_ptr<MatrixXfr> storage;
+  std::shared_ptr<MatrixXfr> storage;
   LandmarkId lmid = -1;
 };
 

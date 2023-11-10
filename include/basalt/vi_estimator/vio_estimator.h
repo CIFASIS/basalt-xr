@@ -59,6 +59,7 @@ struct VioVisualizationData {
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
   UILandmarkBlocks::Ptr landmark_blocks;
+  UILandmarkBlocks::Ptr hl_landmark_blocks;  // Highlighted
   std::shared_ptr<ManagedImage<uint8_t>> mat;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

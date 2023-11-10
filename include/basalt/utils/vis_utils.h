@@ -47,8 +47,10 @@ const uint8_t cam_color[3]{250, 0, 26};
 const uint8_t state_color[3]{250, 0, 26};
 const uint8_t pose_color[3]{0, 50, 255};
 const uint8_t gt_color[3]{0, 171, 47};
-const float MIN_DEPTH_COLOR[3] = {0.27, 0.79, 1};  // blue
-const float MAX_DEPTH_COLOR[3] = {1, 0.1, 0.42};   // pink
+const float MIN_DEPTH_COLOR[3]{0.27, 0.79, 1};      // blue
+const float MAX_DEPTH_COLOR[3]{1, 0.1, 0.42};       // pink
+const uint8_t MIN_DEPTH_COLOR_UB[3]{69, 201, 255};  // blue
+const uint8_t MAX_DEPTH_COLOR_UB[3]{255, 26, 107};  // pink
 
 inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const uint8_t* color, float sizeFactor) {
   const float sz = sizeFactor;
@@ -117,6 +119,16 @@ inline std::tuple<float, float, float> color_lerp(float t,                      
           min[2] + t * (max[2] - min[2])};
 }
 
+inline std::tuple<uint8_t, uint8_t, uint8_t> color_lerp_ub(float t,                                      //
+                                                           const uint8_t minub[3] = MIN_DEPTH_COLOR_UB,  //
+                                                           const uint8_t maxub[3] = MAX_DEPTH_COLOR_UB   //
+) {
+  float min[3] = {minub[0] / 255.0F, minub[1] / 255.0F, minub[2] / 255.0F};
+  float max[3] = {maxub[0] / 255.0F, maxub[1] / 255.0F, maxub[2] / 255.0F};
+  auto [r, g, b] = color_lerp(t, min, max);
+  return {uint8_t(r * 255.0F), uint8_t(g * 255.0F), uint8_t(b * 255.0F)};
+}
+
 template <typename P, int N, class Allocator>
 void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>& points, float radius = 5.0) {
   for (auto& p : points) {
@@ -126,16 +138,41 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
 
 namespace basalt::vis {
 
+const uint8_t BLUE[4]{0x21, 0x96, 0xF3, 0xFF};
+const uint8_t GREEN[4]{0x4C, 0xAF, 0x50, 0xFF};
+const uint8_t RED[4]{0xF4, 0x43, 0x36, 0xFF};
+
+struct SelectionNode {
+  bool is_range;
+  size_t a;
+  size_t b;
+
+  bool contains(size_t n) const { return is_range ? a <= n && n <= b : n == a; }
+};
+using Selection = std::vector<SelectionNode>;
+
+//! Parse a set of numbers described in @p str. Example inputs: "1,3,5-10", "1000-2000,3,5-7"
+Selection parse_selection(const std::string& str);
+
+bool is_selected(const Selection& selection, size_t n);
+
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
-               const OpticalFlowBase::Ptr& opt_flow, bool show_ids);
+               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights,
+               bool show_ids);
+
+void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
+                     pangolin::ImageView& v, bool show_ids);
 
 void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
-                         const VioVisualizationData::Ptr& prev_vis_data);
+                         const VioVisualizationData::Ptr& prev_vis_data, const Selection& highlights,
+                         bool filter_highlights);
 
 void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
-                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map);
+                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
+                             const Selection& highlights, bool filter_highlights);
 
-void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
+                           bool filter_highlights);
 
 void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
 
@@ -144,24 +181,38 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
 void show_grid(const VioConfig& config, const Calibration<double>& calib);
 
 void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
-                  const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
-                  bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth);
+                  const Calibration<double>& calib, const Selection& highlights, bool filter_highlights,
+                  bool show_same_pixel_guess, bool show_reproj_fix_depth_guess, bool show_reproj_avg_depth_guess,
+                  bool show_active_guess, double fixed_depth);
 
 void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
-              const VioConfig& config, const Calibration<double>& calib, bool show_same_pixel_guess,
-              bool show_reproj_fix_depth_guess, bool show_reproj_avg_depth_guess, bool show_active_guess,
-              double fixed_depth, bool show_ids, bool show_depth, bool show_guesses);
+              const VioConfig& config, const Calibration<double>& calib, const Selection& highlights,
+              bool filter_highlights, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
+              bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
+              bool show_depth, bool show_guesses);
 
-void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v, bool show_block_vals,
-                         bool show_ids);
+void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
+                         const Selection& highlights, bool filter_highlights, bool show_highlights,
+                         bool show_block_vals, bool show_ids);
 
 void draw_blocks_overlay_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
                              const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                             pangolin::ImageView& v, bool show_block_vals, bool show_ids);
+                             pangolin::ImageView& v, const Selection& highlights, bool filter_highlights,
+                             bool show_highlights, bool show_block_vals, bool show_ids);
 
 bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
                    pangolin::Attach UI_WIDTH);
 
-void show_blocks(const VioVisualizationData::Ptr& curr_vis_data, const std::shared_ptr<pangolin::ImageView>& view);
+void show_blocks(const VioVisualizationData::Ptr& curr_vis_data, const std::shared_ptr<pangolin::ImageView>& view,
+                 const Selection& highlights, bool filter_highlights);
+
+bool follow_highlight(const VioVisualizationData::Ptr& curr_vis_data,
+                      std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
+                      bool smooth_zoom);
+
+bool follow_highlight_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
+                          const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
+                          std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
+                          bool smooth_zoom);
 
 }  // namespace basalt::vis

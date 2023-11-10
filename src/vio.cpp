@@ -108,6 +108,11 @@ pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
+pangolin::Var<std::string> highlight_landmarks("ui.Highlight", "0, 1, 10-5000");
+pangolin::Var<bool> filter_highlights("ui.filter_highlights", false, false, true);
+pangolin::Var<bool> show_highlights("ui.show_highlights", false, false, true);
+pangolin::Var<bool> follow_highlight("ui.follow_highlight", false, false, true);
+
 Button toggle_blocks_btn("ui.toggle_blocks", &toggle_blocks);
 pangolin::Var<bool> show_block_vals("ui.show_block_vals", false, false, true);
 
@@ -186,7 +191,11 @@ basalt::VioEstimatorBase::Ptr vio;
 pangolin::View* img_view_display;
 pangolin::View* plot_display;
 pangolin::View* blocks_display;
+std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
 bool show_blocks = false;
+vis::Selection highlights{};
+
+bool is_highlighted(size_t lmid) { return vis::is_selected(highlights, lmid); }
 
 // Feed functions
 void feed_images() {
@@ -458,8 +467,8 @@ int main(int argc, char** argv) {
     auto blocks_view = std::make_shared<pangolin::ImageView>();
     blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
     blocks_view->extern_draw_function = [](pangolin::View& v) {
-      vis::draw_blocks_overlay_vio(show_frame, vio_dataset, vis_map, dynamic_cast<pangolin::ImageView&>(v),
-                                   show_block_vals, show_ids);
+      vis::draw_blocks_overlay_vio(show_frame, vio_dataset, vis_map, dynamic_cast<pangolin::ImageView&>(v), highlights,
+                                   filter_highlights, show_highlights, show_block_vals, show_ids);
     };
     const int DEFAULT_W = 480;
     blocks_display = &pangolin::CreateDisplay();
@@ -469,7 +478,6 @@ int main(int argc, char** argv) {
 
     pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, UI_WIDTH);
 
-    std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
     while (img_view.size() < calib.intrinsics.size()) {
       std::shared_ptr<pangolin::ImageView> iv(new pangolin::ImageView);
       iv->UseNN() = true;  // Disable antialiasing, can be toggled with N key
@@ -547,8 +555,10 @@ int main(int argc, char** argv) {
             img_view[cam_id]->SetImage(img_vec[cam_id].img->ptr, img_vec[cam_id].img->w, img_vec[cam_id].img->h,
                                        img_vec[cam_id].img->pitch, fmt);
         }
+        if (follow_highlight) vis::follow_highlight_vio(frame_id, vio_dataset, vis_map, img_view, highlights, false);
 
-        if (show_blocks && it != vis_map.end()) vis::show_blocks(it->second, blocks_view);
+        if (show_blocks && it != vis_map.end())
+          vis::show_blocks(it->second, blocks_view, highlights, filter_highlights);
 
         draw_plots();
       }
@@ -556,6 +566,22 @@ int main(int argc, char** argv) {
       if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() || show_est_ba.GuiChanged() ||
           show_est_bg.GuiChanged()) {
         draw_plots();
+      }
+
+      if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
+        highlights = vis::parse_selection(highlight_landmarks);
+        filter_highlights = filter_highlights && !highlights.empty();
+        for (const auto& [ts, vis] : vis_map) vis->mat = nullptr;  // Regenerate lmbs
+        if (show_blocks && it != vis_map.end())
+          vis::show_blocks(it->second, blocks_view, highlights, filter_highlights);
+      }
+
+      if (follow_highlight.GuiChanged()) {
+        follow_highlight = follow_highlight && highlights.size() == 1 && !highlights[0].is_range;
+        if (follow_highlight)
+          vis::follow_highlight_vio(frame_id, vio_dataset, vis_map, img_view, highlights, true);
+        else
+          for (auto& v : img_view) v->ResetView();
       }
 
       if (euroc_fmt.GuiChanged()) {
@@ -722,15 +748,19 @@ void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
   }
 
   if (show_obs) {
-    vis::show_obs(cam_id, curr_vis_data, v, vio_config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
-                  show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
+    vis::show_obs(cam_id, curr_vis_data, v, vio_config, calib, highlights, filter_highlights, show_same_pixel_guess,
+                  show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids,
+                  show_depth, show_guesses);
   }
 
-  if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, show_ids);
+  if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, highlights, filter_highlights, show_ids);
 
-  if (show_tracking_guess) vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
+  if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
 
-  if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data);
+  if (show_tracking_guess)
+    vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map, highlights, filter_highlights);
+
+  if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
 
   if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
@@ -762,6 +792,7 @@ void draw_scene(pangolin::View& view) {
   size_t frame_id = show_frame;
   int64_t t_ns = vio_dataset->get_image_timestamps()[frame_id];
   auto it = vis_map.find(t_ns);
+  VioVisualizationData::Ptr curr_vis_data = it->second;
 
   if (it != vis_map.end()) {
     for (size_t i = 0; i < calib.T_i_c.size(); i++)
@@ -780,7 +811,39 @@ void draw_scene(pangolin::View& view) {
         render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
 
     glColor3ubv(pose_color);
-    pangolin::glDrawPoints(it->second->points);
+    if (!filter_highlights) pangolin::glDrawPoints(it->second->points);
+
+    Eigen::aligned_vector<Eigen::Vector3d> highlighted_points;
+    if (show_highlights || filter_highlights) {
+      for (size_t i = 0; i < curr_vis_data->point_ids.size(); i++) {
+        Vector3d pos = curr_vis_data->points.at(i);
+        int id = curr_vis_data->point_ids.at(i);
+        if (is_highlighted(id)) highlighted_points.push_back(pos);
+      }
+    }
+
+    if (filter_highlights) pangolin::glDrawPoints(highlighted_points);
+
+    if (show_highlights) {
+      glColor3ubv(vis::GREEN);
+      glPointSize(10);
+      pangolin::glDrawPoints(highlighted_points);
+    }
+  }
+
+  glColor3ubv(pose_color);
+  if (show_ids) {
+    for (size_t i = 0; i < curr_vis_data->points.size(); i++) {
+      Vector3d pos = curr_vis_data->points.at(i);
+      int id = curr_vis_data->point_ids.at(i);
+
+      bool highlighted = is_highlighted(id);
+      if (filter_highlights && !highlighted) continue;
+
+      if (show_highlights && highlighted) glColor3ubv(vis::GREEN);
+      pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+      if (show_highlights && highlighted) glColor3ubv(pose_color);
+    }
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
