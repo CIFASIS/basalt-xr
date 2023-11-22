@@ -288,8 +288,8 @@ class slam_tracker_ui {
     for (const auto &kps : curr_vis_data->opt_flow_res->keypoints)
       for (const auto &[kpid, kp] : kps) kpids.insert(kpid);
 
-    std::string str{};
-    str.reserve(kpids.size() * 10);
+    std::string str = highlight_landmarks;
+    str.reserve(str.size() + kpids.size() * 10);
     for (const KeypointId &kpid : kpids) str += std::to_string(kpid) + ",";
     if (!str.empty()) str.pop_back();
 
@@ -309,7 +309,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
-  pangolin::Var<std::string> highlight_landmarks{"ui.Highlight", "0, 1, 10-5000"};
+  pangolin::Var<std::string> highlight_landmarks{"ui.Highlight", ""};
   pangolin::Var<bool> filter_highlights{"ui.filter_highlights", false, false, true};
   pangolin::Var<bool> show_highlights{"ui.show_highlights", false, false, true};
   pangolin::Var<bool> follow_highlight{"ui.follow_highlight", false, false, true};

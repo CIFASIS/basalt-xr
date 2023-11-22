@@ -84,6 +84,7 @@ void draw_scene(pangolin::View& view);
 void load_data(const std::string& calib_path);
 bool next_step();
 bool prev_step();
+bool take_ltkf();
 bool toggle_blocks();
 bool highlight_frame();
 void draw_plots();
@@ -111,7 +112,7 @@ pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
-pangolin::Var<std::string> highlight_landmarks("ui.Highlight", "0, 1, 10-5000");
+pangolin::Var<std::string> highlight_landmarks("ui.Highlight", "");
 pangolin::Var<bool> filter_highlights("ui.filter_highlights", false, false, true);
 pangolin::Var<bool> show_highlights("ui.show_highlights", false, false, true);
 pangolin::Var<bool> follow_highlight("ui.follow_highlight", false, false, true);
@@ -143,6 +144,7 @@ pangolin::Var<bool> show_gt("ui.show_gt", true, false, true);
 
 Button next_step_btn("ui.next_step", &next_step);
 Button prev_step_btn("ui.prev_step", &prev_step);
+Button take_ltkf_btn("ui.Take Keyframe", &take_ltkf);
 
 pangolin::Var<bool> continue_btn("ui.continue", false, false, true);
 pangolin::Var<bool> continue_fast("ui.continue_fast", true, false, true);
@@ -803,43 +805,45 @@ void draw_scene(pangolin::View& view) {
   size_t frame_id = show_frame;
   int64_t t_ns = vio_dataset->get_image_timestamps()[frame_id];
   auto it = vis_map.find(t_ns);
+  if (it == vis_map.end()) return;
   VioVisualizationData::Ptr curr_vis_data = it->second;
 
-  if (it != vis_map.end()) {
+  for (size_t i = 0; i < calib.T_i_c.size(); i++)
+    if (!it->second->states.empty()) {
+      render_camera((it->second->states.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
+    } else if (!it->second->frames.empty()) {
+      render_camera((it->second->frames.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
+    }
+
+  for (const auto& p : it->second->states)
     for (size_t i = 0; i < calib.T_i_c.size(); i++)
-      if (!it->second->states.empty()) {
-        render_camera((it->second->states.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
-      } else if (!it->second->frames.empty()) {
-        render_camera((it->second->frames.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
-      }
+      render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, state_color, 0.1f);
 
-    for (const auto& p : it->second->states)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++)
-        render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, state_color, 0.1f);
+  for (const auto& p : it->second->frames)
+    for (size_t i = 0; i < calib.T_i_c.size(); i++)
+      render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
 
-    for (const auto& p : it->second->frames)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++)
-        render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
+  for (const auto& p : it->second->ltframes)
+    for (size_t i = 0; i < calib.T_i_c.size(); i++) render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, vis::BLUE, 0.1f);
 
-    glColor3ubv(pose_color);
-    if (!filter_highlights) pangolin::glDrawPoints(it->second->points);
+  glColor3ubv(pose_color);
+  if (!filter_highlights) pangolin::glDrawPoints(it->second->points);
 
-    Eigen::aligned_vector<Eigen::Vector3d> highlighted_points;
-    if (show_highlights || filter_highlights) {
-      for (size_t i = 0; i < curr_vis_data->point_ids.size(); i++) {
-        Vector3d pos = curr_vis_data->points.at(i);
-        int id = curr_vis_data->point_ids.at(i);
-        if (is_highlighted(id)) highlighted_points.push_back(pos);
-      }
+  Eigen::aligned_vector<Eigen::Vector3d> highlighted_points;
+  if (show_highlights || filter_highlights) {
+    for (size_t i = 0; i < curr_vis_data->point_ids.size(); i++) {
+      Vector3d pos = curr_vis_data->points.at(i);
+      int id = curr_vis_data->point_ids.at(i);
+      if (is_highlighted(id)) highlighted_points.push_back(pos);
     }
+  }
 
-    if (filter_highlights) pangolin::glDrawPoints(highlighted_points);
+  if (filter_highlights) pangolin::glDrawPoints(highlighted_points);
 
-    if (show_highlights) {
-      glColor3ubv(vis::GREEN);
-      glPointSize(10);
-      pangolin::glDrawPoints(highlighted_points);
-    }
+  if (show_highlights) {
+    glColor3ubv(vis::GREEN);
+    glPointSize(10);
+    pangolin::glDrawPoints(highlighted_points);
   }
 
   glColor3ubv(pose_color);
@@ -895,6 +899,12 @@ bool prev_step() {
   }
 }
 
+bool take_ltkf() {
+  std::cout << "Take long term keyframe" << std::endl;
+  vio->takeLongTermKeyframe();
+  return true;
+}
+
 bool toggle_blocks() {
   show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
   return show_blocks;
@@ -910,8 +920,8 @@ bool highlight_frame() {
   for (const auto& kps : curr_vis_data->opt_flow_res->keypoints)
     for (const auto& [kpid, kp] : kps) kpids.insert(kpid);
 
-  std::string str{};
-  str.reserve(kpids.size() * 10);
+  std::string str = highlight_landmarks;
+  str.reserve(str.size() + kpids.size() * 10);
   for (const KeypointId& kpid : kpids) str += std::to_string(kpid) + ",";
   if (!str.empty()) str.pop_back();
 

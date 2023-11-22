@@ -559,6 +559,11 @@ struct slam_tracker::implementation {
     std::cout << "Tracker state reset\n";
     vio->scheduleResetState();
   }
+
+  void take_keyframe() {
+    std::cout << "Tracker take long-term keyframe\n";
+    vio->takeLongTermKeyframe();
+  }
 };
 
 EXPORT slam_tracker::slam_tracker(const slam_config &slam_config) {

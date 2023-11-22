@@ -49,6 +49,7 @@ struct VioVisualizationData {
 
   Eigen::aligned_vector<Sophus::SE3d> states;
   Eigen::aligned_vector<Sophus::SE3d> frames;
+  Eigen::aligned_vector<Sophus::SE3d> ltframes;  // Poses of long-term keyframes
 
   Eigen::aligned_vector<Eigen::Vector3d> points;
   std::vector<int> point_ids;
@@ -114,6 +115,7 @@ class VioEstimatorBase {
   }
 
   virtual void scheduleResetState(){};
+  virtual void takeLongTermKeyframe(){};
 
   virtual inline void debug_finalize() {}
 

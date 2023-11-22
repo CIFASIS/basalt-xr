@@ -126,6 +126,11 @@ void SqrtKeypointVioEstimator<Scalar>::scheduleResetState() {
 }
 
 template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::takeLongTermKeyframe() {
+  take_ltkf = true;
+}
+
+template <class Scalar>
 bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurement<Scalar>::Ptr& meas,
                                                   OpticalFlowResult::Ptr& curr_frame,
                                                   OpticalFlowResult::Ptr& prev_frame) {
@@ -148,6 +153,7 @@ bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurem
   take_kf = true;
   frames_after_kf = 0;
   kf_ids.clear();
+  ltkfs.clear();
   imu_meas.clear();
   prev_opt_flow_res.clear();
   num_points_kf.clear();
@@ -453,6 +459,15 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     }
   }
 
+  if (take_ltkf) {
+    if (!kf_ids.empty()) {  // Move newest kf to ltkfs
+      auto last_kf_it = std::prev(kf_ids.end());
+      ltkfs.emplace(*last_kf_it);
+      kf_ids.erase(last_kf_it);
+    }
+    take_ltkf = false;
+  }
+
   if (take_kf) {
     // Triangulate new points from one of the observations (with sufficient
     // baseline) and make keyframe
@@ -632,8 +647,9 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       visual_data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
     }
 
-    for (const auto& kv : frame_poses) {
-      visual_data->frames.emplace_back(kv.second.getPose().template cast<double>());
+    for (const auto& [ts, pstate] : frame_poses) {
+      Eigen::aligned_vector<Sophus::SE3d>& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
+      frames.emplace_back(pstate.getPose().template cast<double>());
     }
 
     get_current_points(visual_data->points, visual_data->point_ids);
@@ -682,7 +698,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
 
   Timer t_total;
 
-  if (frame_poses.size() > max_kfs || frame_states.size() >= max_states) {
+  if (frame_poses.size() > ltkfs.size() + max_kfs || frame_states.size() >= max_states) {
     // Marginalize
 
     const int states_to_remove = frame_states.size() - max_states + 1;
@@ -698,7 +714,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     for (const auto& kv : frame_poses) {
       aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_SIZE);
 
-      if (kf_ids.count(kv.first) == 0) poses_to_marg.emplace(kv.first);
+      if (kf_ids.count(kv.first) == 0 && ltkfs.count(kv.first) == 0) poses_to_marg.emplace(kv.first);
 
       // Check that we have the same order as marginalization
       BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
@@ -713,7 +729,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
       if (kv.first > last_state_to_marg) break;
 
       if (kv.first != last_state_to_marg) {
-        if (kf_ids.count(kv.first) > 0) {
+        if (kf_ids.count(kv.first) > 0 || ltkfs.count(kv.first) > 0) {
           states_to_marg_vel_bias.emplace(kv.first);
         } else {
           states_to_marg_all.emplace(kv.first);
@@ -744,7 +760,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
         // should also prioritize keyframes that: are older, have more features,
         // have better quality features.
         if (kf_ids.size() > 2 && id_to_marg < 0) {
-          auto end_minus_2 = std::prev(kf_ids.end(), 2);
+          std::set<int64_t> all_kfs = ltkfs;
+          all_kfs.insert(kf_ids.begin(), kf_ids.end());
+
+          // Do not account for the two most recent frames
+          auto last1 = std::prev(kf_ids.end(), 2);
+          auto last2 = std::prev(all_kfs.end(), 2);
           Scalar min_score = std::numeric_limits<Scalar>::max();
           int64_t min_score_id = -1;
 
@@ -756,10 +777,10 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
             return fwd2d;
           };
 
-          for (auto it1 = kf_ids.begin(); it1 != end_minus_2; ++it1) {
+          for (auto it1 = kf_ids.begin(); it1 != last1; ++it1) {
             Vec2 fwd1 = get_forward_vector2d(*it1);
             Scalar score = 0;
-            for (auto it2 = kf_ids.begin(); it2 != end_minus_2; ++it2) {
+            for (auto it2 = all_kfs.begin(); it2 != last2; ++it2) {
               Vec2 fwd2 = get_forward_vector2d(*it2);
               Scalar dot = std::clamp(fwd1.dot(fwd2), Scalar(-1), Scalar(1));  // clamp needed, otherwise acos can fail
               Scalar angle = acos(dot);
