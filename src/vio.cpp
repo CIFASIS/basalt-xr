@@ -69,9 +69,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/system_utils.h>
 #include <basalt/utils/vio_config.h>
 #include <basalt/utils/vis_utils.h>
+#include <basalt/linearization/landmark_block.hpp>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
-#include "basalt/linearization/landmark_block.hpp"
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
@@ -85,6 +85,7 @@ void load_data(const std::string& calib_path);
 bool next_step();
 bool prev_step();
 bool toggle_blocks();
+bool highlight_frame();
 void draw_plots();
 void alignButton();
 void alignDeviceButton();
@@ -102,8 +103,10 @@ std::shared_ptr<pangolin::Plotter> plotter;
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
 pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_responses("ui.show_responses", false, false, true);
 pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false, true);
 pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, true);
+pangolin::Var<bool> show_recall_guess("ui.show_recall_guess", false, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
@@ -112,11 +115,13 @@ pangolin::Var<std::string> highlight_landmarks("ui.Highlight", "0, 1, 10-5000");
 pangolin::Var<bool> filter_highlights("ui.filter_highlights", false, false, true);
 pangolin::Var<bool> show_highlights("ui.show_highlights", false, false, true);
 pangolin::Var<bool> follow_highlight("ui.follow_highlight", false, false, true);
+Button highlight_frame_btn("ui.highlight_frame", &highlight_frame);
 
 Button toggle_blocks_btn("ui.toggle_blocks", &toggle_blocks);
 pangolin::Var<bool> show_block_vals("ui.show_block_vals", false, false, true);
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
+pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
 pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
 pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 
@@ -150,7 +155,7 @@ pangolin::Var<bool> kitti_fmt("ui.kitti_fmt", false, false, true);
 pangolin::Var<bool> save_groundtruth("ui.save_groundtruth", false, false, true);
 Button save_traj_btn("ui.save_traj", &saveTrajectoryButton);
 
-pangolin::Var<bool> follow("ui.follow", true, false, true);
+pangolin::Var<bool> follow("ui.follow", false, false, true);
 
 // pangolin::Var<bool> record("ui.record", false, false, true);
 
@@ -343,6 +348,7 @@ int main(int argc, char** argv) {
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
     vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
+    vio->opt_flow_lm_bundle_queue = &opt_flow_ptr->input_lm_bundle_queue;
   }
 
   basalt::MargDataSaver::Ptr marg_data_saver;
@@ -753,7 +759,8 @@ void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
                   show_depth, show_guesses);
   }
 
-  if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, highlights, filter_highlights, show_ids);
+  if (show_flow)
+    vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, highlights, filter_highlights, show_ids, show_responses);
 
   if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
 
@@ -762,11 +769,15 @@ void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
 
   if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
 
+  if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
+
   if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
   if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, vio_config, calib);
 
   if (show_grid) vis::show_grid(vio_config, calib);
+
+  if (show_safe_radius) vis::show_safe_radius(vio_config, calib);
 }
 
 void draw_scene(pangolin::View& view) {
@@ -875,7 +886,7 @@ bool next_step() {
 }
 
 bool prev_step() {
-  if (show_frame > 1) {
+  if (show_frame >= 1) {
     show_frame = show_frame - 1;
     show_frame.Meta().gui_changed = true;
     return true;
@@ -887,6 +898,27 @@ bool prev_step() {
 bool toggle_blocks() {
   show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
   return show_blocks;
+}
+
+bool highlight_frame() {
+  int64_t curr_ts = vio_dataset->get_image_timestamps().at(show_frame);
+  auto it = vis_map.find(curr_ts);
+  if (it == vis_map.end()) return false;
+  basalt::VioVisualizationData::Ptr curr_vis_data = it->second;
+
+  std::set<KeypointId> kpids;
+  for (const auto& kps : curr_vis_data->opt_flow_res->keypoints)
+    for (const auto& [kpid, kp] : kps) kpids.insert(kpid);
+
+  std::string str{};
+  str.reserve(kpids.size() * 10);
+  for (const KeypointId& kpid : kpids) str += std::to_string(kpid) + ",";
+  if (!str.empty()) str.pop_back();
+
+  highlight_landmarks = str;
+  highlight_landmarks.Meta().gui_changed = true;
+
+  return true;
 }
 
 void draw_plots() {

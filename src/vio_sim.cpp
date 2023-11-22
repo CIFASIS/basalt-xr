@@ -153,7 +153,7 @@ pangolin::Var<bool> continue_btn("ui.continue", true, false, true);
 Button align_step_btn("ui.align_se3", &alignButton);
 
 bool use_imu = true;
-bool use_double = true;
+bool use_double = false;
 
 int main(int argc, char** argv) {
   srand(1);
@@ -221,6 +221,7 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < gt_frame_t_ns.size(); i++) {
       basalt::OpticalFlowResult::Ptr data(new basalt::OpticalFlowResult);
       data->t_ns = gt_frame_t_ns[i];
+      data->input_images = std::make_shared<basalt::OpticalFlowInput>();
 
       for (size_t j = 0; j < calib.T_i_c.size(); j++) {
         data->keypoints.emplace_back();

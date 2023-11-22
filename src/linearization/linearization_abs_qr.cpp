@@ -41,8 +41,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/ba_utils.h>
 #include <basalt/linearization/imu_block.hpp>
+#include <basalt/linearization/landmark_block.hpp>
 #include <basalt/utils/cast_utils.hpp>
-#include "basalt/linearization/landmark_block.hpp"
 
 namespace basalt {
 

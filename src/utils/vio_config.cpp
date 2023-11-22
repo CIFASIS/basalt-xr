@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cereal/archives/json.hpp>
 #include <cereal/cereal.hpp>
+#include <cereal/types/vector.hpp>
 #include <magic_enum.hpp>
 
 namespace basalt {
@@ -60,6 +61,14 @@ VioConfig::VioConfig() {
   optical_flow_skip_frames = 1;
   optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
   optical_flow_matching_default_depth = 2.0;
+  optical_flow_image_safe_radius = 0.0;
+  optical_flow_recall_enable = false;
+  optical_flow_recall_all_cams = false;
+  optical_flow_recall_num_points_cell = true;
+  optical_flow_recall_over_tracking = false;
+  optical_flow_recall_update_patch_viewpoint = false;
+  optical_flow_recall_max_patch_dist = 3;
+  optical_flow_recall_max_patch_norms = {1.74, 0.96, 0.99, 0.44};
 
   vio_linearization_type = LinearizationType::ABS_QR;
   vio_sqrt_marg = true;
@@ -93,9 +102,10 @@ VioConfig::VioConfig() {
   vio_init_ba_weight = 1e1;
   vio_init_bg_weight = 1e2;
 
-  vio_marg_lost_landmarks = true;
+  vio_marg_lost_landmarks = false;
 
   vio_kf_marg_feature_ratio = 0.1;
+  vio_kf_marg_criteria = KeyframeMargCriteria::KF_MARG_DEFAULT;
 
   mapper_obs_std_dev = 0.25;
   mapper_obs_huber_thresh = 1.5;
@@ -162,6 +172,27 @@ void load_minimal(const Archive& ar, basalt::MatchingGuessType& guess_type, cons
 }
 
 template <class Archive>
+std::string save_minimal(const Archive& ar, const basalt::KeyframeMargCriteria& marg_crit) {
+  UNUSED(ar);
+  auto name = magic_enum::enum_name(marg_crit);
+  return std::string(name);
+}
+
+template <class Archive>
+void load_minimal(const Archive& ar, basalt::KeyframeMargCriteria& marg_crit, const std::string& name) {
+  UNUSED(ar);
+
+  auto crit_enum = magic_enum::enum_cast<basalt::KeyframeMargCriteria>(name);
+
+  if (crit_enum.has_value()) {
+    marg_crit = crit_enum.value();
+  } else {
+    std::cerr << "Could not find the KeyframeMargCriteria for " << name << std::endl;
+    std::abort();
+  }
+}
+
+template <class Archive>
 std::string save_minimal(const Archive& ar, const basalt::LinearizationType& linearization_type) {
   UNUSED(ar);
   auto name = magic_enum::enum_name(linearization_type);
@@ -198,6 +229,14 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_skip_frames));
   ar(CEREAL_NVP(config.optical_flow_matching_guess_type));
   ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
+  ar(CEREAL_NVP(config.optical_flow_image_safe_radius));
+  ar(CEREAL_NVP(config.optical_flow_recall_enable));
+  ar(CEREAL_NVP(config.optical_flow_recall_all_cams));
+  ar(CEREAL_NVP(config.optical_flow_recall_num_points_cell));
+  ar(CEREAL_NVP(config.optical_flow_recall_over_tracking));
+  ar(CEREAL_NVP(config.optical_flow_recall_update_patch_viewpoint));
+  ar(CEREAL_NVP(config.optical_flow_recall_max_patch_dist));
+  ar(CEREAL_NVP(config.optical_flow_recall_max_patch_norms));
 
   ar(CEREAL_NVP(config.vio_linearization_type));
   ar(CEREAL_NVP(config.vio_sqrt_marg));
@@ -230,6 +269,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
 
   ar(CEREAL_NVP(config.vio_marg_lost_landmarks));
   ar(CEREAL_NVP(config.vio_kf_marg_feature_ratio));
+  ar(CEREAL_NVP(config.vio_kf_marg_criteria));
 
   ar(CEREAL_NVP(config.mapper_obs_std_dev));
   ar(CEREAL_NVP(config.mapper_obs_huber_thresh));

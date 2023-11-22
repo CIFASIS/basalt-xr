@@ -435,7 +435,8 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
     KeypointsData kd;  // Detected new points
     detectKeypoints(pyramid->at(cam_id).lvl(level), kd, config.optical_flow_detection_grid_size,
                     config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
-                    config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
+                    config.optical_flow_detection_max_threshold, config.optical_flow_image_safe_radius,
+                    transforms->input_images->masks.at(cam_id), pts);
 
     //! @note Using static grid size for all levels. Scaling it made feature
     //! count increase 2x but ATE/RTE scores were just slightly worse/better.

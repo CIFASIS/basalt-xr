@@ -283,10 +283,28 @@ class slam_tracker_ui {
     return show_blocks;
   }
 
+  bool highlight_frame() {
+    std::set<KeypointId> kpids;
+    for (const auto &kps : curr_vis_data->opt_flow_res->keypoints)
+      for (const auto &[kpid, kp] : kps) kpids.insert(kpid);
+
+    std::string str{};
+    str.reserve(kpids.size() * 10);
+    for (const KeypointId &kpid : kpids) str += std::to_string(kpid) + ",";
+    if (!str.empty()) str.pop_back();
+
+    highlight_landmarks = str;
+    highlight_landmarks.Meta().gui_changed = true;
+
+    return true;
+  }
+
   pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
   pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
+  pangolin::Var<bool> show_responses{"ui.show_responses", false, false, true};
   pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
   pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
+  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", false, false, true};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
@@ -295,11 +313,13 @@ class slam_tracker_ui {
   pangolin::Var<bool> filter_highlights{"ui.filter_highlights", false, false, true};
   pangolin::Var<bool> show_highlights{"ui.show_highlights", false, false, true};
   pangolin::Var<bool> follow_highlight{"ui.follow_highlight", false, false, true};
+  Button highlight_frame_btn{"ui.highlight_frame", [this]() { highlight_frame(); }};
 
   Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
   pangolin::Var<bool> show_block_vals{"ui.show_block_vals", false, false, true};
 
   pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
+  pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
   pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
   pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 
@@ -327,7 +347,8 @@ class slam_tracker_ui {
                     show_depth, show_guesses);
     }
 
-    if (show_flow) vis::show_flow(cam_id, curr_vis_data, v, opt_flow, highlights, filter_highlights, show_ids);
+    if (show_flow)
+      vis::show_flow(cam_id, curr_vis_data, v, opt_flow, highlights, filter_highlights, show_ids, show_responses);
 
     if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
 
@@ -336,11 +357,15 @@ class slam_tracker_ui {
 
     if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
 
+    if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
+
     if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
     if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, config, calib);
 
     if (show_grid) vis::show_grid(config, calib);
+
+    if (show_safe_radius) vis::show_safe_radius(config, calib);
   }
 
   void draw_scene() {

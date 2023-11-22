@@ -37,7 +37,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vis_utils.h>
 #include <pangolin/gl/glfont.h>
 
+namespace pangolin {
+extern "C" const unsigned char AnonymousPro_ttf[];
+}
+
 namespace basalt::vis {
+
+pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
 
 using Eigen::MatrixXf;
 using Eigen::Vector2d;
@@ -57,8 +63,8 @@ bool try_draw_image_text(pangolin::ImageView& view, float x, float y, const pang
 }
 
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& view,
-               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights,
-               bool show_ids) {
+               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights, bool show_ids,
+               bool show_responses) {
   glLineWidth(1.0);
   glColor3ubv(RED);
   glEnable(GL_BLEND);
@@ -68,22 +74,25 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pa
   if (cam_id >= keypoints.size()) return;
 
   const Keypoints& kp_map = keypoints[cam_id];
+  const KeypointResponses& responses = curr_vis_data->opt_flow_res->keypoint_responses[cam_id];
 
-  for (const auto& kv : kp_map) {
-    bool show = !filter_highlights || is_selected(highlights, kv.first);
+  for (const auto& [lmid, pose] : kp_map) {
+    bool show = !filter_highlights || is_selected(highlights, lmid);
     if (!show) continue;
 
-    MatrixXf transformed_patch = kv.second.linear() * opt_flow->patch_coord;
-    transformed_patch.colwise() += kv.second.translation();
+    MatrixXf transformed_patch = pose.linear() * opt_flow->patch_coord;
+    transformed_patch.colwise() += pose.translation();
 
     for (int i = 0; i < transformed_patch.cols(); i++) {
       const Vector2f c = transformed_patch.col(i);
       pangolin::glDrawCirclePerimeter(c[0], c[1], 0.5F);
     }
 
-    const Vector2f c = kv.second.translation();
+    const Vector2f c = pose.translation();
 
-    if (show_ids) try_draw_image_text(view, c[0] + 5, c[1] + 5, pangolin::GlFont::I().Text("%d", kv.first));
+    if (show_ids) try_draw_image_text(view, c[0] + 5, c[1] + 5, pangolin::GlFont::I().Text("%d", lmid));
+    if (show_responses && responses.count(lmid) > 0)
+      try_draw_image_text(view, c[0] + 5, c[1], pangolin::GlFont::I().Text("%.1f", responses.at(lmid)));
   }
 
   pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
@@ -161,6 +170,40 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
   glDrawCirclePerimeters(prev_points, radius);
 
   glColor4f(1, 0.59, 0, 0.5);
+  pangolin::glDrawLines(guess_lines);
+  glDrawCirclePerimeters(guess_points, radius);
+}
+
+void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
+                         bool filter_highlights) {
+  auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
+  auto guess_obs = curr_vis_data->opt_flow_res->recall_guesses.at(cam_id);
+
+  std::vector<Vector2f> guess_lines;
+  std::vector<Vector2f> guess_points;
+
+  guess_lines.reserve(new_kpts.size());
+  guess_points.reserve(new_kpts.size());
+
+  float radius = 1.0F;
+  glColor4f(255 / 255.0F, 13 / 255.0F, 134 / 255.0F, 0.9);
+
+  // Draw tracked features in previous frame
+  for (auto& [kpid, kpt] : guess_obs) {
+    bool show = !filter_highlights || is_selected(highlights, kpid);
+    if (!show) continue;
+
+    auto g = kpt.translation();
+    guess_points.emplace_back(g);
+    pangolin::GlFont::I().Text("%zu", kpid).Draw(5 + g.x(), 5 + g.y());
+
+    if (new_kpts.count(kpid) > 0) {
+      auto n = new_kpts.at(kpid).translation();
+      guess_lines.emplace_back(g);
+      guess_lines.emplace_back(n);
+    }
+  }
+
   pangolin::glDrawLines(guess_lines);
   glDrawCirclePerimeters(guess_points, radius);
 }
@@ -354,6 +397,13 @@ void show_grid(const VioConfig& config, const Calibration<double>& calib) {
     grid_lines.emplace_back(x_end, y);
   }
   pangolin::glDrawLines(grid_lines);
+}
+
+void show_safe_radius(const VioConfig& config, const Calibration<double>& calib) {
+  glColor4f(1.0, 0.0, 1.0, 0.25);
+  int w = calib.resolution.at(0).x();
+  int h = calib.resolution.at(0).y();
+  pangolin::glDrawCirclePerimeter(w / 2, h / 2, config.optical_flow_image_safe_radius);
 }
 
 void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
@@ -555,7 +605,7 @@ void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangoli
           float u = x + xoff - 0.25;
           float v = i + y;
           glColor3ubv(c > 0 ? GREEN : RED);
-          auto text = pangolin::GlFont::I().Text("%.2f", c);
+          auto text = SMALL_FONT.Text("%.2f", c);
           try_draw_image_text(blocks_view, u, v, text);
         }
       }

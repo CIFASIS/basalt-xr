@@ -586,7 +586,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       float default_depth = config.optical_flow_matching_default_depth;
       double avg_depth = valid ? num_features / avg_invdepth : default_depth;
 
-      opt_flow_depth_guess_queue->push(avg_depth);
+      if (opt_flow_depth_guess_queue) opt_flow_depth_guess_queue->push(avg_depth);
     }
 
     if (features_ext) {
@@ -602,8 +602,29 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         }
       }
     }
-    out_state_queue->push(data);
-    opt_flow_state_queue->push(data);
+    if (out_state_queue) out_state_queue->push(data);
+    if (opt_flow_state_queue) opt_flow_state_queue->push(data);
+  }
+
+  bool lm_bundle_needed = opt_flow_lm_bundle_queue && config.optical_flow_recall_enable;
+  if (lm_bundle_needed) {
+    LandmarkBundle::Ptr lmb = std::make_shared<LandmarkBundle>();
+    lmb->ts = last_state_t_ns;
+    for (const auto& [lmid, lm] : lmdb.getLandmarks()) {
+      if (frame_poses.count(lm.host_kf_id.frame_id) == 0) continue;
+      SE3 T_w_i = frame_poses.at(lm.host_kf_id.frame_id).getPose();
+      SE3 T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
+      SE3 T_w_c = T_w_i * T_i_c;
+
+      Vec4 pt_c = StereographicParam<Scalar>::unproject(lm.direction);
+      pt_c *= 1 / lm.inv_dist;  // scale by depth
+      pt_c[3] = 1;
+
+      Vec4 pt_w = T_w_c * pt_c;
+      lmb->lmids.emplace_back(lmid);
+      lmb->lms.emplace_back(pt_w.template cast<float>());
+    }
+    opt_flow_lm_bundle_queue->push(lmb);
   }
 
   if (out_vis_queue) {
@@ -714,59 +735,102 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     while (kf_ids.size() > max_kfs && !states_to_marg_vel_bias.empty()) {
       int64_t id_to_marg = -1;
 
-      // starting from the oldest kf (and skipping the newest 2 kfs), try to
-      // find a kf that has less than a small percentage of it's landmarks
-      // tracked by the current frame
-      if (kf_ids.size() > 2) {
-        // Note: size > 2 check is to ensure prev(kf_ids.end(), 2) is valid
-        auto end_minus_2 = std::prev(kf_ids.end(), 2);
+      if (config.vio_kf_marg_criteria == KeyframeMargCriteria::KF_MARG_FORWARD_VECTOR) {
+        // TODO: With feature recall enabled, we needed a better marginalization
+        // criteria since "unconnected observations" is now not always something
+        // bad because they can be reconnected. The KF_MARG_FORWARD_VECTOR
+        // criteria tries to keep keyframes with forward vectors as spread as
+        // possible but it is just a basic approach. A more complete approach
+        // should also prioritize keyframes that: are older, have more features,
+        // have better quality features.
+        if (kf_ids.size() > 2 && id_to_marg < 0) {
+          auto end_minus_2 = std::prev(kf_ids.end(), 2);
+          Scalar min_score = std::numeric_limits<Scalar>::max();
+          int64_t min_score_id = -1;
 
-        for (auto it = kf_ids.begin(); it != end_minus_2; ++it) {
-          if (num_points_connected.count(*it) == 0 ||
-              (num_points_connected.at(*it) / static_cast<float>(num_points_kf.at(*it)) <
-               config.vio_kf_marg_feature_ratio)) {
-            id_to_marg = *it;
-            break;
+          auto get_forward_vector2d = [&](int64_t ts) -> Vec2 {
+            SE3 T_w_i = frame_poses.at(ts).getPose();
+            SE3 T_w_c0 = T_w_i * calib.T_i_c[0];
+            Vec3 fwd3d = T_w_c0.so3() * Vec3{0, 0, 1};
+            Vec2 fwd2d = fwd3d.template head<2>();
+            return fwd2d;
+          };
+
+          for (auto it1 = kf_ids.begin(); it1 != end_minus_2; ++it1) {
+            Vec2 fwd1 = get_forward_vector2d(*it1);
+            Scalar score = 0;
+            for (auto it2 = kf_ids.begin(); it2 != end_minus_2; ++it2) {
+              Vec2 fwd2 = get_forward_vector2d(*it2);
+              Scalar dot = std::clamp(fwd1.dot(fwd2), Scalar(-1), Scalar(1));  // clamp needed, otherwise acos can fail
+              Scalar angle = acos(dot);
+              score += angle;
+            }
+
+            if (score < min_score) {
+              min_score_id = *it1;
+              min_score = score;
+            }
+          }
+
+          id_to_marg = min_score_id;
+        }
+      } else if (config.vio_kf_marg_criteria == KeyframeMargCriteria::KF_MARG_DEFAULT) {
+        // starting from the oldest kf (and skipping the newest 2 kfs), try to
+        // find a kf that has less than a small percentage of it's landmarks
+        // tracked by the current frame
+        if (kf_ids.size() > 2) {
+          // Note: size > 2 check is to ensure prev(kf_ids.end(), 2) is valid
+          auto end_minus_2 = std::prev(kf_ids.end(), 2);
+
+          for (auto it = kf_ids.begin(); it != end_minus_2; ++it) {
+            if (num_points_connected.count(*it) == 0 ||
+                (num_points_connected.at(*it) / static_cast<float>(num_points_kf.at(*it)) <
+                 config.vio_kf_marg_feature_ratio)) {
+              id_to_marg = *it;
+              break;
+            }
           }
         }
-      }
 
-      // Note: This score function is taken from DSO, but it seems to mostly
-      // marginalize the oldest keyframe. This may be due to the fact that
-      // we don't have as long-lived landmarks, which may change if we ever
-      // implement "rediscovering" of lost feature tracks by projecting
-      // untracked landmarks into the localized frame.
-      if (kf_ids.size() > 2 && id_to_marg < 0) {
-        // Note: size > 2 check is to ensure prev(kf_ids.end(), 2) is valid
-        auto end_minus_2 = std::prev(kf_ids.end(), 2);
+        // Note: This score function is taken from DSO, but it seems to mostly
+        // marginalize the oldest keyframe. This may be due to the fact that
+        // we don't have as long-lived landmarks, which may change if we ever
+        // implement "rediscovering" of lost feature tracks by projecting
+        // untracked landmarks into the localized frame.
+        if (kf_ids.size() > 2 && id_to_marg < 0) {
+          // Note: size > 2 check is to ensure prev(kf_ids.end(), 2) is valid
+          auto end_minus_2 = std::prev(kf_ids.end(), 2);
 
-        int64_t last_kf = *kf_ids.crbegin();
-        Scalar min_score = std::numeric_limits<Scalar>::max();
-        int64_t min_score_id = -1;
+          int64_t last_kf = *kf_ids.crbegin();
+          Scalar min_score = std::numeric_limits<Scalar>::max();
+          int64_t min_score_id = -1;
 
-        for (auto it1 = kf_ids.begin(); it1 != end_minus_2; ++it1) {
-          // small distance to other keyframes --> higher score
-          Scalar denom = 0;
-          for (auto it2 = kf_ids.begin(); it2 != end_minus_2; ++it2) {
-            denom +=
-                1 /
-                ((frame_poses.at(*it1).getPose().translation() - frame_poses.at(*it2).getPose().translation()).norm() +
-                 Scalar(1e-5));
+          for (auto it1 = kf_ids.begin(); it1 != end_minus_2; ++it1) {
+            // small distance to other keyframes --> higher score
+            Scalar denom = 0;
+            for (auto it2 = kf_ids.begin(); it2 != end_minus_2; ++it2) {
+              denom +=
+                  1 / ((frame_poses.at(*it1).getPose().translation() - frame_poses.at(*it2).getPose().translation())
+                           .norm() +
+                       Scalar(1e-5));
+            }
+
+            // small distance to latest kf --> lower score
+            Scalar score = std::sqrt((frame_poses.at(*it1).getPose().translation() -
+                                      frame_states.at(last_kf).getState().T_w_i.translation())
+                                         .norm()) *
+                           denom;
+
+            if (score < min_score) {
+              min_score_id = *it1;
+              min_score = score;
+            }
           }
 
-          // small distance to latest kf --> lower score
-          Scalar score = std::sqrt((frame_poses.at(*it1).getPose().translation() -
-                                    frame_states.at(last_kf).getState().T_w_i.translation())
-                                       .norm()) *
-                         denom;
-
-          if (score < min_score) {
-            min_score_id = *it1;
-            min_score = score;
-          }
+          id_to_marg = min_score_id;
         }
-
-        id_to_marg = min_score_id;
+      } else {
+        BASALT_ASSERT_MSG(false, "Unexpected marginalization criteria");
       }
 
       // if no frame was selected, the logic above is faulty

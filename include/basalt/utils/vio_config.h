@@ -35,11 +35,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace basalt {
 
 enum class LinearizationType { ABS_QR, ABS_SC, REL_SC };
 enum class MatchingGuessType { SAME_PIXEL, REPROJ_FIX_DEPTH, REPROJ_AVG_DEPTH };
+enum class KeyframeMargCriteria { KF_MARG_DEFAULT, KF_MARG_FORWARD_VECTOR };
 
 struct VioConfig {
   VioConfig();
@@ -60,6 +62,14 @@ struct VioConfig {
   int optical_flow_skip_frames;
   MatchingGuessType optical_flow_matching_guess_type;
   float optical_flow_matching_default_depth;
+  float optical_flow_image_safe_radius;                    // Use to mask black corners in cameras
+  bool optical_flow_recall_enable;                         // Enable feature/landmark recall
+  bool optical_flow_recall_all_cams;                       // Recall in all cameras, not just cam0
+  bool optical_flow_recall_num_points_cell;                // Respect gridcell feature limit
+  bool optical_flow_recall_over_tracking;                  // Always perform recall, even on already tracked features
+  bool optical_flow_recall_update_patch_viewpoint;         // Update feature patch when succesfully recalled
+  float optical_flow_recall_max_patch_dist;                // Maximum distance in % of width to accept a recall, or 0
+  std::vector<float> optical_flow_recall_max_patch_norms;  // Maximum patch residual norm to accept a recall
 
   LinearizationType vio_linearization_type;
   bool vio_sqrt_marg;
@@ -94,6 +104,7 @@ struct VioConfig {
 
   bool vio_marg_lost_landmarks;
   double vio_kf_marg_feature_ratio;
+  KeyframeMargCriteria vio_kf_marg_criteria;  // Keyframe removal criteria
 
   double mapper_obs_std_dev;
   double mapper_obs_huber_thresh;

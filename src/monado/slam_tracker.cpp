@@ -302,6 +302,7 @@ struct slam_tracker::implementation {
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
     vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
+    vio->opt_flow_lm_bundle_queue = &opt_flow_ptr->input_lm_bundle_queue;
 
     if (!marg_data_path.empty()) {
       marg_data_saver.reset(new MargDataSaver(marg_data_path));

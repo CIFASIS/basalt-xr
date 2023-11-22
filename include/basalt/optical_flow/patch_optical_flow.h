@@ -410,7 +410,8 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     KeypointsData kd;  // Detected new points
     detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
                     config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
-                    config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
+                    config.optical_flow_detection_max_threshold, config.optical_flow_image_safe_radius,
+                    transforms->input_images->masks.at(cam_id), pts);
 
     Keypoints new_kpts;
     for (auto& corner : kd.corners) {  // Set new points as keypoints

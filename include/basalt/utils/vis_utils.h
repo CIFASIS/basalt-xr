@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pangolin/display/image_view.h>
 #include <pangolin/gl/gldraw.h>
+#include <pangolin/gl/glfont.h>
 
 #include <basalt/vi_estimator/vio_estimator.h>
 #include <basalt/utils/sophus_utils.hpp>
@@ -52,26 +53,31 @@ const float MAX_DEPTH_COLOR[3]{1, 0.1, 0.42};       // pink
 const uint8_t MIN_DEPTH_COLOR_UB[3]{69, 201, 255};  // blue
 const uint8_t MAX_DEPTH_COLOR_UB[3]{255, 26, 107};  // pink
 
-inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const uint8_t* color, float sizeFactor) {
+inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const uint8_t* color, float sizeFactor,
+                          bool show_fwd = false) {
   const float sz = sizeFactor;
   const float width = 640, height = 480, fx = 500, fy = 500, cx = 320, cy = 240;
 
-  const Eigen::aligned_vector<Eigen::Vector3f> lines = {{0, 0, 0},
-                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-                                                        {0, 0, 0},
-                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {0, 0, 0},
-                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {0, 0, 0},
-                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
-                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
-                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
-                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-                                                        {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
-                                                        {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz}};
+  Eigen::aligned_vector<Eigen::Vector3f> lines = {{0, 0, 0},
+                                                  {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                  {0, 0, 0},
+                                                  {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {0, 0, 0},
+                                                  {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {0, 0, 0},
+                                                  {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                  {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                  {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz},
+                                                  {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                  {sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz},
+                                                  {sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz}};
+  if (show_fwd) {
+    lines.emplace_back(0, 0, 0);
+    lines.emplace_back(0, 0, 1);
+  }
 
   glPushMatrix();
   glMultMatrixd(T_w_c.data());
@@ -138,6 +144,8 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
 
 namespace basalt::vis {
 
+extern pangolin::GlFont SMALL_FONT;
+
 const uint8_t BLUE[4]{0x21, 0x96, 0xF3, 0xFF};
 const uint8_t GREEN[4]{0x4C, 0xAF, 0x50, 0xFF};
 const uint8_t RED[4]{0xF4, 0x43, 0x36, 0xFF};
@@ -157,8 +165,8 @@ Selection parse_selection(const std::string& str);
 bool is_selected(const Selection& selection, size_t n);
 
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& v,
-               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights,
-               bool show_ids);
+               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights, bool show_ids,
+               bool show_responses);
 
 void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
                      pangolin::ImageView& v, bool show_ids);
@@ -171,6 +179,9 @@ void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr
                              const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
                              const Selection& highlights, bool filter_highlights);
 
+void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
+                         bool filter_highlights);
+
 void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
                            bool filter_highlights);
 
@@ -179,6 +190,8 @@ void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
 void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, const Calibration<double>& calib);
 
 void show_grid(const VioConfig& config, const Calibration<double>& calib);
+
+void show_safe_radius(const VioConfig& config, const Calibration<double>& calib);
 
 void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
                   const Calibration<double>& calib, const Selection& highlights, bool filter_highlights,

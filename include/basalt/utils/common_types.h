@@ -100,6 +100,7 @@ struct KeypointsData {
   /// collection of feature descriptors with same index as `corners` (indexed by
   /// FeatureId)
   std::vector<std::bitset<256>> corner_descriptors;
+  std::vector<float> corner_responses;
 
   Eigen::aligned_vector<Eigen::Vector4d> corners_3d;
 
