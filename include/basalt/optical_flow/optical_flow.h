@@ -49,6 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/patch.h>
 #include <basalt/utils/assert.h>
 #include <basalt/utils/keypoints.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
@@ -77,6 +78,7 @@ struct LandmarkBundle {
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
   using Vec3 = Eigen::Matrix<double, 3, 1>;
+  using UIMAT = vis::UIMAT;
 
   OpticalFlowInput() = default;
 
@@ -89,11 +91,10 @@ struct OpticalFlowInput {
   std::vector<ImageData> img_data;
 
   // Recorded internal pipeline values for UI playback
-  double depth_guess = -1;
-
-  bool state_reset = false;
-
-  std::vector<Masks> masks;  //!< Regions of the image to ignore
+  double depth_guess = -1;        //!< Depth guess to use for all features
+  bool state_reset = false;       //!< Whether to schedule a state reset in the backend
+  std::vector<Masks> masks{};     //!< Regions of the image to ignore
+  UIMAT show_uimat = UIMAT::ALL;  //!< Which matrix to compute for the UI
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) { stats.addTime(name, custom_ts); }

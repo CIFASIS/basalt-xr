@@ -459,9 +459,7 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& opt
 
     BASALT_ASSERT(frame_states.empty());
 
-    for (const auto& kv : frame_poses) {
-      data->frames.emplace_back(kv.second.getPose().template cast<double>());
-    }
+    for (const auto& [ts, p] : frame_poses) data->frames[ts] = p.getPose().template cast<double>();
 
     get_current_points(data->points, data->point_ids);
 

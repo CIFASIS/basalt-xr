@@ -148,10 +148,12 @@ bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurem
   // drain_input_queues();
   frame_states.clear();
   frame_poses.clear();
+  frame_idx.clear();
   lmdb.clear();
 
   take_kf = true;
   frames_after_kf = 0;
+  frame_count = 0;
   kf_ids.clear();
   ltkfs.clear();
   imu_meas.clear();
@@ -212,6 +214,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(int64_t t_ns, const Sophus::S
   imu_meas[t_ns] = IntegratedImuMeasurement<Scalar>(t_ns, bg.cast<Scalar>(), ba.cast<Scalar>());
   frame_states[t_ns] = PoseVelBiasStateWithLin<Scalar>(t_ns, T_w_i_init, vel_w_i.cast<Scalar>(), bg.cast<Scalar>(),
                                                        ba.cast<Scalar>(), true);
+  frame_idx[t_ns] = frame_count++;
 
   marg_data.order.abs_order_map[t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
   marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
@@ -289,6 +292,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
         imu_meas[last_state_t_ns] = IntegratedImuMeasurement<Scalar>(last_state_t_ns, bg, ba);
         frame_states[last_state_t_ns] =
             PoseVelBiasStateWithLin<Scalar>(last_state_t_ns, T_w_i_init, vel_w_i_init, bg, ba, true);
+        frame_idx[last_state_t_ns] = frame_count++;
 
         marg_data.order.abs_order_map[last_state_t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
         marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
@@ -408,6 +412,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     next_state.t_ns = opt_flow_meas->t_ns;
 
     frame_states[last_state_t_ns] = PoseVelBiasStateWithLin<Scalar>(next_state);
+    frame_idx[last_state_t_ns] = frame_count++;
 
     imu_meas[meas->get_start_t_ns()] = *meas;
   }
@@ -474,6 +479,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     take_kf = false;
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
+    if (visual_data) visual_data->keyframed_idx[last_state_t_ns] = frame_idx.at(last_state_t_ns);
 
     int num_points_added = 0;
     for (int i = 0; i < NUM_CAMS; i++) {
@@ -643,14 +649,14 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   }
 
   if (out_vis_queue) {
-    for (const auto& kv : frame_states) {
-      visual_data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
-    }
+    for (const auto& [ts, p] : frame_states) visual_data->states[ts] = p.getState().T_w_i.template cast<double>();
 
     for (const auto& [ts, pstate] : frame_poses) {
-      Eigen::aligned_vector<Sophus::SE3d>& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
-      frames.emplace_back(pstate.getPose().template cast<double>());
+      auto& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
+      frames[ts] = pstate.getPose().template cast<double>();
     }
+
+    visual_data->frame_idx = frame_idx;
 
     get_current_points(visual_data->points, visual_data->point_ids);
 
@@ -689,6 +695,20 @@ Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargNullspace() const {
 template <class Scalar_>
 Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues() const {
   return checkEigenvalues(nullspace_marg_data, false);
+}
+
+template <class Scalar>
+bool SqrtKeypointVioEstimator<Scalar>::show_uimat(UIMAT m) const {
+  UIMAT showed = prev_opt_flow_res.at(last_state_t_ns)->input_images->show_uimat;
+
+  bool show_none = showed == UIMAT::NONE;
+  if (show_none) return false;
+
+  bool ui_enabled = out_vis_queue != nullptr;
+  bool show_all = showed == UIMAT::ALL;
+  bool show_this = showed == m;
+  bool res = ui_enabled && (show_all || show_this);
+  return res;
 }
 
 template <class Scalar_>
@@ -909,7 +929,11 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                                               &lost_landmaks, last_state_to_marg);
 
       lqr->linearizeProblem();
+
+      if (show_uimat(UIMAT::JR_M)) visual_data->getj(UIMAT::JR_M).Jr = lqr->getUILandmarkBlocks();
+
       lqr->performQR();
+      if (show_uimat(UIMAT::JR_M_QR)) visual_data->getj(UIMAT::JR_M_QR).Jr = lqr->getUILandmarkBlocks();
 
       if (is_lin_sqrt && marg_data.is_sqrt) {
         lqr->get_dense_Q2Jp_Q2r(Q2Jp_or_H, Q2r_or_b);
@@ -1067,7 +1091,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     for (const int64_t id : states_to_marg_all) {
+      if (visual_data) visual_data->marginalized_idx[id] = frame_idx.at(id);
       frame_states.erase(id);
+      frame_idx.erase(id);
       imu_meas.erase(id);
       prev_opt_flow_res.erase(id);
     }
@@ -1082,7 +1108,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     for (const int64_t id : poses_to_marg) {
+      if (visual_data) visual_data->marginalized_idx[id] = frame_idx.at(id);
       frame_poses.erase(id);
+      frame_idx.erase(id);
       prev_opt_flow_res.erase(id);
     }
 
@@ -1110,6 +1138,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     marg_data.H = marg_H_new;
     marg_data.b = marg_b_new;
     marg_data.order = marg_order_new;
+
+    if (show_uimat(UIMAT::HB_M)) {
+      visual_data->geth(UIMAT::HB_M).H = std::make_shared<Eigen::MatrixXf>(marg_H_new.template cast<float>());
+      visual_data->geth(UIMAT::HB_M).b = std::make_shared<Eigen::VectorXf>(marg_b_new.template cast<float>());
+      visual_data->geth(UIMAT::HB_M).aom = std::make_shared<AbsOrderMap>(marg_order_new);
+    }
 
     BASALT_ASSERT(size_t(marg_data.H.cols()) == marg_data.order.total_size);
 
@@ -1262,8 +1296,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         // linearize residuals
         bool numerically_valid;
         error_total = lqr->linearizeProblem(&numerically_valid);
-
-        if (out_vis_queue) visual_data->landmark_blocks = lqr->getUILandmarkBlocks();
+        if (show_uimat(UIMAT::JR)) visual_data->getj(UIMAT::JR).Jr = lqr->getUILandmarkBlocks();
 
         BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
         stats.add("linearizeProblem", t.reset()).format("ms");
@@ -1282,6 +1315,8 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
         // marginalize points in place
         lqr->performQR();
+        if (show_uimat(UIMAT::JR_QR)) visual_data->getj(UIMAT::JR_QR).Jr = lqr->getUILandmarkBlocks();
+
         stats.add("performQR", t.reset()).format("ms");
       }
 
@@ -1380,6 +1415,12 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
           if (!inc_valid) {
             std::cerr << "Still invalid inc after " << max_num_iter << " iterations." << std::endl;
+          }
+
+          if (show_uimat(UIMAT::HB)) {
+            visual_data->geth(UIMAT::HB).H = std::make_shared<Eigen::MatrixXf>(H.template cast<float>());
+            visual_data->geth(UIMAT::HB).b = std::make_shared<Eigen::VectorXf>(b.template cast<float>());
+            visual_data->geth(UIMAT::HB).aom = std::make_shared<AbsOrderMap>(aom);
           }
         }
 

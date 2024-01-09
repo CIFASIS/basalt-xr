@@ -507,11 +507,11 @@ void draw_scene() {
   auto it = vis_map.find(gt_frame_t_ns[frame_id]);
 
   if (it != vis_map.end()) {
-    for (const auto& p : it->second->states)
+    for (const auto& [ts, p] : it->second->states)
       for (size_t i = 0; i < calib.T_i_c.size(); i++)
         render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
 
-    for (const auto& p : it->second->frames)
+    for (const auto& [ts, p] : it->second->frames)
       for (size_t i = 0; i < calib.T_i_c.size(); i++)
         render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
 

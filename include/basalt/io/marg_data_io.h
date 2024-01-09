@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <memory>
 #include <thread>
 
+#include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/imu_types.h>
 
 namespace basalt {

@@ -356,6 +356,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/tracks.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/union_find.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/vio_config.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/vis_matrices.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/vis_utils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/ba_base.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/landmark_database.h
@@ -389,8 +390,8 @@ target_sources(basalt_internal
 )
 
 target_link_libraries(basalt_internal
-  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado
-  PRIVATE basalt::magic_enum nlohmann::json fmt::fmt)
+  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado basalt::magic_enum
+  PRIVATE nlohmann::json fmt::fmt)
 target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
 #target_compile_definitions(basalt_internal PUBLIC BASALT_DISABLE_ASSERTS)

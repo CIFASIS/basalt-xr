@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 
 #include <basalt/imu/preintegration.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/utils/time_utils.hpp>
 
 #include <basalt/vi_estimator/sqrt_ba_base.h>
@@ -62,6 +63,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   using MatN3 = Eigen::Matrix<Scalar, N, 3>;
   using MatX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
   using SE3 = Sophus::SE3<Scalar>;
+  using UIMAT = vis::UIMAT;
 
   using typename SqrtBundleAdjustmentBase<Scalar>::RelLinData;
   using typename SqrtBundleAdjustmentBase<Scalar>::AbsLinData;
@@ -125,6 +127,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   void marginalize(const std::map<int64_t, int>& num_points_connected,
                    const std::unordered_set<KeypointId>& lost_landmaks);
   void optimize();
+
+  bool show_uimat(UIMAT m) const;
 
   void debug_finalize() override;
 
@@ -206,9 +210,11 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
  private:
   bool take_kf;
   int frames_after_kf;
+  size_t frame_count = 0;
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
+  Eigen::aligned_map<int64_t, size_t> frame_idx;
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

@@ -44,7 +44,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sophus/se3.hpp>
 
 #include <basalt/imu/imu_types.h>
-#include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/common_types.h>
 #include <basalt/utils/sophus_utils.hpp>
 
@@ -57,6 +56,8 @@ class IntegratedImuMeasurement;
 
 template <class Scalar_>
 struct PoseStateWithLin;
+
+struct OpticalFlowResult;
 
 namespace constants {
 static const Eigen::Vector3d g(0, 0, -9.81);
@@ -331,7 +332,7 @@ struct MargData {
   std::set<int64_t> kfs_to_marg;
   bool use_imu;
 
-  std::vector<OpticalFlowResult::Ptr> opt_flow_res;
+  std::vector<std::shared_ptr<OpticalFlowResult>> opt_flow_res;
 };
 
 struct RelPoseFactor {

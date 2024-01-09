@@ -314,7 +314,7 @@ struct slam_tracker::implementation {
     running = true;
     vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
-    if (show_gui) ui.start(vio->getT_w_i_init(), calib, vio_config, &opt_flow_ptr->input_depth_queue, opt_flow_ptr);
+    if (show_gui) ui.start(vio->getT_w_i_init(), calib, vio_config, opt_flow_ptr, vio);
     state_consumer_thread = thread(&slam_tracker::implementation::state_consumer, this);
     if (print_queue) queues_printer_thread = thread(&slam_tracker::implementation::queues_printer, this);
   }
@@ -365,6 +365,7 @@ struct slam_tracker::implementation {
 
     if (i == 0) {
       partial_frame = make_shared<OpticalFlowInput>(cam_count);
+      partial_frame->show_uimat = ui.get_mat_to_show();
 
       partial_frame->t_ns = s.timestamp;
 

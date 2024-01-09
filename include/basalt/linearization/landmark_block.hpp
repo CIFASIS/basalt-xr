@@ -4,10 +4,14 @@
 #include <Eigen/Sparse>
 
 #include <basalt/optimization/accumulator.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/vi_estimator/landmark_database.h>
 #include <basalt/linearization/block_diagonal.hpp>
 
 namespace basalt {
+
+using vis::UILandmarkBlock;
+using vis::UILandmarkBlocks;
 
 template <class Scalar>
 struct RelPoseLin {
@@ -19,25 +23,6 @@ struct RelPoseLin {
   Mat6 d_rel_d_t;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
-
-struct UILandmarkBlock {
-  using MatrixXfr = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-  std::shared_ptr<MatrixXfr> storage;
-  LandmarkId lmid = -1;
-};
-
-struct UILandmarkBlocks {
-  using Ptr = std::shared_ptr<UILandmarkBlocks>;
-  std::vector<UILandmarkBlock> blocks;
-  AbsOrderMap aom;
-
-  size_t getW() const { return blocks.empty() ? 0 : blocks[0].storage->cols(); }
-  size_t getH() const {
-    size_t h = 0;
-    for (const UILandmarkBlock& lmb : blocks) h += lmb.storage->rows();
-    return h;
-  }
 };
 
 template <typename Scalar>

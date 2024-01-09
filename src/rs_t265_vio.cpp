@@ -313,7 +313,7 @@ int main(int argc, char** argv) {
 
       if (follow) {
         if (curr_vis_data.get()) {
-          auto T_w_i = curr_vis_data->states.back();
+          auto T_w_i = curr_vis_data->states.rbegin()->second;
           T_w_i.so3() = Sophus::SO3d();
 
           camera.Follow(T_w_i.matrix());
@@ -417,14 +417,14 @@ void draw_scene() {
   pangolin::glDrawLineStrip(sub_gt);
 
   if (curr_vis_data.get()) {
-    for (const auto& p : curr_vis_data->states)
+    for (const auto& [ts, p] : curr_vis_data->states)
       for (const auto& t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0f, state_color, 0.1f);
 
-    for (const auto& p : curr_vis_data->frames)
+    for (const auto& [ts, p] : curr_vis_data->frames)
       for (const auto& t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0f, pose_color, 0.1f);
 
     for (const auto& t_i_c : calib.T_i_c)
-      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0f, cam_color, 0.1f);
+      render_camera((curr_vis_data->states.rbegin()->second * t_i_c).matrix(), 2.0f, cam_color, 0.1f);
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(curr_vis_data->points);

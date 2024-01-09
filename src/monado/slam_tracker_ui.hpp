@@ -7,6 +7,8 @@
 #include <string>
 #include <thread>
 
+#include <magic_enum.hpp>
+
 #include <CLI/CLI.hpp>
 
 #include <sophus/se3.hpp>
@@ -21,6 +23,7 @@
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/utils/vio_config.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/utils/vis_utils.h>
 #include <basalt/vi_estimator/vio_estimator.h>
 
@@ -37,6 +40,8 @@
 
 namespace xrt::auxiliary::tracking::slam {
 
+using namespace basalt;
+using namespace Eigen;
 using std::cout;
 using std::make_shared;
 using std::shared_ptr;
@@ -44,11 +49,9 @@ using std::string;
 using std::thread;
 using std::to_string;
 using std::vector;
-using namespace basalt;
-using namespace Eigen;
-using Button = pangolin::Var<std::function<void(void)>>;
+using vis::UIMAT;
 
-class slam_tracker_ui {
+class slam_tracker_ui : vis::VIOUIBase {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
@@ -60,19 +63,11 @@ class slam_tracker_ui {
   size_t num_cams = 0;
   std::atomic<bool> running = false;
 
-  pangolin::View *img_view_display;
-  pangolin::View *plot_display;
-  pangolin::View *blocks_display;
-  std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
-  bool show_blocks = false;
-
-  int UI_WIDTH_PIX = 200;
-  const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
-
  public:
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
   tbb::concurrent_queue<double> *opt_flow_depth_queue = nullptr;
-  OpticalFlowBase::Ptr opt_flow;
+
+  VioVisualizationData::Ptr get_curr_vis_data() override { return curr_vis_data; }
 
   void initialize(int ncams) {
     vio_data_log.Clear();
@@ -81,9 +76,10 @@ class slam_tracker_ui {
   }
 
   void start(const Sophus::SE3d &T_w_i_init, const Calibration<double> &calib, const VioConfig &config,
-             tbb::concurrent_queue<double> *ofq_depth, OpticalFlowBase::Ptr of) {
-    opt_flow_depth_queue = ofq_depth;
+             OpticalFlowBase::Ptr of, VioEstimatorBase::Ptr ve) {
+    opt_flow_depth_queue = &of->input_depth_queue;
     opt_flow = of;
+    vio = ve;
     running = true;
     start_visualization_thread();
     start_ui(T_w_i_init, calib, config);
@@ -108,12 +104,11 @@ class slam_tracker_ui {
     });
   }
 
-  vis::Selection highlights{};
-  bool is_highlighted(size_t lmid) const { return vis::is_selected(highlights, lmid); }
-
   int64_t start_t_ns = -1;
   std::vector<int64_t> vio_t_ns;
   Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
+
+  UIMAT get_mat_to_show() { return show_blocks ? (UIMAT)mat_to_show.Get() : UIMAT::NONE; }
 
   void log_vio_data(const PoseVelBiasState<double>::Ptr &data) {
     int64_t t_ns = data->t_ns;
@@ -146,22 +141,14 @@ class slam_tracker_ui {
 
   std::shared_ptr<pangolin::Plotter> plotter;
   pangolin::DataLog imu_data_log{};
-  Calibration<double> calib;
-  VioConfig config;
   void start_ui(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
     ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
   }
 
-  pangolin::Var<bool> follow{"ui.follow", true, false, true};
-  pangolin::Var<bool> show_est_pos{"ui.show_est_pos", true, false, true};
-  pangolin::Var<bool> show_est_vel{"ui.show_est_vel", false, false, true};
-  pangolin::Var<bool> show_est_bg{"ui.show_est_bg", false, false, true};
-  pangolin::Var<bool> show_est_ba{"ui.show_est_ba", false, false, true};
-
   void ui_runner(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
     calib = cal;
     config = conf;
-    string window_name = "Basalt 6DoF Tracker for Monado";
+    string window_name = "Basalt";
     pangolin::CreateWindowAndBind(window_name, 1800, 1000);
 
     glEnable(GL_DEPTH_TEST);
@@ -178,8 +165,7 @@ class slam_tracker_ui {
     auto blocks_view = std::make_shared<pangolin::ImageView>();
     blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
     blocks_view->extern_draw_function = [this](pangolin::View &v) {
-      vis::draw_blocks_overlay(curr_vis_data, dynamic_cast<pangolin::ImageView &>(v), highlights, filter_highlights,
-                               show_highlights, show_block_vals, show_ids);
+      draw_blocks_overlay(dynamic_cast<pangolin::ImageView &>(v));
     };
     const int DEFAULT_W = 480;
     blocks_display = &pangolin::CreateDisplay();
@@ -222,7 +208,7 @@ class slam_tracker_ui {
         // TODO: There is a small race condition here over
         // curr_vis_data that is also present in the original basalt examples
         if (curr_vis_data) {
-          auto T_w_i = curr_vis_data->states.back();
+          auto T_w_i = curr_vis_data->states.rbegin()->second;
           T_w_i.so3() = Sophus::SO3d();
 
           camera.Follow(T_w_i.matrix());
@@ -255,21 +241,26 @@ class slam_tracker_ui {
                                        img_data[cam_id].img->pitch, fmt);
           }
         }
-        if (follow_highlight) vis::follow_highlight(curr_vis_data, img_view, highlights, false);
+        if (follow_highlight) do_follow_highlight(false);
       }
 
       if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
         highlights = vis::parse_selection(highlight_landmarks);
         filter_highlights = filter_highlights && !highlights.empty();
-        if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
+        if (show_blocks) do_show_blocks(blocks_view);
       }
+
+      if (mat_to_show.GuiChanged()) {
+        mat_name = std::string(magic_enum::enum_name((UIMAT)mat_to_show.Get()));
+        if (show_blocks) do_show_blocks(blocks_view);
+      }
+
+      if (show_blocks) do_show_blocks(blocks_view);
 
       if (follow_highlight.GuiChanged())
         follow_highlight = follow_highlight && highlights.size() == 1 && !highlights[0].is_range;
 
       draw_plots();
-
-      if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
 
       pangolin::FinishFrame();
     }
@@ -278,94 +269,20 @@ class slam_tracker_ui {
     cout << "Finished ui_runner\n";
   }
 
-  bool toggle_blocks() {
-    show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
-    return show_blocks;
-  }
-
-  bool highlight_frame() {
-    std::set<KeypointId> kpids;
-    for (const auto &kps : curr_vis_data->opt_flow_res->keypoints)
-      for (const auto &[kpid, kp] : kps) kpids.insert(kpid);
-
-    std::string str = highlight_landmarks;
-    str.reserve(str.size() + kpids.size() * 10);
-    for (const KeypointId &kpid : kpids) str += std::to_string(kpid) + ",";
-    if (!str.empty()) str.pop_back();
-
-    highlight_landmarks = str;
-    highlight_landmarks.Meta().gui_changed = true;
-
-    return true;
-  }
-
-  pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
-  pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
-  pangolin::Var<bool> show_responses{"ui.show_responses", false, false, true};
-  pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
-  pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
-  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", false, false, true};
-  pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
-  pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
-  pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
-
-  pangolin::Var<std::string> highlight_landmarks{"ui.Highlight", ""};
-  pangolin::Var<bool> filter_highlights{"ui.filter_highlights", false, false, true};
-  pangolin::Var<bool> show_highlights{"ui.show_highlights", false, false, true};
-  pangolin::Var<bool> follow_highlight{"ui.follow_highlight", false, false, true};
-  Button highlight_frame_btn{"ui.highlight_frame", [this]() { highlight_frame(); }};
-
-  Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
-  pangolin::Var<bool> show_block_vals{"ui.show_block_vals", false, false, true};
-
-  pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
-  pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
-  pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
-  pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
-
-  pangolin::Var<bool> show_guesses{"ui.Show matching guesses", false, false, true};
-  pangolin::Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, false, true};
-  pangolin::Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, false, true};
-  pangolin::Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, false, true};
-  pangolin::Var<double> fixed_depth{"ui.FIX_DEPTH", 2, 0, 3};
-  pangolin::Var<bool> show_active_guess{"ui.Active Guess", true, false, true};
-
-  pangolin::Var<double> depth_guess{"ui.depth_guess", 2, pangolin::META_FLAG_READONLY};
-
   void draw_image_overlay(pangolin::ImageView &v, size_t cam_id) {
-    if (!curr_vis_data ||                                               //
-        !curr_vis_data->opt_flow_res ||                                 //
-        !curr_vis_data->opt_flow_res->input_images ||                   //
-        curr_vis_data->opt_flow_res->input_images->img_data.empty() ||  //
-        !curr_vis_data->opt_flow_res->input_images->img_data.at(0).img) {
-      return;
-    }
+    UNUSED(v);
+    if (curr_vis_data == nullptr) return;
 
-    if (show_obs) {
-      vis::show_obs(cam_id, curr_vis_data, v, config, calib, highlights, filter_highlights, show_same_pixel_guess,
-                    show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids,
-                    show_depth, show_guesses);
-    }
-
-    if (show_flow)
-      vis::show_flow(cam_id, curr_vis_data, v, opt_flow, highlights, filter_highlights, show_ids, show_responses);
-
-    if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
-
-    if (show_tracking_guess)
-      vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data, highlights, filter_highlights);
-
-    if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_masks) vis::show_masks(cam_id, curr_vis_data);
-
-    if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, config, calib);
-
-    if (show_grid) vis::show_grid(config, calib);
-
-    if (show_safe_radius) vis::show_safe_radius(config, calib);
+    if (show_obs) do_show_obs(cam_id);
+    if (show_flow) do_show_flow(cam_id);
+    if (show_highlights) do_show_highlights(cam_id);
+    if (show_tracking_guess) do_show_tracking_guess(cam_id, show_frame, prev_vis_data);
+    if (show_matching_guess) do_show_matching_guesses(cam_id);
+    if (show_recall_guess) do_show_recall_guesses(cam_id);
+    if (show_masks) do_show_masks(cam_id);
+    if (show_cam0_proj) do_show_cam0_proj(cam_id, depth_guess);
+    if (show_grid) do_show_grid();
+    if (show_safe_radius) do_show_safe_radius();
   }
 
   void draw_scene() {
@@ -382,14 +299,23 @@ class slam_tracker_ui {
 
     if (!curr_vis_data) return;
 
-    for (const auto &p : curr_vis_data->states)
-      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, state_color, 0.1);
+    for (size_t i = 0; i < calib.T_i_c.size(); i++)
+      if (!curr_vis_data->states.empty()) {
+        const auto &[ts, p] = *curr_vis_data->states.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+      } else if (!curr_vis_data->frames.empty()) {
+        const auto &[ts, p] = *curr_vis_data->frames.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+      }
 
-    for (const auto &p : curr_vis_data->frames)
-      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, pose_color, 0.1);
+    for (const auto &[ts, p] : curr_vis_data->states)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
 
-    for (const auto &t_i_c : calib.T_i_c)
-      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0, cam_color, 0.1);
+    for (const auto &[ts, p] : curr_vis_data->frames)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
+
+    for (const auto &[ts, p] : curr_vis_data->ltframes)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, vis::BLUE);
 
     glColor3ubv(pose_color);
     if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);

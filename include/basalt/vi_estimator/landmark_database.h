@@ -34,12 +34,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
 
+#include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/imu_types.h>
 #include <basalt/utils/eigen_utils.hpp>
 
 namespace basalt {
 
-using LandmarkId = KeypointId;
 template <class Scalar_>
 struct KeypointObservation {
   using Scalar = Scalar_;

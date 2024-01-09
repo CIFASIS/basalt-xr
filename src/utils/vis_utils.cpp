@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/vis_utils.h>
 #include <pangolin/gl/glfont.h>
+#include <pangolin/var/var.h>
 
 namespace pangolin {
 extern "C" const unsigned char AnonymousPro_ttf[];
@@ -44,13 +45,6 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 namespace basalt::vis {
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
-
-using Eigen::MatrixXf;
-using Eigen::Vector2d;
-using Eigen::Vector2f;
-using Eigen::Vector4d;
-using std::string;
-using std::vector;
 
 bool try_draw_image_text(pangolin::ImageView& view, float x, float y, const pangolin::GlText& text) {
   float xwin = -1;
@@ -62,9 +56,41 @@ bool try_draw_image_text(pangolin::ImageView& view, float x, float y, const pang
   return in_bounds;
 }
 
-void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& view,
-               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights, bool show_ids,
-               bool show_responses) {
+bool VIOUIBase::highligh_frame() {
+  VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return false;
+
+  std::set<KeypointId> kpids;
+  for (const auto& kps : get_curr_vis_data()->opt_flow_res->keypoints)
+    for (const auto& [kpid, kp] : kps) kpids.insert(kpid);
+
+  std::string str = highlight_landmarks;
+  str.reserve(str.size() + kpids.size() * 10);
+  for (const KeypointId& kpid : kpids) str += std::to_string(kpid) + ",";
+  if (!str.empty()) str.pop_back();
+
+  highlight_landmarks = str;
+  highlight_landmarks.Meta().gui_changed = true;
+
+  return true;
+}
+
+bool VIOUIBase::toggle_blocks() {
+  show_blocks = do_toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
+  return show_blocks;
+}
+
+bool VIOUIBase::take_ltkf() {
+  vio->takeLongTermKeyframe();
+  return true;
+}
+
+void VIOUIBase::do_show_flow(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glLineWidth(1.0);
   glColor3ubv(RED);
   glEnable(GL_BLEND);
@@ -98,8 +124,12 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pa
   pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
 }
 
-void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                     pangolin::ImageView& view, bool show_ids) {
+void VIOUIBase::do_show_highlights(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glColor3ubv(vis::GREEN);
 
   const std::vector<Keypoints>& keypoints = curr_vis_data->opt_flow_res->keypoints;
@@ -116,9 +146,10 @@ void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_da
   }
 }
 
-void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
-                         const VioVisualizationData::Ptr& prev_vis_data, const Selection& highlights,
-                         bool filter_highlights) {
+void VIOUIBase::do_show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& prev_vis_data) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   if (frame_id < 1) return;
 
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints[cam_id];
@@ -174,8 +205,10 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                         bool filter_highlights) {
+void VIOUIBase::do_show_recall_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
   auto guess_obs = curr_vis_data->opt_flow_res->recall_guesses.at(cam_id);
 
@@ -208,28 +241,22 @@ void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vi
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
-                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                             const Selection& highlights, bool filter_highlights) {
+void VIOUIBase::do_show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
+                                           const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map) {
   if (frame_id < 1) return;
 
-  int64_t now_ts = vio_dataset->get_image_timestamps().at(frame_id);
   int64_t prev_ts = vio_dataset->get_image_timestamps().at(frame_id - 1);
-
-  auto now_it = vis_map.find(now_ts);
   auto prev_it = vis_map.find(prev_ts);
-
-  auto end_it = vis_map.end();
-  if (now_it == end_it || prev_it == end_it) return;
-
-  const VioVisualizationData::Ptr& curr_vis_data = now_it->second;
+  if (prev_it == vis_map.end()) return;
   const VioVisualizationData::Ptr& prev_vis_data = prev_it->second;
 
-  show_tracking_guess(cam_id, frame_id, curr_vis_data, prev_vis_data, highlights, filter_highlights);
+  do_show_tracking_guess(cam_id, frame_id, prev_vis_data);
 }
 
-void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                           bool filter_highlights) {
+void VIOUIBase::do_show_matching_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
   auto cam0_kpts = curr_vis_data->opt_flow_res->keypoints.at(0);
   auto guess_obs = curr_vis_data->opt_flow_res->matching_guesses.at(cam_id);
@@ -283,14 +310,17 @@ void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data) {
+void VIOUIBase::do_show_masks(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   glColor4f(0.0, 1.0, 1.0, 0.1);
   for (const Rect& m : curr_vis_data->opt_flow_res->input_images->masks[cam_id].masks) {
     pangolin::glDrawRect(m.x, m.y, m.x + m.w, m.y + m.h);
   }
 }
 
-void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_cam0_proj(size_t cam_id, double depth_guess) {
   int C = config.optical_flow_detection_grid_size;
 
   int w = calib.resolution.at(0).x();
@@ -306,7 +336,7 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
   int y_last = y_stop + C / 2;
 
   std::vector<Vector2d> points;
-  auto drawPoint = [&points, &calib, w, h, depth_guess](float u, float v, int j, bool draw_c0_uv) {
+  auto drawPoint = [&points, this, w, h, depth_guess](float u, float v, int j, bool draw_c0_uv) {
     Vector2d ci_uv{u, v};
     Vector2d c0_uv;
     double _;
@@ -372,7 +402,7 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
   }
 }
 
-void show_grid(const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_grid() {
   glColor4f(1.0, 0.0, 1.0, 0.25);
 
   int C = config.optical_flow_detection_grid_size;
@@ -399,17 +429,18 @@ void show_grid(const VioConfig& config, const Calibration<double>& calib) {
   pangolin::glDrawLines(grid_lines);
 }
 
-void show_safe_radius(const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_safe_radius() {
+  if (config.optical_flow_image_safe_radius == 0) return;
   glColor4f(1.0, 0.0, 1.0, 0.25);
   int w = calib.resolution.at(0).x();
   int h = calib.resolution.at(0).y();
   pangolin::glDrawCirclePerimeter(w / 2, h / 2, config.optical_flow_image_safe_radius);
 }
 
-void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
-                  const Calibration<double>& calib, const Selection& highlights, bool filter_highlights,
-                  bool show_same_pixel_guess, bool show_reproj_fix_depth_guess, bool show_reproj_avg_depth_guess,
-                  bool show_active_guess, double fixed_depth) {
+void VIOUIBase::do_show_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   if (cam_id == 0) return;
 
   const auto keypoints0 = curr_vis_data->projections->at(0);
@@ -484,11 +515,12 @@ void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data,
   }
 }
 
-void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& view,
-              const VioConfig& config, const Calibration<double>& calib, const Selection& highlights,
-              bool filter_highlights, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
-              bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
-              bool show_depth, bool show_guesses) {
+void VIOUIBase::do_show_obs(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glLineWidth(1.0);
   glColor3f(1.0, 0.0, 0.0);
   glEnable(GL_BLEND);
@@ -547,53 +579,86 @@ void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pan
       }
     }
 
-    if (show_guesses) {
-      vis::show_guesses(cam_id, curr_vis_data, config, calib, highlights, filter_highlights, show_same_pixel_guess,
-                        show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth);
-    }
+    if (show_guesses) do_show_guesses(cam_id);
 
     glColor3f(0.0, 1.0, 0.0);
     pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
   }
 }
 
-void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& blocks_view,
-                         const Selection& highlights, bool filter_highlights, bool show_highlights,
-                         bool show_block_vals, bool show_ids) {
-  const auto& uibs = filter_highlights ? curr_vis_data->hl_landmark_blocks : curr_vis_data->landmark_blocks;
+void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  UIMAT m = (UIMAT)mat_to_show.Get();
+  if (is_jacobian(m)) {
+    UIJacobians& uijac = curr_vis_data->getj(m);
+    draw_jacobian_overlay(blocks_view, uijac);
+  } else if (is_hessian(m)) {
+    UIHessians& uihes = curr_vis_data->geth(m);
+    draw_hessian_overlay(blocks_view, uihes);
+  } else {
+    BASALT_ASSERT(false);
+  }
+}
+
+void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UIJacobians& uij) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  const auto& uibs = filter_highlights ? uij.Jr_h : uij.Jr;
   if (!uibs) return;
 
   const std::vector<UILandmarkBlock>& lmbs = uibs->blocks;
   if (lmbs.empty()) return;
 
+  size_t pad = show_ids ? 12 : 0;
   size_t w = uibs->getW();
   size_t h = uibs->getH();
-  size_t side = max(w, h);
-  long xoff = int((side - w) / 2);  // Offset to center view
+  size_t W = w + pad;
+  size_t H = h + pad;
+  size_t side = max(W, H);
+  long xoffh = int((side - W) / 2);  // Offset to center view
+  long xoff = xoffh + pad;           // Offset plus padding for ids
+  long yoff = pad;                   // Offset plus padding for ids
   const auto& aom = uibs->aom.abs_order_map;
 
   // Draw column separators
   glLineWidth(0.25);
   glColor3ubv(BLUE);
-  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, h - 0.5);  // Matrix start
+  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, H - 0.5);  // Matrix start
   for (const auto& [ts, idx_size] : aom) {                      // Keyframe/frame end
     const auto [idx, size] = idx_size;
-    pangolin::glDrawLine(xoff + idx + size - 0.5, -0.5, xoff + idx + size - 0.5, h - 0.5);
+    pangolin::glDrawLine(xoff + idx + size - 0.5, -0.5, xoff + idx + size - 0.5, H - 0.5);
+    if (show_ids) {
+      bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+      bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool present = curr_vis_data->frame_idx.count(ts) > 0;
+      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                   : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      auto text = pangolin::GlFont::I().Text("%lu", fid);
+      try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
+      glColor3ubv(BLUE);
+    }
   }
-  pangolin::glDrawLine(xoff + w - 4 - 0.5, -0.5, xoff + w - 4 - 0.5, h - 0.5);  // Landmark start
-  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, h - 0.5);  // Residual start
-  pangolin::glDrawLine(xoff + w - 0 - 0.5, -0.5, xoff + w - 0 - 0.5, h - 0.5);  // Matrix end
+  pangolin::glDrawLine(xoff + w - 4 - 0.5, -0.5, xoff + w - 4 - 0.5, H - 0.5);  // Landmark start
+  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, H - 0.5);  // Residual start
+  pangolin::glDrawLine(xoff + w - 0 - 0.5, -0.5, xoff + w - 0 - 0.5, H - 0.5);  // Matrix end
 
   // Draw row separators
   size_t i = 0;
   for (const UILandmarkBlock& b : lmbs) {
     bool highlighted = show_highlights && is_selected(highlights, b.lmid);
     glColor3ubv(highlighted ? GREEN : BLUE);
-    pangolin::glDrawLine(xoff - 0.5, i - 0.5, xoff + w - 0.5, i - 0.5);
+    pangolin::glDrawLine(xoffh - 0.5, yoff + i - 0.5, xoffh + W - 0.5, yoff + i - 0.5);
 
     if (show_ids) {
       auto text = pangolin::GlFont::I().Text("%lu", b.lmid);
-      try_draw_image_text(blocks_view, xoff + w / 2, i + b.storage->rows() / 2.0F, text);
+      try_draw_image_text(blocks_view, xoffh + 2, yoff + i + b.storage->rows() / 2.0F, text);
     }
 
     if (show_block_vals) {  // Draw cell values
@@ -603,9 +668,9 @@ void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangoli
           if (c == 0) continue;
 
           float u = x + xoff - 0.25;
-          float v = i + y;
+          float v = i + y + yoff;
           glColor3ubv(c > 0 ? GREEN : RED);
-          auto text = SMALL_FONT.Text("%.2f", c);
+          auto text = SMALL_FONT.Text("%.2f", abs(c));
           try_draw_image_text(blocks_view, u, v, text);
         }
       }
@@ -615,20 +680,70 @@ void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangoli
   }
 }
 
-void draw_blocks_overlay_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
-                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                             pangolin::ImageView& blocks_view, const Selection& highlights, bool filter_highlights,
-                             bool show_highlights, bool show_block_vals, bool show_ids) {
-  int64_t curr_ts = vio_dataset->get_image_timestamps().at(frame_id);
-  auto it = vis_map.find(curr_ts);
-  if (it == vis_map.end()) return;
-  VioVisualizationData::Ptr curr_vis_data = it->second;
-  draw_blocks_overlay(curr_vis_data, blocks_view, highlights, filter_highlights, show_highlights, show_block_vals,
-                      show_ids);
+void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIHessians& uihes) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  if (uihes.H == nullptr || uihes.b == nullptr || uihes.aom == nullptr) return;
+
+  const auto H = uihes.H;
+  const auto b = uihes.b;
+  const auto aom = uihes.aom;
+
+  size_t pad = show_ids ? 6 : 0;
+  size_t w = H->cols() + 1;
+  size_t h = H->rows();
+  size_t pw = w + pad;
+  size_t ph = h + pad;
+  size_t side = max(pw, ph);
+  long xoffh = int((side - pw) / 2);  // Offset to center view
+  long xoff = xoffh + pad;            // Offset plus padding for ids
+  long yoff = pad;                    // Offset plus padding for ids
+
+  // Draw column and row separators
+  glLineWidth(0.25);
+  glColor3ubv(BLUE);
+  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, ph - 0.5);               // Matrix start col
+  pangolin::glDrawLine(xoffh - 0.5, yoff - 0.5, xoff + w - 0.5, yoff - 0.5);  // Matrix start row
+  for (const auto& [ts, idx_size] : aom->abs_order_map) {                     // Keyframe/frame end
+    const auto [idx, size] = idx_size;
+    float p = xoff + idx + size - 0.5;
+    pangolin::glDrawLine(p, -0.5, p, ph - 0.5);               // Column
+    pangolin::glDrawLine(xoffh - 0.5, p, xoff + w - 0.5, p);  // Row
+
+    if (show_ids) {
+      bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+      bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool present = curr_vis_data->frame_idx.count(ts) > 0;
+      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                   : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      auto text = pangolin::GlFont::I().Text("%lu", fid);
+      try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
+      try_draw_image_text(blocks_view, 0, yoff + idx + pad / 2, text);
+      glColor3ubv(BLUE);
+    }
+  }
+  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, ph - 0.5);  // Column for b
+
+  if (show_block_vals) {  // Draw cell values
+    for (long y = 0; y < H->rows(); y++) {
+      for (long x = 0; x < H->cols() + 1; x++) {
+        float c = x != H->cols() ? H->coeff(y, x) : b->coeff(y);
+        if (c == 0) continue;
+        glColor3ubv(c > 0 ? GREEN : RED);
+        auto text = SMALL_FONT.Text("%.2f", abs(c));
+        try_draw_image_text(blocks_view, x + xoff - 0.25, yoff + y, text);
+      }
+    }
+  }
 }
 
-bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
-                   pangolin::Attach UI_WIDTH) {
+bool VIOUIBase::do_toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display,
+                                 pangolin::View* img_view_display, pangolin::Attach UI_WIDTH) {
   blocks_display->ToggleShow();
   bool show_blocks = blocks_display->IsShown();
 
@@ -654,18 +769,92 @@ bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display,
   return show_blocks;
 }
 
-void show_blocks(const VioVisualizationData::Ptr& curr_vis_data,
-                 const std::shared_ptr<pangolin::ImageView>& blocks_view, const Selection& highlights,
-                 bool filter_highlights) {
-  UILandmarkBlocks::Ptr uibs = curr_vis_data->landmark_blocks;
-  if (uibs && uibs->blocks.empty()) return;
+void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  UIMAT m = (UIMAT)mat_to_show.Get();
+  if (is_jacobian(m)) {
+    UIJacobians& uijac = curr_vis_data->getj(m);
+    do_show_jacobian(blocks_view, uijac);
+  } else if (is_hessian(m)) {
+    UIHessians& uihes = curr_vis_data->geth(m);
+    do_show_hessian(blocks_view, uihes);
+  } else {
+    BASALT_ASSERT(false);
+  }
+}
+
+void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHessians& uih) {
+  if (uih.H == nullptr || uih.b == nullptr) return;
+
+  const auto H = uih.H;
+  const auto b = uih.b;
 
   std::shared_ptr<ManagedImage<uint8_t>> mat;
-  if (!uibs) {
+  size_t w = H->cols() + 1;
+  size_t h = H->rows();
+  size_t pad = show_ids ? 6 : 0;
+  size_t pw = w + pad;
+  size_t ph = h + pad;
+
+  size_t side = max(pw, ph);
+  mat = std::make_shared<ManagedImage<uint8_t>>(side, side);
+  mat->Memset(0);
+  long xoffh = int((side - pw) / 2);  // Offset to center view
+  long xoff = xoffh + pad;            // Offset plus padding for ids
+  long yoff = pad;                    // Offset plus padding for ids
+
+  float min = MAXFLOAT;
+  float max = -MAXFLOAT;
+  for (long y = 0; y < H->rows(); y++) {
+    for (long x = 0; x < H->cols() + 1; x++) {
+      float v = std::abs(x != H->cols() ? H->coeff(y, x) : b->coeff(y));
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+
+  max = std::min(max, 255000.0F);
+
+  const uint8_t max_pixel = 245;
+  for (long y = 0; y < H->rows(); y++) {
+    for (long x = 0; x < H->cols() + 1; x++) {
+      float value = std::abs(x != H->cols() ? H->coeff(y, x) : b->coeff(y));
+      value = std::min(value, max);
+      bool is_not_zero = value > 0;
+      uint8_t pixel = (1 - value / max) * 255.0F;
+      if (pixel > max_pixel && is_not_zero) pixel = max_pixel;
+      (*mat)(x + xoff, yoff + y) = pixel;
+    }
+  }
+
+  // Fill in row and height title borders
+  uint8_t fill_color = 230;
+  for (size_t i = 0; i < pad; i++)
+    for (size_t j = 0; j < w; j++) (*mat)(xoff + j, i) = fill_color;
+
+  for (size_t i = 0; i < ph; i++)
+    for (size_t j = 0; j < pad; j++) (*mat)(xoffh + j, i) = fill_color;
+
+  uih.img = mat;
+
+  pangolin::GlPixFormat fmt;
+  fmt.glformat = GL_LUMINANCE;
+  fmt.gltype = GL_UNSIGNED_BYTE;
+  fmt.scalable_internal_format = GL_LUMINANCE8;
+  blocks_view->SetImage(mat->ptr, mat->w, mat->h, mat->pitch, fmt);
+}
+
+void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij) {
+  UILandmarkBlocks::Ptr uibs = uij.Jr;
+  std::shared_ptr<ManagedImage<uint8_t>> mat;
+
+  if (!uibs || (uibs && uibs->blocks.empty())) {
     mat = std::make_shared<ManagedImage<uint8_t>>(1, 1);
     mat->Memset(127);
-  } else if (curr_vis_data->mat != nullptr) {  // Reuse same image
-    mat = curr_vis_data->mat;
+  } else if (uij.img != nullptr) {  // Reuse same image
+    mat = uij.img;
   } else {
     // Use a different UILandmarkBlocks when landmarks are highlighted
     UILandmarkBlocks::Ptr hluibs;
@@ -674,17 +863,22 @@ void show_blocks(const VioVisualizationData::Ptr& curr_vis_data,
       hluibs->aom = uibs->aom;
       for (const UILandmarkBlock& b : uibs->blocks)
         if (is_selected(highlights, b.lmid)) hluibs->blocks.push_back(b);
-      curr_vis_data->hl_landmark_blocks = hluibs;
+      uij.Jr_h = hluibs;
     }
 
     const UILandmarkBlocks::Ptr u = filter_highlights ? hluibs : uibs;
     const std::vector<UILandmarkBlock>& lmbs = u->blocks;
+    size_t pad = show_ids ? 12 : 0;
     size_t w = u->getW();
     size_t h = u->getH();
-    size_t side = max(w, h);
+    size_t W = w + pad;
+    size_t H = h + pad;
+    size_t side = max(W, H);
     mat = std::make_shared<ManagedImage<uint8_t>>(side, side);
     mat->Memset(0);
-    long xoff = int((side - w) / 2);  // Offset to center view
+    long xoffh = int((side - W) / 2);  // Offset to center view
+    long xoff = xoffh + pad;           // Offset plus padding for ids
+    long yoff = pad;                   // Offset plus padding for ids
 
     size_t i = 0;
     float min = MAXFLOAT;
@@ -692,7 +886,7 @@ void show_blocks(const VioVisualizationData::Ptr& curr_vis_data,
     for (const UILandmarkBlock& b : lmbs) {
       for (long y = 0; y < b.storage->rows(); y++) {
         for (long x = 0; x < b.storage->cols(); x++) {
-          float v = b.storage->coeff(y, x);
+          float v = std::abs(b.storage->coeff(y, x));
           if (v < min) min = v;
           if (v > max) max = v;
         }
@@ -709,13 +903,21 @@ void show_blocks(const VioVisualizationData::Ptr& curr_vis_data,
           bool is_not_zero = value > 0;
           uint8_t pixel = (1 - value / max) * 255.0F;
           if (pixel > max_pixel && is_not_zero) pixel = max_pixel;
-          (*mat)(x + xoff, i + y) = pixel;
+          (*mat)(x + xoff, i + yoff + y) = pixel;
         }
       }
       i += b.storage->rows();
     }
 
-    curr_vis_data->mat = mat;
+    // Fill in row and height title borders
+    uint8_t fill_color = 230;
+    for (size_t i = 0; i < pad; i++)
+      for (size_t j = 0; j < u->getW(); j++) (*mat)(xoff + j, i) = fill_color;
+
+    for (size_t i = 0; i < H; i++)
+      for (size_t j = 0; j < pad; j++) (*mat)(xoffh + j, i) = fill_color;
+
+    uij.img = mat;
   }
 
   pangolin::GlPixFormat fmt;
@@ -754,11 +956,12 @@ bool is_selected(const Selection& selection, size_t n) {
   return false;
 }
 
-bool follow_highlight(const VioVisualizationData::Ptr& curr_vis_data,
-                      std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
-                      bool smooth_zoom) {
-  for (size_t cam_id = 0; cam_id < img_views.size(); cam_id++) {
-    std::shared_ptr<pangolin::ImageView> v = img_views.at(cam_id);
+bool VIOUIBase::do_follow_highlight(bool smooth_zoom) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return false;
+
+  for (size_t cam_id = 0; cam_id < img_view.size(); cam_id++) {
+    std::shared_ptr<pangolin::ImageView> v = img_view.at(cam_id);
     if (v == nullptr) continue;
 
     if (highlights.size() != 1 || highlights[0].is_range) {
@@ -801,15 +1004,20 @@ bool follow_highlight(const VioVisualizationData::Ptr& curr_vis_data,
   return true;
 }
 
-bool follow_highlight_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
-                          const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                          std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
-                          bool smooth_zoom) {
-  int64_t curr_ts = vio_dataset->get_image_timestamps().at(frame_id);
-  auto it = vis_map.find(curr_ts);
-  if (it == vis_map.end()) return false;
-  VioVisualizationData::Ptr curr_vis_data = it->second;
-  return follow_highlight(curr_vis_data, img_views, highlights, smooth_zoom);
+void VIOUIBase::do_render_camera(const Sophus::SE3d& T_w_c, size_t i, size_t ts, const uint8_t* color) {
+  VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+  bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+  bool present = curr_vis_data->frame_idx.count(ts) > 0;
+  if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+  size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                : marginalized ? curr_vis_data->marginalized_idx[ts]
+                               : curr_vis_data->frame_idx[ts]);
+  const uint8_t* fid_color = keyframed ? GREEN : marginalized ? RED : BLUE;
+  render_camera(T_w_c.matrix(), 2.0F, color, 0.1F, show_ids && i == 0, fid, fid_color);
 }
 
 }  // namespace basalt::vis

@@ -38,18 +38,27 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/imu_types.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/linearization/landmark_block.hpp>
 
 namespace basalt {
 
 struct VioVisualizationData {
-  typedef std::shared_ptr<VioVisualizationData> Ptr;
+  using Ptr = std::shared_ptr<VioVisualizationData>;
+  using UIMAT = vis::UIMAT;
+  using UIJacobians = vis::UIJacobians;
+  using UIHessians = vis::UIHessians;
+  static constexpr int UIMAT_COUNT_J = vis::UIMAT_COUNT_J;
+  static constexpr int UIMAT_COUNT_H = vis::UIMAT_COUNT_H;
 
   int64_t t_ns;
 
-  Eigen::aligned_vector<Sophus::SE3d> states;
-  Eigen::aligned_vector<Sophus::SE3d> frames;
-  Eigen::aligned_vector<Sophus::SE3d> ltframes;  // Poses of long-term keyframes
+  Eigen::aligned_map<int64_t, Sophus::SE3d> states;
+  Eigen::aligned_map<int64_t, Sophus::SE3d> frames;
+  Eigen::aligned_map<int64_t, Sophus::SE3d> ltframes;  // Poses of long-term keyframes
+  Eigen::aligned_map<int64_t, size_t> frame_idx{};
+  Eigen::aligned_map<int64_t, size_t> keyframed_idx{};
+  Eigen::aligned_map<int64_t, size_t> marginalized_idx{};
 
   Eigen::aligned_vector<Eigen::Vector3d> points;
   std::vector<int> point_ids;
@@ -58,9 +67,17 @@ struct VioVisualizationData {
 
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
-  UILandmarkBlocks::Ptr landmark_blocks;
-  UILandmarkBlocks::Ptr hl_landmark_blocks;  // Highlighted
-  std::shared_ptr<ManagedImage<uint8_t>> mat;
+  // Indices in Jr and Hb fields
+  UIJacobians Jr[UIMAT_COUNT_J];
+  UIHessians Hb[UIMAT_COUNT_H];
+
+  UIJacobians& getj(UIMAT u) { return Jr[(int)u]; };
+  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::HB]; };
+
+  void invalidate_mat_imgs() {
+    for (UIJacobians& j : Jr) j.img = nullptr;
+    for (UIHessians& h : Hb) h.img = nullptr;
+  }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
