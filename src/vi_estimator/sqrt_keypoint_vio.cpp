@@ -350,7 +350,12 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
       }
       curr_frame->input_images->addTime("imu_preintegrated");
 
-      measure(curr_frame, meas);
+      bool success = measure(curr_frame, meas);
+      if (!success) {
+        schedule_reset = true;
+        continue;
+      }
+
       prev_frame = curr_frame;
     }
 
@@ -573,7 +578,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   }
   opt_flow_meas->input_images->addTime("landmarks_updated");
 
-  optimize_and_marg(opt_flow_meas->input_images, num_points_connected, lost_landmaks);
+  bool success = optimize_and_marg(opt_flow_meas->input_images, num_points_connected, lost_landmaks);
+  if (!success) return false;
 
   size_t num_cams = opt_flow_meas->keypoints.size();
   bool features_ext = opt_flow_meas->input_images->stats.features_enabled;
@@ -712,9 +718,9 @@ bool SqrtKeypointVioEstimator<Scalar>::show_uimat(UIMAT m) const {
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>& num_points_connected,
+bool SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>& num_points_connected,
                                                     const std::unordered_set<KeypointId>& lost_landmaks) {
-  if (!opt_started) return;
+  if (!opt_started) return true;
 
   Timer t_total;
 
@@ -871,7 +877,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
           id_to_marg = min_score_id;
         }
       } else {
-        BASALT_ASSERT_MSG(false, "Unexpected marginalization criteria");
+        BASALT_LOG_FATAL("Unexpected marginalization criteria");
       }
 
       // if no frame was selected, the logic above is faulty
@@ -1197,10 +1203,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
   }
 
   stats_sums_.add("marginalize", t_total.elapsed()).format("ms");
+
+  return true;
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::optimize() {
+bool SqrtKeypointVioEstimator<Scalar_>::optimize() {
   if (config.vio_debug) {
     std::cout << "=================================" << std::endl;
   }
@@ -1298,7 +1306,11 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         error_total = lqr->linearizeProblem(&numerically_valid);
         if (show_uimat(UIMAT::JR)) visual_data->getj(UIMAT::JR).Jr = lqr->getUILandmarkBlocks();
 
-        BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
+        if (!numerically_valid) {
+          std::cerr << "did not expect numerical failure during linearization\n";
+          return false;
+        }
+
         stats.add("linearizeProblem", t.reset()).format("ms");
 
         //        // compute pose jacobian norm squared for Jacobian scaling
@@ -1602,16 +1614,25 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       std::cout << "=================================" << std::endl;
     }
   }
+
+  return true;
 }
 
 template <class Scalar_>
-void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(const OpticalFlowInput::Ptr& input_images,
+bool SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(const OpticalFlowInput::Ptr& input_images,
                                                           const std::map<int64_t, int>& num_points_connected,
                                                           const std::unordered_set<KeypointId>& lost_landmaks) {
-  optimize();
+  bool success = true;
+
+  success &= optimize();
+  if (!success) return false;
   input_images->addTime("optimized");
-  marginalize(num_points_connected, lost_landmaks);
+
+  success &= marginalize(num_points_connected, lost_landmaks);
+  if (!success) return false;
   input_images->addTime("marginalized");
+
+  return success;
 }
 
 template <class Scalar_>

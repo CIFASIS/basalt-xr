@@ -209,24 +209,24 @@ template <typename Scalar, int POSE_SIZE>
 typename LinearizationAbsSC<Scalar, POSE_SIZE>::VecX LinearizationAbsSC<Scalar, POSE_SIZE>::getJp_diag2() const {
   // TODO: group relative by host frame
 
-  BASALT_ASSERT_STREAM(false, "Not implemented");
+  BASALT_LOG_FATAL("Not implemented");
 }
 
 template <typename Scalar, int POSE_SIZE>
 void LinearizationAbsSC<Scalar, POSE_SIZE>::scaleJl_cols() {
-  BASALT_ASSERT_STREAM(false, "Not implemented");
+  BASALT_LOG_FATAL("Not implemented");
 }
 
 template <typename Scalar, int POSE_SIZE>
 void LinearizationAbsSC<Scalar, POSE_SIZE>::scaleJp_cols(const VecX& jacobian_scaling) {
   UNUSED(jacobian_scaling);
-  BASALT_ASSERT_STREAM(false, "Not implemented");
+  BASALT_LOG_FATAL("Not implemented");
 }
 
 template <typename Scalar, int POSE_SIZE>
 void LinearizationAbsSC<Scalar, POSE_SIZE>::setLandmarkDamping(Scalar lambda) {
   UNUSED(lambda);
-  BASALT_ASSERT_STREAM(false, "Not implemented");
+  BASALT_LOG_FATAL("Not implemented");
 }
 
 template <typename Scalar, int POSE_SIZE>
@@ -295,7 +295,7 @@ template <typename Scalar, int POSE_SIZE>
 void LinearizationAbsSC<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r_pose_damping(MatX& Q2Jp, size_t start_idx) const {
   UNUSED(Q2Jp);
   UNUSED(start_idx);
-  BASALT_ASSERT_STREAM(false, "Not implemented");
+  BASALT_LOG_FATAL("Not implemented");
 }
 
 template <typename Scalar, int POSE_SIZE>
