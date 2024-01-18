@@ -881,8 +881,8 @@ void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJac
     long yoff = pad;                   // Offset plus padding for ids
 
     size_t i = 0;
-    float min = MAXFLOAT;
-    float max = -MAXFLOAT;
+    float min = std::numeric_limits<float>::max();
+    float max = -std::numeric_limits<float>::max();
     for (const UILandmarkBlock& b : lmbs) {
       for (long y = 0; y < b.storage->rows(); y++) {
         for (long x = 0; x < b.storage->cols(); x++) {

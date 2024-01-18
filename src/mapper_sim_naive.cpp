@@ -698,7 +698,7 @@ void alignButton() {
   auto it = vis_map.find(kf_t_ns.back());
 
   if (it != vis_map.end()) {
-    for (const auto& t : it->second->states) vio_t_w_i.emplace_back(t.translation());
+    for (const auto& [ts, t] : it->second->states) vio_t_w_i.emplace_back(t.translation());
 
   } else {
     std::cerr << "Could not find results!!" << std::endl;

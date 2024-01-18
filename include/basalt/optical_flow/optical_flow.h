@@ -53,7 +53,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
-#include <slam_tracker.hpp>
+#include <basalt/vit_tracker.hpp>
 #include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
@@ -65,7 +65,6 @@ using KeypointId = size_t;
 using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
 using KeypointLevels = std::map<KeypointId, size_t>;
 using KeypointResponses = std::map<KeypointId, float>;
-using xrt::auxiliary::tracking::slam::timestats;
 using LandmarkId = KeypointId;
 
 struct LandmarkBundle {
@@ -96,7 +95,7 @@ struct OpticalFlowInput {
   std::vector<Masks> masks{};     //!< Regions of the image to ignore
   UIMAT show_uimat = UIMAT::ALL;  //!< Which matrix to compute for the UI
 
-  timestats stats;  //!< Keeps track of internal metrics for this t_ns
+  TimeStats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) { stats.addTime(name, custom_ts); }
 };
 

@@ -294,9 +294,9 @@ message(STATUS "Found {fmt} ${fmt_VERSION} in: ${fmt_DIR}")
 
 add_subdirectory(thirdparty)
 
-# custom scoped monado target
-add_library(basalt::monado INTERFACE IMPORTED)
-set_property(TARGET basalt::monado PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/monado)
+# custom scoped vit target from monado
+add_library(basalt::vit INTERFACE IMPORTED)
+set_property(TARGET basalt::vit PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vit)
 
 # custom scoped cli11 target
 add_library(basalt::cli11 INTERFACE IMPORTED)
@@ -390,7 +390,7 @@ target_sources(basalt_internal
 )
 
 target_link_libraries(basalt_internal
-  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado basalt::magic_enum
+  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::vit basalt::magic_enum
   PRIVATE nlohmann::json fmt::fmt)
 target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
@@ -421,10 +421,20 @@ target_sources(basalt_internal
 )
 target_link_libraries(basalt_internal PRIVATE rosbag apriltag opengv)
 
+
 endif()
 
 add_library(basalt SHARED)
-target_sources(basalt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/monado/slam_tracker.cpp)
+
+target_include_directories(basalt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/monado)
+
+target_sources(basalt
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vit_tracker.hpp
+	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vit_tracker.cpp
+)
+
+target_compile_definitions(basalt PRIVATE VIT_INTERFACE_IMPLEMENTATION)
+
 target_link_libraries(basalt basalt_internal)
 
 if(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
@@ -475,11 +485,8 @@ endif()
 
 endif(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
 
-# Let's export only the slam_tracker.hpp functions for libbasalt.so,
+# Export only the VIT interface symbols
 set_target_properties(${PROJECT_NAME} PROPERTIES
-  C_VISIBILITY_PRESET hidden
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN YES
   LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map
   LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map"
 )

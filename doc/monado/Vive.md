@@ -1,7 +1,8 @@
 # Valve Index, HTC Vive, and other lighthouse-tracked headsets
 
-When running Monado set the environment variable `XRT_DEBUG_GUI=1`. You will
-need to manually press the "Submit to SLAM" checkbox in the "SLAM Tracker" box.
+When running Monado set the environment variables `VIVE_SLAM=1` and
+`XRT_DEBUG_GUI=1`. You will need to manually press the "Submit to SLAM"
+checkbox in the "SLAM Tracker" box on the debug gui.
 It's not enabled by default due to some timestamps initialization problem I've
 not managed to fix.
 

@@ -233,7 +233,7 @@ class slam_tracker_ui : vis::VIOUIBase {
       fmt.scalable_internal_format = GL_LUMINANCE16;
 
       if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
-        auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
+        auto img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
         for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
           if (img_data[cam_id].img) {

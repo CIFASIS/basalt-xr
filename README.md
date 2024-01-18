@@ -29,7 +29,11 @@ Many thanks to the Basalt authors.
 
 ## Usage
 
-If you want to run OpenXR applications, you should now rebuild Monado so that it finds the Basalt shared library.
+If you want to run OpenXR application with Monado, you need to set the
+environment variable `VIT_SYSTEM_LIBRARY_PATH` to the path of the basalt library.
+
+By default, Monado will try to load the library from `/usr/lib/libbasalt.so` if
+the environment variable is not set.
 
 If you want to test whether everything is working you can download a sample euroc dataset like `V1_02_medium`:
 

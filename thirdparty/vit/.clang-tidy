@@ -1,0 +1,18 @@
+Checks: >
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-special-member-functions,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*"
+
+CheckOptions:
+  - key: readability-identifier-naming
+    value: lower_case
