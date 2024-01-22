@@ -460,7 +460,7 @@ struct Tracker::Implementation {
 
     if (popped) {
       // Discard the pose if the caller doesn't request it.
-      if (*pose == NULL) {
+      if (pose == NULL) {
         return vit::Result::VIT_SUCCESS;
       }
 
