@@ -1,3 +1,43 @@
+/**
+BSD 3-Clause License
+
+This file is part of the Basalt project.
+https://gitlab.com/VladyslavUsenko/basalt-headers.git
+
+Copyright (c) 2022-2024, Collabora Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+@file
+@brief UI for Basalt when providing the VIT interface
+@author Mateo de Mayo <mateo.demayo@collabora.com>
+@author Simon Zeni <simon.zeni@collabora.com>
+*/
+
 #pragma once
 
 #include <algorithm>
@@ -38,9 +78,8 @@
   } while (false);
 #define ASSERT_(cond) ASSERT(cond, "%s", #cond);
 
-namespace xrt::auxiliary::tracking::slam {
+namespace basalt::vit_implementation {
 
-using namespace basalt;
 using namespace Eigen;
 using std::cout;
 using std::make_shared;
@@ -51,7 +90,7 @@ using std::to_string;
 using std::vector;
 using vis::UIMAT;
 
-class slam_tracker_ui : vis::VIOUIBase {
+class vit_tracker_ui : vis::VIOUIBase {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
@@ -76,7 +115,7 @@ class slam_tracker_ui : vis::VIOUIBase {
   }
 
   void start(const Sophus::SE3d &T_w_i_init, const Calibration<double> &calib, const VioConfig &config,
-             OpticalFlowBase::Ptr of, VioEstimatorBase::Ptr ve) {
+             const OpticalFlowBase::Ptr &of, const VioEstimatorBase::Ptr &ve) {
     opt_flow_depth_queue = &of->input_depth_queue;
     opt_flow = of;
     vio = ve;
@@ -142,7 +181,7 @@ class slam_tracker_ui : vis::VIOUIBase {
   std::shared_ptr<pangolin::Plotter> plotter;
   pangolin::DataLog imu_data_log{};
   void start_ui(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
-    ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
+    ui_runner_thread = thread(&vit_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
   }
 
   void ui_runner(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
@@ -265,7 +304,7 @@ class slam_tracker_ui : vis::VIOUIBase {
       pangolin::FinishFrame();
     }
 
-    pangolin::QuitAll();
+    pangolin::DestroyWindow(window_name);
     cout << "Finished ui_runner\n";
   }
 
@@ -299,7 +338,7 @@ class slam_tracker_ui : vis::VIOUIBase {
 
     if (!curr_vis_data) return;
 
-    for (size_t i = 0; i < calib.T_i_c.size(); i++)
+    for (size_t i = 0; i < calib.T_i_c.size(); i++) {
       if (!curr_vis_data->states.empty()) {
         const auto &[ts, p] = *curr_vis_data->states.rbegin();
         do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
@@ -307,6 +346,7 @@ class slam_tracker_ui : vis::VIOUIBase {
         const auto &[ts, p] = *curr_vis_data->frames.rbegin();
         do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
       }
+    }
 
     for (const auto &[ts, p] : curr_vis_data->states)
       for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
@@ -393,4 +433,4 @@ class slam_tracker_ui : vis::VIOUIBase {
     }
   }
 };
-}  // namespace xrt::auxiliary::tracking::slam
+}  // namespace basalt::vit_implementation

@@ -50,8 +50,19 @@ export LIBRARY_PATH=\$bsltinstall/lib/:\$LIBRARY_PATH                # for compi
 cd $bsltdeps
 git clone --recursive https://gitlab.freedesktop.org/mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
-sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
-cmake .. -G Ninja -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBASALT_BUILD_SHARED_LIBRARY_ONLY=on
-make install -j12
+cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBASALT_INSTANTIATIONS_DOUBLE=off -DBUILD_TESTS=off
+cmake --build build --target install
 ```
+
+## Static analysis
+
+Setup clang-format and clang-tidy.
+
+## Run CI
+
+TODO
+
+## Branch and merge request convention
+
+TODO

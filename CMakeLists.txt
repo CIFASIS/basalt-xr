@@ -33,11 +33,22 @@ endif(LSB_RELEASE_PROGRAM)
 
 string(TIMESTAMP PROJECT_VERSION_REVISION "%Y%m%d%H%M")
 
+# Get VIT interface version. Note that modifying vit_interface.h won't trigger
+# the regeneration of basalt.map by itself.
+set(VIT_INTERFACE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vit/vit_interface.h)
+file(READ ${VIT_INTERFACE_FILE} VIT_INTERFACE_CONTENTS)
+string(REGEX MATCH "#define VIT_HEADER_VERSION_MAJOR ([0-9]+)" _ ${VIT_INTERFACE_CONTENTS})
+set(VIT_VERSION_MAJOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define VIT_HEADER_VERSION_MINOR ([0-9]+)" _ ${VIT_INTERFACE_CONTENTS})
+set(VIT_VERSION_MINOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define VIT_HEADER_VERSION_PATCH ([0-9]+)" _ ${VIT_INTERFACE_CONTENTS})
+set(VIT_VERSION_PATCH ${CMAKE_MATCH_1})
+
 set(CPACK_GENERATOR "DEB")
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Vladyslav Usenko <vlad.usenko@tum.de>")
-set(CPACK_PACKAGE_VERSION_MAJOR "0")
-set(CPACK_PACKAGE_VERSION_MINOR "1")
-set(CPACK_PACKAGE_VERSION_PATCH "0-${PROJECT_VERSION_REVISION}~${LSB_RELEASE_ID_SHORT}")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mateo de Mayo <mateo.demayo@collabora.com>")
+set(CPACK_PACKAGE_VERSION_MAJOR ${VIT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${VIT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH "${VIT_VERSION_PATCH}-${PROJECT_VERSION_REVISION}~${LSB_RELEASE_ID_SHORT}")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS ${DEBIAN_DEPENDS})
 set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME_LOWERCASE}_${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
@@ -297,6 +308,7 @@ add_subdirectory(thirdparty)
 # custom scoped vit target from monado
 add_library(basalt::vit INTERFACE IMPORTED)
 set_property(TARGET basalt::vit PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vit)
+target_sources(basalt::vit INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vit/vit_implementation_helper.cpp)
 
 # custom scoped cli11 target
 add_library(basalt::cli11 INTERFACE IMPORTED)
@@ -426,11 +438,9 @@ endif()
 
 add_library(basalt SHARED)
 
-target_include_directories(basalt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/monado)
-
 target_sources(basalt
-	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vit_tracker.hpp
-	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vit_tracker.cpp
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vit/vit_tracker.hpp
+	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vit/vit_tracker.cpp
 )
 
 target_compile_definitions(basalt PRIVATE VIT_INTERFACE_IMPLEMENTATION)
@@ -485,10 +495,19 @@ endif()
 
 endif(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
 
+# Update basalt.map library name (symbol present in the final .so)
+configure_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map.in
+  ${CMAKE_CURRENT_BINARY_DIR}/basalt.map
+  @ONLY
+)
+
 # Export only the VIT interface symbols
 set_target_properties(${PROJECT_NAME} PROPERTIES
-  LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map
-  LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.map"
+  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/basalt.map
+  LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/basalt.map"
+  VERSION "${VIT_VERSION_MAJOR}.${VIT_VERSION_MINOR}.${VIT_VERSION_PATCH}"
+  SOVERSION ${VIT_VERSION_MAJOR}
 )
 
 if(BASALT_BUILD_SHARED_LIBRARY_ONLY)
@@ -533,7 +552,7 @@ endforeach()
 endif(BASALT_BUILD_SHARED_LIBRARY_ONLY)
 
 # Configure and install unified config toml files
-set(CONFIG_FILE_INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt) # Used for unified_config.in
+set(CONFIG_FILE_INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/share/basalt) # Used for unified_config.in
 foreach(unified_config IN LISTS UNIFIED_CONFIG_FILES)
   configure_file(
     ${CMAKE_CURRENT_LIST_DIR}/data/monado/${unified_config}.in
@@ -543,7 +562,7 @@ foreach(unified_config IN LISTS UNIFIED_CONFIG_FILES)
   list(APPEND CONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/data/monado/${unified_config})
 endforeach()
 
-install(FILES ${CONFIG_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
+install(FILES ${CONFIG_FILES} DESTINATION ${CONFIG_FILE_INSTALL_DESTINATION})
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.pc.in

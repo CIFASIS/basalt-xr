@@ -42,7 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/cast_utils.hpp>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
-#include <basalt/vit_tracker.hpp>
+#include <vit_implementation_helper.hpp>
 
 #include <basalt/linearization/linearization_base.hpp>
 

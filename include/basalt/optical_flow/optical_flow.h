@@ -53,7 +53,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
-#include <basalt/vit_tracker.hpp>
+#include <vit_implementation_helper.hpp>
 #include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
@@ -95,7 +95,7 @@ struct OpticalFlowInput {
   std::vector<Masks> masks{};     //!< Regions of the image to ignore
   UIMAT show_uimat = UIMAT::ALL;  //!< Which matrix to compute for the UI
 
-  TimeStats stats;  //!< Keeps track of internal metrics for this t_ns
+  vit::TimeStats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) { stats.addTime(name, custom_ts); }
 };
 

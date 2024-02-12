@@ -1,20 +1,55 @@
-// Copyright 2023, Collabora, Ltd.
+/**
+BSD 3-Clause License
+
+This file is part of the Basalt project.
+https://gitlab.com/VladyslavUsenko/basalt-headers.git
+
+Copyright (c) 2022-2024, Collabora Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+@file
+@brief Implementation for the VIT interface
+@author Mateo de Mayo <mateo.demayo@collabora.com>
+@author Simon Zeni <simon.zeni@collabora.com>
+*/
+
+#include <basalt/io/marg_data_io.h>
+#include <basalt/optical_flow/optical_flow.h>
+#include <basalt/serialization/headers_serialization.h>
+#include <basalt/utils/vio_config.h>
+#include <basalt/vi_estimator/vio_estimator.h>
+#include <basalt/calibration/calibration.hpp>
+#include <basalt/vit/vit_tracker.hpp>
+#include "vit_tracker_ui.hpp"
 
 #include <tbb/concurrent_queue.h>
-#include <opencv2/core/mat.hpp>
-
-#include "basalt/io/marg_data_io.h"
-#include "basalt/optical_flow/optical_flow.h"
-#include "basalt/utils/vio_config.h"
-#include "basalt/vi_estimator/vio_estimator.h"
-#include "basalt/vit_tracker.hpp"
-
-#include "slam_tracker_ui.hpp"
-
-#include <basalt/serialization/headers_serialization.h>
-#include <basalt/calibration/calibration.hpp>
-
 #include <CLI/CLI.hpp>
+#include <opencv2/core/mat.hpp>
 #include <sophus/se3.hpp>
 
 #include <chrono>
@@ -54,7 +89,7 @@ static const char *timing_titles[] = {
 };
 constexpr size_t TITLES_SIZE = sizeof(timing_titles) / sizeof(char *);
 
-namespace basalt {
+namespace basalt::vit_implementation {
 
 using std::cout;
 using std::make_shared;
@@ -66,9 +101,6 @@ using std::string;
 using std::thread;
 using std::to_string;
 using std::vector;
-
-// TODO move ui out of this namespace
-using xrt::auxiliary::tracking::slam::slam_tracker_ui;
 
 struct Tracker::Implementation {
   static const uint32_t caps = VIT_TRACKER_CAPABILITY_CAMERA_CALIBRATION | VIT_TRACKER_CAPABILITY_IMU_CALIBRATION;
@@ -109,7 +141,7 @@ struct Tracker::Implementation {
   thread queues_printer_thread;
 
   // External Queues
-  slam_tracker_ui ui{};
+  vit_tracker_ui ui{};
   MargDataSaver::Ptr marg_data_saver;
   // Additional calibration data
   vector<vit::CameraCalibration> added_cam_calibs{};
@@ -130,7 +162,7 @@ struct Tracker::Implementation {
     ASSERT(cam_count > 1, "Basalt doesn't support running with %d cameras", cam_count);
     calib_data_ready.cam.resize(cam_count, false);
 
-    if (!config->file) {
+    if (config->file == nullptr) {
       // For the pipeline to work now, the user will need to use add_cam/imu_calibration
       return;
     }
@@ -225,7 +257,7 @@ struct Tracker::Implementation {
     Eigen::Quaterniond q(ric);
     Eigen::Vector3d p{tic(0, 3), tic(1, 3), tic(2, 3)};
     ASSERT_(calib.T_i_c.size() == i);
-    calib.T_i_c.push_back(Calibration<Scalar>::SE3(q, p));
+    calib.T_i_c.emplace_back(q, p);
 
     GenericCamera<double> model;
     const double *d = cam_calib.distortion;
@@ -255,7 +287,7 @@ struct Tracker::Implementation {
     calib.intrinsics.push_back(model);
 
     ASSERT_(calib.resolution.size() == i);
-    calib.resolution.push_back({cam_calib.width, cam_calib.height});
+    calib.resolution.emplace_back(cam_calib.width, cam_calib.height);
 
     calib_data_ready.cam.at(i) = true;
   }
@@ -311,6 +343,15 @@ struct Tracker::Implementation {
     calib.gyro_bias_std << gyro.bias_std[0], gyro.bias_std[1], gyro.bias_std[2];
 
     calib_data_ready.imu = true;
+  }
+
+  void print_calibration() {
+    std::stringstream ss{};
+    {
+      cereal::JSONOutputArchive write_to_stream(ss);
+      write_to_stream(calib);
+    }
+    cout << "Calibration: " << ss.str() << "\n";
   }
 
   void initialize() {
@@ -379,7 +420,7 @@ struct Tracker::Implementation {
     // happens in a lambda from keypoint_vio.cpp and ends at line c1alib_bias.hpp:112
   }
 
-  void finalize() {
+  void finalize() const {
     // Only the OpticalFlow gets started by initialize, finish it with this
     image_data_queue->push(nullptr);
   }
@@ -460,26 +501,26 @@ struct Tracker::Implementation {
 
     if (popped) {
       // Discard the pose if the caller doesn't request it.
-      if (pose == NULL) {
+      if (pose == nullptr) {
         return vit::Result::VIT_SUCCESS;
       }
 
       // TODO find another way to give the state to the pose implementation
       // without touching the interface
       Pose *p = new Pose();
-      p->impl = make_unique<Pose::Implementation>(state);
-      assert(p->impl);
+      p->impl_ = make_unique<Pose::Implementation>(state);
+      assert(p->impl_);
       state->input_images->addTime("get_pose");
 
       *pose = static_cast<vit_pose_t *>(p);
     } else {
-      *pose = NULL;
+      *pose = nullptr;
     }
 
     return vit::Result::VIT_SUCCESS;
   }
 
-  vit::Result get_timing_titles(vit_tracker_timing_titles *out_titles) const {
+  static vit::Result get_timing_titles(vit_tracker_timing_titles *out_titles) {
     if ((pose_caps & VIT_TRACKER_POSE_CAPABILITY_TIMING) == 0) {
       return vit::Result::VIT_ERROR_NOT_SUPPORTED;
     }
@@ -529,7 +570,7 @@ struct Tracker::Implementation {
   }
 };
 
-Tracker::Tracker(const vit::Config *config) { impl = make_unique<Tracker::Implementation>(config); }
+Tracker::Tracker(const vit::Config *config) { impl_ = make_unique<Tracker::Implementation>(config); }
 
 vit::Result Tracker::has_image_format(vit::ImageFormat fmt, bool *out) const {
   switch (fmt) {
@@ -546,66 +587,66 @@ vit::Result Tracker::has_image_format(vit::ImageFormat fmt, bool *out) const {
   return vit::Result::VIT_ERROR_INVALID_VALUE;
 }
 
-vit::Result Tracker::get_capabilities(vit::TrackerCapability *out) const { return impl->get_caps(out); }
+vit::Result Tracker::get_capabilities(vit::TrackerCapability *out) const { return impl_->get_caps(out); }
 
-vit::Result Tracker::get_pose_capabilities(vit::TrackerPoseCapability *out) const { return impl->get_pose_caps(out); }
+vit::Result Tracker::get_pose_capabilities(vit::TrackerPoseCapability *out) const { return impl_->get_pose_caps(out); }
 
-vit::Result Tracker::set_pose_capabilities(const vit::TrackerPoseCapability caps, bool value) {
-  return impl->set_pose_caps(caps, value);
+vit::Result Tracker::set_pose_capabilities(vit::TrackerPoseCapability caps, bool value) {
+  return impl_->set_pose_caps(caps, value);
 }
 
 vit::Result Tracker::start() {
-  impl->initialize();
-  impl->start();
+  impl_->initialize();
+  impl_->start();
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::stop() {
-  impl->finalize();
-  impl->stop();
+  impl_->finalize();
+  impl_->stop();
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::reset() {
-  impl->reset();
+  impl_->reset();
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::is_running(bool *out_running) const {
-  *out_running = impl->running;
+  *out_running = impl_->running;
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::push_imu_sample(const vit::ImuSample *sample) {
-  impl->push_imu_sample(sample);
+  impl_->push_imu_sample(sample);
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::push_img_sample(const vit::ImgSample *sample) {
-  impl->push_frame(sample);
+  impl_->push_frame(sample);
   return vit::Result::VIT_SUCCESS;
 }
 
-vit::Result Tracker::pop_pose(vit::Pose **pose) { return impl->pop_pose(pose); }
+vit::Result Tracker::pop_pose(vit::Pose **pose) { return impl_->pop_pose(pose); }
 
 vit::Result Tracker::get_timing_titles(vit_tracker_timing_titles *out_titles) const {
-  return impl->get_timing_titles(out_titles);
+  return impl_->get_timing_titles(out_titles);
 }
 
 vit::Result Tracker::add_imu_calibration(const vit::ImuCalibration *calibration) {
-  impl->added_imu_calibs.push_back(*calibration);
+  impl_->added_imu_calibs.push_back(*calibration);
   return vit::Result::VIT_SUCCESS;
 }
 
 vit::Result Tracker::add_camera_calibration(const vit::CameraCalibration *calibration) {
-  impl->added_cam_calibs.push_back(*calibration);
+  impl_->added_cam_calibs.push_back(*calibration);
   return vit::Result::VIT_SUCCESS;
 }
 
 struct Pose::Implementation {
   PoseVelBiasState<double>::Ptr state;
 
-  Implementation(PoseVelBiasState<double>::Ptr state) : state(state) {}
+  Implementation(const PoseVelBiasState<double>::Ptr &state) : state(state) {}
 
   ~Implementation() = default;
 
@@ -620,12 +661,13 @@ struct Pose::Implementation {
     data->oy = T_w_i.unit_quaternion().y();
     data->oz = T_w_i.unit_quaternion().z();
     data->ow = T_w_i.unit_quaternion().w();
-
-    // TODO linear velocity
+    data->vx = state->vel_w_i.x();
+    data->vy = state->vel_w_i.y();
+    data->vz = state->vel_w_i.z();
   }
 
   vit::Result get_timing(vit::PoseTiming *out_timing) const {
-    const TimeStats &stats = state->input_images->stats;
+    const vit::TimeStats &stats = state->input_images->stats;
     if ((stats.enabled_caps & VIT_TRACKER_POSE_CAPABILITY_TIMING) == 0) {
       return vit::Result::VIT_ERROR_NOT_ENABLED;
     }
@@ -636,7 +678,7 @@ struct Pose::Implementation {
   }
 
   vit::Result get_features(uint32_t camera_index, vit::PoseFeatures *out_features) const {
-    const TimeStats &stats = state->input_images->stats;
+    const vit::TimeStats &stats = state->input_images->stats;
     if ((stats.enabled_caps & VIT_TRACKER_POSE_CAPABILITY_FEATURES) == 0) {
       return vit::Result::VIT_ERROR_NOT_ENABLED;
     }
@@ -650,21 +692,21 @@ struct Pose::Implementation {
 };
 
 vit::Result Pose::get_data(vit::PoseData *data) const {
-  impl->get_data(data);
+  impl_->get_data(data);
   return vit::Result::VIT_SUCCESS;
 }
 
-vit::Result Pose::get_timing(vit::PoseTiming *out_timing) const { return impl->get_timing(out_timing); }
+vit::Result Pose::get_timing(vit::PoseTiming *out_timing) const { return impl_->get_timing(out_timing); }
 
 vit::Result Pose::get_features(uint32_t camera_index, vit::PoseFeatures *out_features) const {
-  return impl->get_features(camera_index, out_features);
+  return impl_->get_features(camera_index, out_features);
 }
 
-}  // namespace basalt
+}  // namespace basalt::vit_implementation
 
 vit_result_t vit_tracker_create(const vit_config_t *config, vit_tracker_t **out_tracker) {
   try {
-    vit::Tracker *tracker = new basalt::Tracker(config);
+    vit::Tracker *tracker = new basalt::vit_implementation::Tracker(config);
     *out_tracker = tracker;
   } catch (...) {
     return VIT_ERROR_ALLOCATION_FAILURE;
