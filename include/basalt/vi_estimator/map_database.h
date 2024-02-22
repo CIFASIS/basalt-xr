@@ -8,6 +8,19 @@
 
 namespace basalt {
 
+struct MapDatabaseVisualizationData {
+  using Ptr = std::shared_ptr<MapDatabaseVisualizationData>;
+
+  int64_t t_ns;
+
+  Eigen::aligned_vector<Eigen::Vector3d> landmarks;
+  std::vector<int> landmarks_ids;
+  Eigen::aligned_map<FrameId, size_t> keyframe_idx;
+  Eigen::aligned_map<int64_t, Sophus::SE3d> keyframe_poses;
+  Eigen::aligned_vector<Eigen::Vector3d> covisibility;
+  std::map<int, Eigen::aligned_vector<Eigen::Vector3d>> observations;
+};
+
 // TODO: This should be a templated class template <class Scalar>
 class MapDatabase {
  public:
@@ -25,6 +38,12 @@ class MapDatabase {
   ~MapDatabase() { maybe_join(); }
 
   void initialize();
+
+  void get_map_points(Eigen::aligned_vector<Vec3d>& points, std::vector<int>& ids);
+
+  Eigen::aligned_map<LandmarkId, Vec3d> get_landmarks_3d_pos(std::set<LandmarkId> landmarks);
+
+  void computeMapVisualData();
   inline void maybe_join() {
     if (processing_thread) {
       processing_thread->join();
@@ -37,10 +56,12 @@ class MapDatabase {
   basalt::Calibration<double> calib;
 
   tbb::concurrent_bounded_queue<MapStamp::Ptr> in_map_stamp_queue;
+  tbb::concurrent_bounded_queue<MapDatabaseVisualizationData::Ptr>* out_vis_queue = nullptr;
 
  private:
   VioConfig config;
   std::shared_ptr<std::thread> processing_thread;
+  MapDatabaseVisualizationData::Ptr map_visual_data;
   LandmarkDatabase<Scalar> map;
 
 };

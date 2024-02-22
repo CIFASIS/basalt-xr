@@ -171,6 +171,7 @@ extern pangolin::GlFont SMALL_FONT;
 const uint8_t BLUE[4]{0x21, 0x96, 0xF3, 0xFF};
 const uint8_t GREEN[4]{0x4C, 0xAF, 0x50, 0xFF};
 const uint8_t RED[4]{0xF4, 0x43, 0x36, 0xFF};
+const uint8_t ORANGE[4] = {(0xF4 + 0xFF) / 2, (0x43 + 0xFF) / 2, (0x36 + 0xFF) / 2, 0xFF};
 
 struct SelectionNode {
   bool is_range;
@@ -204,6 +205,10 @@ struct VIOUIBase {
 
   Var<int> show_frame{"ui.show_frame", 0, META_FLAG_READONLY};
 
+  Var<bool> show_vio{"ui.show_vio", true, true};
+  Var<bool> show_map{"ui.show_map", false, true};
+  Var<bool> show_covisibility{"ui.show_covisibility", false, true};
+  Var<bool> show_observations{"ui.show_observations", false, true};
   Var<bool> show_flow{"ui.show_flow", false, true};
   Var<bool> show_responses{"ui.show_responses", false, true};
   Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, true};
@@ -249,6 +254,7 @@ struct VIOUIBase {
   Var<bool> follow{"ui.follow", true, true};
 
   virtual VioVisualizationData::Ptr get_curr_vis_data() = 0;
+  virtual MapDatabaseVisualizationData::Ptr get_curr_map_vis_data() = 0;
 
   bool is_highlighted(size_t lmid) const { return vis::is_selected(highlights, lmid); }
   bool highligh_frame();

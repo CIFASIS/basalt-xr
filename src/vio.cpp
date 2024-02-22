@@ -93,6 +93,7 @@ using UIMAT = vis::UIMAT;
 
 struct basalt_vio_ui : vis::VIOUIBase {
   unordered_map<int64_t, VioVisualizationData::Ptr> vis_map;
+  unordered_map<int64_t, MapDatabaseVisualizationData::Ptr> mapper_vis_map;
 
   VioDatasetPtr vio_dataset;
 
@@ -102,6 +103,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
   pangolin::OpenGlRenderState camera;
 
   tbb::concurrent_bounded_queue<basalt::VioVisualizationData::Ptr> out_vis_queue;
+  tbb::concurrent_bounded_queue<basalt::MapDatabaseVisualizationData::Ptr> out_mapper_vis_queue;
   tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr> out_state_queue;
 
   std::vector<int64_t> vio_t_ns;
@@ -134,6 +136,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
   thread feed_images_thread;
   thread feed_imu_thread;
   thread vis_thread;
+  thread map_vis_thread;
   thread state_consumer_thread;
   thread queues_printer_thread;
 
@@ -250,6 +253,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
       map_db = std::make_shared<basalt::MapDatabase>(config, calib);
       map_db->initialize();
       vio->out_vio_data_queue = &map_db->in_map_stamp_queue;
+      if (show_gui) map_db->out_vis_queue = &out_mapper_vis_queue;
     }
 
     basalt::MargDataSaver::Ptr marg_data_saver;
@@ -277,7 +281,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
     feed_images_thread = thread([this]() { feed_images(); });
     feed_imu_thread = thread([this]() { feed_imu(); });
 
-    if (show_gui)
+    if (show_gui) {
       vis_thread = thread([&]() {
         basalt::VioVisualizationData::Ptr data;
 
@@ -293,6 +297,23 @@ struct basalt_vio_ui : vis::VIOUIBase {
 
         std::cout << "Finished t3" << std::endl;
       });
+
+      map_vis_thread = thread([&]() {
+        basalt::MapDatabaseVisualizationData::Ptr data;
+
+        while (true) {
+          out_mapper_vis_queue.pop(data);
+
+          if (data.get()) {
+            mapper_vis_map[data->t_ns] = data;
+          } else {
+            break;
+          }
+        }
+
+        std::cout << "Finished map visualization thread" << std::endl;
+      });
+    }
 
     state_consumer_thread = thread([&]() {
       basalt::PoseVelBiasState<double>::Ptr data;
@@ -570,7 +591,10 @@ struct basalt_vio_ui : vis::VIOUIBase {
     terminate = true;
 
     // join other threads
-    if (show_gui) vis_thread.join();
+    if (show_gui) {
+      vis_thread.join();
+      map_vis_thread.join();
+    }
     state_consumer_thread.join();
     if (print_queue) queues_printer_thread.join();
 
@@ -645,12 +669,24 @@ struct basalt_vio_ui : vis::VIOUIBase {
     }
   }
 
+  // TODO: get_curr_vis_data and get_curr_map_vis_data check concurrent access
   VioVisualizationData::Ptr get_curr_vis_data() override {
     int64_t curr_ts = vio_dataset->get_image_timestamps().at(show_frame);
     auto it = vis_map.find(curr_ts);
     if (it == vis_map.end()) return nullptr;
     VioVisualizationData::Ptr curr_vis_data = it->second;
     return curr_vis_data;
+  }
+
+  MapDatabaseVisualizationData::Ptr get_curr_map_vis_data() override {
+    int map_last_frame = show_frame;
+    while(true) {
+      if (map_last_frame == 0) return nullptr;
+      int64_t curr_ts = vio_dataset->get_image_timestamps().at(map_last_frame);
+      auto it = mapper_vis_map.find(curr_ts);
+      if (it != mapper_vis_map.end()) return it->second;
+      map_last_frame--;
+    }
   }
 
   // Feed functions
@@ -741,36 +777,89 @@ struct basalt_vio_ui : vis::VIOUIBase {
     glColor3ubv(gt_color);
     if (show_gt) pangolin::glDrawLineStrip(gt_t_w_i);
 
-    VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
-    if (curr_vis_data == nullptr) return;
+    pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
 
-    for (size_t i = 0; i < calib.T_i_c.size(); i++) {
-      if (!curr_vis_data->states.empty()) {
-        const auto& [ts, p] = *curr_vis_data->states.rbegin();
-        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
-      } else if (!curr_vis_data->frames.empty()) {
-        const auto& [ts, p] = *curr_vis_data->frames.rbegin();
-        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+    if (show_vio) {
+      VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+      if (curr_vis_data == nullptr) return;
+
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) {
+        if (!curr_vis_data->states.empty()) {
+          const auto& [ts, p] = *curr_vis_data->states.rbegin();
+          do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+        } else if (!curr_vis_data->frames.empty()) {
+          const auto& [ts, p] = *curr_vis_data->frames.rbegin();
+          do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+        }
+      }
+
+      for (const auto& [ts, p] : curr_vis_data->states)
+        for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
+
+      for (const auto& [ts, p] : curr_vis_data->frames)
+        for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
+
+      for (const auto& [ts, p] : curr_vis_data->ltframes)
+        for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, vis::BLUE);
+
+      show_3d_points(curr_vis_data->points, curr_vis_data->point_ids, vis::BLUE);
+    }
+    if (show_map) {
+      MapDatabaseVisualizationData::Ptr curr_map_vis_data = get_curr_map_vis_data();
+      if (curr_map_vis_data == nullptr) return;
+
+      glPointSize(3);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      // SHOW LANDMARKS
+      show_3d_points(curr_map_vis_data->landmarks, curr_map_vis_data->landmarks_ids, vis::ORANGE);
+
+      // SHOW OBSERVATIONS
+      if (show_observations) {
+        glLineWidth(0.25);
+        glColor3f(0.75, 0.75, 0.75);
+        for (const auto& [lm_id, obs] : curr_map_vis_data->observations) {
+          if (filter_highlights && is_highlighted(lm_id)) {
+            pangolin::glDrawLines(curr_map_vis_data->observations.at(lm_id));
+          }
+          if (!filter_highlights) {
+            pangolin::glDrawLines(curr_map_vis_data->observations.at(lm_id));
+          }
+        }
+      }
+
+      // SHOW KEYFRAMES POSES
+      glLineWidth(0.25);
+      for (const auto& [kf_id, pose] : curr_map_vis_data->keyframe_poses) {
+        pangolin::glDrawAxis(pose.matrix(), 0.1);
+        if (show_ids) {
+          glPushMatrix();
+          glMultMatrixd(pose.matrix().data());
+          glColor3ubv(vis::BLUE);
+          pangolin::GlFont::I().Text("%d", curr_map_vis_data->keyframe_idx[kf_id]).Draw(0, 0, -0.01F);
+          glPopMatrix();
+        }
+      }
+
+      // SHOW COVISIBILITY
+      if (show_covisibility) {
+        glColor3ubv(vis::BLUE);
+        glLineWidth(0.25);
+        pangolin::glDrawLines(curr_map_vis_data->covisibility);
       }
     }
+  }
 
-    for (const auto& [ts, p] : curr_vis_data->states)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
-
-    for (const auto& [ts, p] : curr_vis_data->frames)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
-
-    for (const auto& [ts, p] : curr_vis_data->ltframes)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, vis::BLUE);
-
-    glColor3ubv(pose_color);
-    if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);
+  void show_3d_points(Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points, std::vector<int>& ids, const uint8_t color[4]) {
+    glColor3ubv(color);
+    if (!filter_highlights) pangolin::glDrawPoints(points);
 
     Eigen::aligned_vector<Eigen::Vector3d> highlighted_points;
     if (show_highlights || filter_highlights) {
-      for (size_t i = 0; i < curr_vis_data->point_ids.size(); i++) {
-        Vector3d pos = curr_vis_data->points.at(i);
-        int id = curr_vis_data->point_ids.at(i);
+      for (size_t i = 0; i < ids.size(); i++) {
+        Vector3d pos = points.at(i);
+        int id = ids.at(i);
         if (is_highlighted(id)) highlighted_points.push_back(pos);
       }
     }
@@ -783,22 +872,20 @@ struct basalt_vio_ui : vis::VIOUIBase {
       pangolin::glDrawPoints(highlighted_points);
     }
 
-    glColor3ubv(pose_color);
+    glColor3ubv(color);
     if (show_ids) {
-      for (size_t i = 0; i < curr_vis_data->points.size(); i++) {
-        Vector3d pos = curr_vis_data->points.at(i);
-        int id = curr_vis_data->point_ids.at(i);
+      for (size_t i = 0; i < points.size(); i++) {
+        Vector3d pos = points.at(i);
+        int id = ids.at(i);
 
         bool highlighted = is_highlighted(id);
         if (filter_highlights && !highlighted) continue;
 
         if (show_highlights && highlighted) glColor3ubv(vis::GREEN);
         pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
-        if (show_highlights && highlighted) glColor3ubv(pose_color);
+        if (show_highlights && highlighted) glColor3ubv(color);
       }
     }
-
-    pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
   }
 
   void load_data(const std::string& calib_path) {
