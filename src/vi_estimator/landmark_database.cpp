@@ -91,6 +91,7 @@ void LandmarkDatabase<Scalar_>::removeKeyframes(const std::set<FrameId> &kfs_to_
     }
   }
   for (const auto &kf_id : kfs_to_marg) {
+    keyframe_idx.erase(kf_id);
     keyframe_poses.erase(kf_id);
   }
 
@@ -144,7 +145,8 @@ void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, con
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::addKeyframe(int64_t kf_id, const SE3 &pos) {
+void LandmarkDatabase<Scalar_>::addKeyframe(int64_t kf_id, size_t idx, const SE3 &pos) {
+  keyframe_idx[kf_id] = idx;
   keyframe_poses[kf_id] = pos;
 }
 
@@ -153,13 +155,19 @@ Sophus::SE3<Scalar_> &LandmarkDatabase<Scalar_>::getKeyframePose(int64_t kf_id) 
   return keyframe_poses.at(kf_id);
 }
 
+template <class Scalar_>
+size_t &LandmarkDatabase<Scalar_>::getKeyframeIndex(FrameId kf_id) {
+  return keyframe_idx.at(kf_id);
+}
+
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::mergeLMDB(LandmarkDatabase<Scalar>::Ptr lmdb, bool override) {
   // Add keyframes
   for (const auto &[kf_id, pose] : lmdb->getKeyframes()) {
     if (!override && keyframeExists(kf_id)) continue;  // Skip if the landmark already exists
-    addKeyframe(kf_id, pose);
+    auto idx = lmdb->getKeyframeIndex(kf_id);
+    addKeyframe(kf_id, idx, pose);
   }
 
   // Add Landmarks
@@ -268,6 +276,7 @@ int LandmarkDatabase<Scalar_>::numObservations() const {
 
 template <class Scalar_>
 int LandmarkDatabase<Scalar_>::numObservations(LandmarkId lm_id) const {
+  if (kpts.count(lm_id) == 0) return 0;
   return kpts.at(lm_id).obs.size();
 }
 
@@ -335,6 +344,46 @@ void LandmarkDatabase<Scalar_>::removeObservations(LandmarkId lm_id, const std::
   if (it->second.obs.size() < min_num_obs) {
     removeLandmarkHelper(it);
   }
+}
+
+template <class Scalar_>
+void LandmarkDatabase<Scalar_>::print(bool show_ids) {
+  // Print database header
+  std::cout << "---------------------------------------------------" << std::endl;
+  std::cout << "| " << std::setw(48) << std::left << debug_name << "|" << std::endl;
+  std::cout << "---------------------------------------------------" << std::endl;
+
+  // Print keyframes
+  if (show_ids) {
+    std::cout << "| Keyframes: ";
+    for (const auto &[_, idx] : keyframe_idx) std::cout << idx << ", ";
+    std::cout << std::endl;
+  } else
+    std::cout << "| Keyframes count: " << numKeyframes() << std::endl;
+
+  // Print landmarks
+  if (show_ids) {
+    std::cout << "| Landmarks: ";
+    for (const auto &[lm_id, _] : kpts) std::cout << lm_id << ", ";
+    std::cout << std::endl;
+  } else
+    std::cout << "| Landmarks count: " << numLandmarks() << std::endl;
+
+  // Print observations
+  if (show_ids) {
+    std::cout << "| Observations: " << std::endl;
+    for (const auto &[tcid, landmarks] : keyframe_obs) {
+      if (!keyframeExists(tcid.frame_id)) continue;  // tcid is not a timestamp of a keyframe
+      auto kf_idx = getKeyframeIndex(tcid.frame_id);
+      std::cout << " - Keyframe " << kf_idx << "." << tcid.cam_id << ": ";
+      for (const auto &lm_id : landmarks) std::cout << lm_id << ", ";
+      std::cout << std::endl;
+    }
+  } else
+    std::cout << "| Observations count: " << numObservations() << std::endl;
+
+  // Print database footer
+  std::cout << "---------------------------------------------------" << std::endl;
 }
 
 // //////////////////////////////////////////////////////////////////

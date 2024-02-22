@@ -117,6 +117,8 @@ SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(const Eigen::Vector3
 
   vision_data_queue.set_capacity(10);
   imu_data_queue.set_capacity(300);
+
+  lmdb = LandmarkDatabase<Scalar>("VIO LMDB");
 }
 
 template <class Scalar>
@@ -485,7 +487,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     kf_ids.emplace(last_state_t_ns);
     if (visual_data) visual_data->keyframed_idx[last_state_t_ns] = frame_idx.at(last_state_t_ns);
     const SE3 pos = getPoseStateWithLin(last_state_t_ns).getPose();
-    lmdb.addKeyframe(last_state_t_ns, pos);
+    lmdb.addKeyframe(last_state_t_ns, frame_idx.at(last_state_t_ns), pos);
 
     int num_points_added = 0;
     for (int i = 0; i < NUM_CAMS; i++) {
