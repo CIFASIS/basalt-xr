@@ -63,6 +63,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/spline/se3_spline.h>
 #include <basalt/utils/assert.h>
 #include <basalt/vi_estimator/vio_estimator.h>
+#include <basalt/vi_estimator/map_database.h>
 #include <basalt/calibration/calibration.hpp>
 
 #include <basalt/serialization/headers_serialization.h>
@@ -244,6 +245,11 @@ struct basalt_vio_ui : vis::VIOUIBase {
       vio->opt_flow_depth_guess_queue = &opt_flow->input_depth_queue;
       vio->opt_flow_state_queue = &opt_flow->input_state_queue;
       vio->opt_flow_lm_bundle_queue = &opt_flow->input_lm_bundle_queue;
+    }
+    {
+      map_db = std::make_shared<basalt::MapDatabase>(config, calib);
+      map_db->initialize();
+      vio->out_vio_data_queue = &map_db->in_map_stamp_queue;
     }
 
     basalt::MargDataSaver::Ptr marg_data_saver;

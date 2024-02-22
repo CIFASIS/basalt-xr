@@ -42,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/vis_matrices.h>
 #include <basalt/vi_estimator/vio_estimator.h>
+#include <basalt/vi_estimator/map_database.h>
 #include <pangolin/var/var.h>
 #include <pangolin/var/varvaluegeneric.h>
 #include <basalt/utils/sophus_utils.hpp>
@@ -199,6 +200,7 @@ struct VIOUIBase {
   Calibration<double> calib;
   OpticalFlowBase::Ptr opt_flow;
   VioEstimatorBase::Ptr vio;
+  MapDatabase::Ptr map_db;
 
   Var<int> show_frame{"ui.show_frame", 0, META_FLAG_READONLY};
 

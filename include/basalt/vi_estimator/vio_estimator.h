@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/imu_types.h>
 #include <basalt/utils/vis_matrices.h>
 #include <basalt/linearization/landmark_block.hpp>
+#include <basalt/vi_estimator/landmark_database.h>
 
 namespace basalt {
 
@@ -82,11 +83,18 @@ struct VioVisualizationData {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+struct MapStamp {
+  typedef std::shared_ptr<MapStamp> Ptr;
+
+  int64_t t_ns;
+  typename LandmarkDatabase<float>::Ptr lmdb;
+};
+
 class VioEstimatorBase {
  public:
   typedef std::shared_ptr<VioEstimatorBase> Ptr;
 
-  VioEstimatorBase() : out_state_queue(nullptr), out_marg_queue(nullptr), out_vis_queue(nullptr) {
+  VioEstimatorBase() : out_state_queue(nullptr), out_marg_queue(nullptr), out_vio_data_queue(nullptr), out_vis_queue(nullptr) {
     vision_data_queue.set_capacity(10);
     imu_data_queue.set_capacity(300);
     last_processed_t_ns = 0;
@@ -97,12 +105,14 @@ class VioEstimatorBase {
   std::atomic<bool> finished;
 
   VioVisualizationData::Ptr visual_data;
+  MapStamp::Ptr map_stamp;
 
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr> vision_data_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> imu_data_queue;
 
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr>* out_state_queue = nullptr;
   tbb::concurrent_bounded_queue<MargData::Ptr>* out_marg_queue = nullptr;
+  tbb::concurrent_bounded_queue<MapStamp::Ptr>* out_vio_data_queue = nullptr;
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr>* out_vis_queue = nullptr;
 
   tbb::concurrent_queue<double>* opt_flow_depth_guess_queue = nullptr;

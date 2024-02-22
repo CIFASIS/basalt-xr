@@ -378,6 +378,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sqrt_keypoint_vio.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/sqrt_keypoint_vo.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/vio_estimator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/vi_estimator/map_database.h
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/marg_data_io.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/linearization/landmark_block.cpp
@@ -399,6 +400,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/sqrt_keypoint_vio.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/sqrt_keypoint_vo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/vio_estimator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/map_database.cpp
 )
 
 target_link_libraries(basalt_internal

@@ -273,6 +273,10 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
         visual_data = std::make_shared<VioVisualizationData>();
         visual_data->t_ns = curr_frame->t_ns;
       }
+      if (out_vio_data_queue) {
+        map_stamp = std::make_shared<MapStamp>();
+        map_stamp->t_ns = curr_frame->t_ns;
+      }
 
       if (!initialized) {
         while (data->t_ns < curr_frame->t_ns) {
@@ -362,6 +366,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
 
     if (out_vis_queue) out_vis_queue->push(nullptr);
     if (out_marg_queue) out_marg_queue->push(nullptr);
+    if (out_vio_data_queue) out_vio_data_queue->push(nullptr);
     if (out_state_queue) out_state_queue->push(nullptr);
 
     finished = true;
@@ -988,6 +993,12 @@ bool SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
 
         out_marg_queue->push(m);
       }
+    }
+
+    // Send a map stamp to the MapDatabase
+    if (out_vio_data_queue && !kfs_to_marg.empty()) {
+      map_stamp->lmdb = std::make_shared<LandmarkDatabase<Scalar_>>(lmdb);
+      out_vio_data_queue->push(map_stamp);
     }
 
     std::set<int> idx_to_keep, idx_to_marg;
