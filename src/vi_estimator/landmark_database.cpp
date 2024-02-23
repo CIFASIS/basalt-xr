@@ -173,43 +173,37 @@ void LandmarkDatabase<Scalar_>::getCovisibilityMap(LandmarkDatabase<Scalar>::Ptr
   submap->clear();
   if (!keyframe_obs.empty()) {
     TimeCamId last_tcid = getLastKeyframe();
-    // ----------------------------------------------------------------------
-    // 1. Get Covisible keyframes: keyframes that shares observations with tcid
+    std::set<TimeCamId> tcids;
     for (const auto &lm_id : keyframe_obs[last_tcid]) {
-      if (!landmarkExists(lm_id)) continue;  // TODO:@brunozanotti maybe not all ids in keyframe_obs are landmarks
-
       auto lm = getLandmark(lm_id);
-      for (const auto &[tcid_target, _] : lm.obs) {
-        // if (tcid_target == last_tcid) continue;
-        auto kf_id = tcid_target.frame_id;
-        if (!keyframeExists(kf_id)) continue;  // the target is not a keyframe
+      for (const auto &[tcid_target, _] : lm.obs) tcids.emplace(tcid_target);
+    }
+    getSubmap(tcids, submap);
+  }
+}
 
-        // Add the target to the submap
-        submap->addKeyframe(kf_id, getKeyframeIndex(kf_id), getKeyframePose(kf_id));
+template <class Scalar_>
+void LandmarkDatabase<Scalar_>::getSubmap(std::set<TimeCamId> tcids, LandmarkDatabase<Scalar>::Ptr submap) {
+  submap->clear();
+  for (const auto &tcid : tcids) {
+    auto kf_id = tcid.frame_id;
+    if (keyframeExists(kf_id)) submap->addKeyframe(kf_id, getKeyframeIndex(kf_id), getKeyframePose(kf_id));
 
-        // 2. For each covisible keyframe:
-        //  - Add landmarks observed
-        //  - Add observations
-        for (const auto &lm_id : keyframe_obs[tcid_target]) {
-          if (!landmarkExists(lm_id)) continue;  // TODO:@brunozanotti maybe not all ids in keyframe_obs are landmarks
-          auto lm = getLandmark(lm_id);
+    for (const auto &lm_id : keyframe_obs[tcid]) {
+      auto lm = getLandmark(lm_id);
 
-          // If not already, add the landmark
-          if (!submap->landmarkExists(lm_id)) {
-            submap->addLandmark(lm_id, lm);
-          }
+      // NOTE: Avoid adding landmarks whose host keyframe is not in the provided set 'tcids'. This prevents drift issues
+      // in Basalt.
+      if (tcids.count(lm.host_kf_id) == 0) continue;
 
-          // Add observations
-          for (const auto &[tcid_target, pos] : lm.obs) {
-            if (!submap->keyframeExists(tcid_target.frame_id)) {
-              auto kf_id = tcid_target.frame_id;
-              submap->addKeyframe(kf_id, getKeyframeIndex(kf_id), getKeyframePose(kf_id));
-            }
-            KeypointObservation<Scalar> kobs;
-            kobs.kpt_id = lm_id;
-            kobs.pos = pos;
-            submap->addObservation(tcid_target, kobs);
-          }
+      submap->addLandmark(lm_id, lm);
+
+      for (const auto &[tcid_target, pos] : lm.obs) {
+        if (tcids.count(tcid_target) > 0) {
+          KeypointObservation<Scalar> kobs;
+          kobs.kpt_id = lm_id;
+          kobs.pos = pos;
+          submap->addObservation(tcid_target, kobs);
         }
       }
     }

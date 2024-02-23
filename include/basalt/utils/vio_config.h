@@ -42,6 +42,7 @@ namespace basalt {
 enum class LinearizationType { ABS_QR, ABS_SC, REL_SC };
 enum class MatchingGuessType { SAME_PIXEL, REPROJ_FIX_DEPTH, REPROJ_AVG_DEPTH };
 enum class KeyframeMargCriteria { KF_MARG_DEFAULT, KF_MARG_FORWARD_VECTOR };
+enum class MapCovisibilityCriteria { MAP_COV_DEFAULT, MAP_COV_STS };
 
 struct VioConfig {
   VioConfig();
@@ -106,6 +107,8 @@ struct VioConfig {
   double vio_kf_marg_feature_ratio;
   KeyframeMargCriteria vio_kf_marg_criteria;  // Keyframe removal criteria
   bool vio_always_get_covisibility_map;
+  MapCovisibilityCriteria map_covisibility_criteria;
+  int map_sts_max_size;
 
   double mapper_obs_std_dev;
   double mapper_obs_huber_thresh;

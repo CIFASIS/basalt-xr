@@ -8,6 +8,46 @@
 
 namespace basalt {
 
+// TODO: Make an abstract struct SpatialDistribution
+template <class Scalar_>
+struct SpatialDistributionCube {
+ public:
+  using Scalar = Scalar_;
+  using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
+  using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+
+  SpatialDistributionCube() = default;
+
+  SpatialDistributionCube(std::vector<Vec3> points) {
+    Vec3 mean = Vec3::Zero();
+    Vec3 variance = Vec3::Zero();
+
+    for (const auto& point : points) {
+      mean += point;
+    }
+    mean /= points.size();
+
+    for (const auto& point : points) {
+      Vec3 diff = point - mean;
+      variance += (diff.array() * diff.array()).matrix();
+    }
+    variance /= points.size();
+    Cx << mean.x() - sqrt(variance.x()), mean.x() + sqrt(variance.x());
+    Cy << mean.y() - sqrt(variance.y()), mean.y() + sqrt(variance.y());
+    Cz << mean.z() - sqrt(variance.z()), mean.z() + sqrt(variance.z());
+  }
+
+  bool hasOverlap(SpatialDistributionCube<Scalar> sdc) {
+    bool overlapX = (Cx[0] <= sdc.Cx[1] && Cx[1] >= sdc.Cx[0]);
+    bool overlapY = (Cy[0] <= sdc.Cy[1] && Cy[1] >= sdc.Cy[0]);
+    bool overlapZ = (Cz[0] <= sdc.Cz[1] && Cz[1] >= sdc.Cz[0]);
+
+    return overlapX && overlapY && overlapZ;
+  }
+
+  Vec2 Cx, Cy, Cz;
+};
+
 struct MapDatabaseVisualizationData {
   using Ptr = std::shared_ptr<MapDatabaseVisualizationData>;
 
@@ -47,6 +87,10 @@ class MapDatabase {
 
   void handleCovisibilityReq();
 
+  void computeSpatialDistributions(const std::set<TimeCamId>& kfs);
+
+  void computeSTSMap();
+
   inline void maybe_join() {
     if (processing_thread) {
       processing_thread->join();
@@ -69,5 +113,9 @@ class MapDatabase {
   MapDatabaseVisualizationData::Ptr map_visual_data;
   LandmarkDatabase<Scalar> map;
 
+  // Covisibility
+  Eigen::aligned_map<TimeCamId, SpatialDistributionCube<double>> keyframes_sdc;
+  LandmarkDatabase<Scalar>::Ptr sts_map =
+      std::make_shared<LandmarkDatabase<Scalar>>("STS Submap");  // spatial-temporal sensitive sub-global map
 };
 }  // namespace basalt

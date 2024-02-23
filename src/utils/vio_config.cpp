@@ -107,6 +107,8 @@ VioConfig::VioConfig() {
   vio_kf_marg_feature_ratio = 0.1;
   vio_kf_marg_criteria = KeyframeMargCriteria::KF_MARG_DEFAULT;
   vio_always_get_covisibility_map = false;
+  map_covisibility_criteria = MapCovisibilityCriteria::MAP_COV_DEFAULT;
+  map_sts_max_size = 7;
 
   mapper_obs_std_dev = 0.25;
   mapper_obs_huber_thresh = 1.5;
@@ -194,6 +196,27 @@ void load_minimal(const Archive& ar, basalt::KeyframeMargCriteria& marg_crit, co
 }
 
 template <class Archive>
+std::string save_minimal(const Archive& ar, const basalt::MapCovisibilityCriteria& cov_crit) {
+  UNUSED(ar);
+  auto name = magic_enum::enum_name(cov_crit);
+  return std::string(name);
+}
+
+template <class Archive>
+void load_minimal(const Archive& ar, basalt::MapCovisibilityCriteria& cov_crit, const std::string& name) {
+  UNUSED(ar);
+
+  auto crit_enum = magic_enum::enum_cast<basalt::MapCovisibilityCriteria>(name);
+
+  if (crit_enum.has_value()) {
+    cov_crit = crit_enum.value();
+  } else {
+    std::cerr << "Could not find the MapCovisibilityCriteria for " << name << std::endl;
+    std::abort();
+  }
+}
+
+template <class Archive>
 std::string save_minimal(const Archive& ar, const basalt::LinearizationType& linearization_type) {
   UNUSED(ar);
   auto name = magic_enum::enum_name(linearization_type);
@@ -272,6 +295,8 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.vio_kf_marg_feature_ratio));
   ar(CEREAL_NVP(config.vio_kf_marg_criteria));
   ar(CEREAL_NVP(config.vio_always_get_covisibility_map));
+  ar(CEREAL_NVP(config.map_covisibility_criteria));
+  ar(CEREAL_NVP(config.map_sts_max_size));
 
   ar(CEREAL_NVP(config.mapper_obs_std_dev));
   ar(CEREAL_NVP(config.mapper_obs_huber_thresh));

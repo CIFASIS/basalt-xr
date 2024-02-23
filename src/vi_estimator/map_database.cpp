@@ -27,6 +27,12 @@ void MapDatabase::initialize() {
 
       map.mergeLMDB(map_stamp->lmdb, true);
 
+      if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_STS) {
+        std::set<TimeCamId> kfs_to_compute;
+        for (auto const& [kf_id, _] : map_stamp->lmdb->getKeyframeObs()) kfs_to_compute.emplace(kf_id);
+        computeSpatialDistributions(kfs_to_compute);
+      }
+
       if (out_vis_queue) {
         map_visual_data = std::make_shared<MapDatabaseVisualizationData>();
         map_visual_data->t_ns = map_stamp->t_ns;
@@ -117,9 +123,42 @@ void MapDatabase::computeMapVisualData() {
 
 void MapDatabase::handleCovisibilityReq() {
   LandmarkDatabase<Scalar>::Ptr covisible_submap{};
-  covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>("Covisible Submap");
-  map.getCovisibilityMap(covisible_submap);
+  if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_DEFAULT) {
+    covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>("Covisible Submap");
+    map.getCovisibilityMap(covisible_submap);
+  } else if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_STS) {
+    computeSTSMap();
+    covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>(*sts_map);
+  } else {
+    BASALT_LOG_FATAL("Unexpected covisibility criteria");
+  }
   if (out_covi_res_queue) out_covi_res_queue->push(covisible_submap);
+}
+
+void MapDatabase::computeSpatialDistributions(const std::set<TimeCamId>& kfs_to_compute) {
+  for (const auto& [kf_id, obs] : map.getKeyframeObs()) {
+    if (kfs_to_compute.count(kf_id) == 0) continue;
+
+    auto landmarks_3d = get_landmarks_3d_pos(obs);
+    std::vector<Vec3d> points;
+    points.reserve(landmarks_3d.size());
+    for (const auto& [lm_id, lm_3d] : landmarks_3d) points.emplace_back(lm_3d);
+    keyframes_sdc[kf_id] = SpatialDistributionCube<double>(points);
+  }
+}
+
+void MapDatabase::computeSTSMap() {
+  if (map.numKeyframes() == 0) return;
+  auto last_keyframe = map.getLastKeyframe();
+  auto last_keyframe_sdc = keyframes_sdc[last_keyframe];
+
+  std::set<TimeCamId> candidate_kfs;
+  for (const auto& [kf_id, sdc] : keyframes_sdc) {
+    if (last_keyframe_sdc.hasOverlap(keyframes_sdc[kf_id])) candidate_kfs.insert(kf_id);
+    if (static_cast<int>(candidate_kfs.size()) >= config.map_sts_max_size) break;
+  }
+
+  map.getSubmap(candidate_kfs, sts_map);
 }
 
 }  // namespace basalt
