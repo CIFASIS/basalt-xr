@@ -160,6 +160,61 @@ size_t &LandmarkDatabase<Scalar_>::getKeyframeIndex(FrameId kf_id) {
   return keyframe_idx.at(kf_id);
 }
 
+template <class Scalar_>
+TimeCamId LandmarkDatabase<Scalar_>::getLastKeyframe() {
+  if (keyframe_obs.empty()) std::cout << "There is no keyframes yet.";
+
+  // Return the last added keyframe
+  return keyframe_obs.rbegin()->first;
+}
+
+template <class Scalar_>
+void LandmarkDatabase<Scalar_>::getCovisibilityMap(LandmarkDatabase<Scalar>::Ptr submap) {
+  submap->clear();
+  if (!keyframe_obs.empty()) {
+    TimeCamId last_tcid = getLastKeyframe();
+    // ----------------------------------------------------------------------
+    // 1. Get Covisible keyframes: keyframes that shares observations with tcid
+    for (const auto &lm_id : keyframe_obs[last_tcid]) {
+      if (!landmarkExists(lm_id)) continue;  // TODO:@brunozanotti maybe not all ids in keyframe_obs are landmarks
+
+      auto lm = getLandmark(lm_id);
+      for (const auto &[tcid_target, _] : lm.obs) {
+        // if (tcid_target == last_tcid) continue;
+        auto kf_id = tcid_target.frame_id;
+        if (!keyframeExists(kf_id)) continue;  // the target is not a keyframe
+
+        // Add the target to the submap
+        submap->addKeyframe(kf_id, getKeyframeIndex(kf_id), getKeyframePose(kf_id));
+
+        // 2. For each covisible keyframe:
+        //  - Add landmarks observed
+        //  - Add observations
+        for (const auto &lm_id : keyframe_obs[tcid_target]) {
+          if (!landmarkExists(lm_id)) continue;  // TODO:@brunozanotti maybe not all ids in keyframe_obs are landmarks
+          auto lm = getLandmark(lm_id);
+
+          // If not already, add the landmark
+          if (!submap->landmarkExists(lm_id)) {
+            submap->addLandmark(lm_id, lm);
+          }
+
+          // Add observations
+          for (const auto &[tcid_target, pos] : lm.obs) {
+            if (!submap->keyframeExists(tcid_target.frame_id)) {
+              auto kf_id = tcid_target.frame_id;
+              submap->addKeyframe(kf_id, getKeyframeIndex(kf_id), getKeyframePose(kf_id));
+            }
+            KeypointObservation<Scalar> kobs;
+            kobs.kpt_id = lm_id;
+            kobs.pos = pos;
+            submap->addObservation(tcid_target, kobs);
+          }
+        }
+      }
+    }
+  }
+}
 
 template <class Scalar_>
 void LandmarkDatabase<Scalar_>::mergeLMDB(LandmarkDatabase<Scalar>::Ptr lmdb, bool override) {

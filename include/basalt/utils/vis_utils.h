@@ -231,6 +231,7 @@ struct VIOUIBase {
   Var<bool> show_block_vals{"ui.show_block_vals", false, true};
 
   Button take_ltkf_btn{"ui.Take Keyframe", [this]() { take_ltkf(); }};
+  Button take_map_btn{"ui.Get Covisibility Map", [this]() { get_covisibility_map(); }};
 
   Var<bool> show_grid{"ui.show_grid", false, true};
   Var<bool> show_safe_radius{"ui.show_safe_radius", false, true};
@@ -260,6 +261,7 @@ struct VIOUIBase {
   bool highligh_frame();
   bool toggle_blocks();
   bool take_ltkf();
+  bool get_covisibility_map();
   void do_show_flow(size_t cam_id);
   void do_show_highlights(size_t cam_id);
   void do_show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& prev_vis_data);

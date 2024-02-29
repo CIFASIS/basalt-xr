@@ -106,6 +106,7 @@ VioConfig::VioConfig() {
 
   vio_kf_marg_feature_ratio = 0.1;
   vio_kf_marg_criteria = KeyframeMargCriteria::KF_MARG_DEFAULT;
+  vio_always_get_covisibility_map = false;
 
   mapper_obs_std_dev = 0.25;
   mapper_obs_huber_thresh = 1.5;
@@ -270,6 +271,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.vio_marg_lost_landmarks));
   ar(CEREAL_NVP(config.vio_kf_marg_feature_ratio));
   ar(CEREAL_NVP(config.vio_kf_marg_criteria));
+  ar(CEREAL_NVP(config.vio_always_get_covisibility_map));
 
   ar(CEREAL_NVP(config.mapper_obs_std_dev));
   ar(CEREAL_NVP(config.mapper_obs_huber_thresh));

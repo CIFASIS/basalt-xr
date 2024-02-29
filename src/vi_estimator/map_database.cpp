@@ -22,6 +22,9 @@ void MapDatabase::initialize() {
         break;
       }
 
+      int _;
+      while (in_covi_req_queue.try_pop(_)) handleCovisibilityReq();
+
       map.mergeLMDB(map_stamp->lmdb, true);
 
       if (out_vis_queue) {
@@ -110,6 +113,13 @@ void MapDatabase::computeMapVisualData() {
       map_visual_data->observations[lm_id].emplace_back(landmarks_3d[lm_id]);
     }
   }
+}
+
+void MapDatabase::handleCovisibilityReq() {
+  LandmarkDatabase<Scalar>::Ptr covisible_submap{};
+  covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>("Covisible Submap");
+  map.getCovisibilityMap(covisible_submap);
+  if (out_covi_res_queue) out_covi_res_queue->push(covisible_submap);
 }
 
 }  // namespace basalt

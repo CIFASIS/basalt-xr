@@ -122,6 +122,10 @@ class LandmarkDatabase {
 
   size_t& getKeyframeIndex(FrameId kf_id);
 
+  TimeCamId getLastKeyframe();
+
+  void getCovisibilityMap(LandmarkDatabase<Scalar>::Ptr submap);
+
   void mergeLMDB(LandmarkDatabase<Scalar>::Ptr lmdb, bool override);
 
   // Const

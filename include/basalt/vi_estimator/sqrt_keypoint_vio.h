@@ -113,6 +113,9 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   void addIMUToQueue(const ImuData<double>::Ptr& data) override;
   void addVisionToQueue(const OpticalFlowResult::Ptr& data) override;
   void takeLongTermKeyframe() override;
+  void GetCovisibilityMap() override;
+  void addCovisibilityMap() override;
+  void addZeroKeyframeToMargData(FrameId toadd_ts);
 
   typename ImuData<Scalar>::Ptr popFromImuDataQueue();
 
@@ -215,6 +218,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   std::set<int64_t> ltkfs;  // Long term keyframes
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
   Eigen::aligned_map<int64_t, size_t> frame_idx;
+  bool get_map=false;
+  typename LandmarkDatabase<Scalar>::Ptr covisible_submap{};
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

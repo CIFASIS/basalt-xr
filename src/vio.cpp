@@ -253,6 +253,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
       map_db = std::make_shared<basalt::MapDatabase>(config, calib);
       map_db->initialize();
       vio->out_vio_data_queue = &map_db->in_map_stamp_queue;
+      vio->out_covi_req_queue = &map_db->in_covi_req_queue;
+      map_db->out_covi_res_queue = &vio->in_covi_res_queue;
       if (show_gui) map_db->out_vis_queue = &out_mapper_vis_queue;
     }
 

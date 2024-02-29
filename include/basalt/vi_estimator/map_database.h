@@ -44,6 +44,9 @@ class MapDatabase {
   Eigen::aligned_map<LandmarkId, Vec3d> get_landmarks_3d_pos(std::set<LandmarkId> landmarks);
 
   void computeMapVisualData();
+
+  void handleCovisibilityReq();
+
   inline void maybe_join() {
     if (processing_thread) {
       processing_thread->join();
@@ -57,6 +60,8 @@ class MapDatabase {
 
   tbb::concurrent_bounded_queue<MapStamp::Ptr> in_map_stamp_queue;
   tbb::concurrent_bounded_queue<MapDatabaseVisualizationData::Ptr>* out_vis_queue = nullptr;
+  tbb::concurrent_bounded_queue<int> in_covi_req_queue;
+  tbb::concurrent_bounded_queue<LandmarkDatabase<Scalar>::Ptr>* out_covi_res_queue = nullptr;
 
  private:
   VioConfig config;

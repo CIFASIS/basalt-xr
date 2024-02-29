@@ -105,6 +105,7 @@ struct VioConfig {
   bool vio_marg_lost_landmarks;
   double vio_kf_marg_feature_ratio;
   KeyframeMargCriteria vio_kf_marg_criteria;  // Keyframe removal criteria
+  bool vio_always_get_covisibility_map;
 
   double mapper_obs_std_dev;
   double mapper_obs_huber_thresh;
