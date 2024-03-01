@@ -12,9 +12,14 @@ MapDatabase::MapDatabase(const VioConfig& config, const Calibration<double>& cal
 void MapDatabase::initialize() {
   auto read_func = [&]() {
     while (true) {
+      auto keypoints_ptr = std::make_shared<std::vector<KeypointId>>();
+      in_covi_req_queue.pop(keypoints_ptr);
+
+      if (keypoints_ptr == nullptr) break;
+      std::vector<KeypointId>& keypoints = *keypoints_ptr;
+
       std::unique_lock<std::mutex> lock(mutex);
-      int _;
-      if (in_covi_req_queue.pop(_)) handleCovisibilityReq();
+      handleCovisibilityReq(keypoints);
     }
   };
 
@@ -128,15 +133,18 @@ void MapDatabase::computeMapVisualData() {
   }
 }
 
-void MapDatabase::handleCovisibilityReq() {
+void MapDatabase::handleCovisibilityReq(const std::vector<size_t>& curr_kpts) {
   LandmarkDatabase<Scalar>::Ptr covisible_submap{};
+
   if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_DEFAULT) {
     covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>("Covisible Submap");
     map.getCovisibilityMap(covisible_submap);
-  } else if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_STS) {
-    computeSTSMap();
+  }
+  else if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_STS) {
+    computeSTSMap(curr_kpts);
     covisible_submap = std::make_shared<LandmarkDatabase<Scalar>>(*sts_map);
-  } else {
+  }
+  else {
     BASALT_LOG_FATAL("Unexpected covisibility criteria");
   }
   if (out_covi_res_queue) out_covi_res_queue->push(covisible_submap);
@@ -154,14 +162,27 @@ void MapDatabase::computeSpatialDistributions(const std::set<TimeCamId>& kfs_to_
   }
 }
 
-void MapDatabase::computeSTSMap() {
+void MapDatabase::computeSTSMap(const std::vector<size_t>& curr_kpts) {
   if (map.numKeyframes() == 0) return;
-  auto last_keyframe = map.getLastKeyframe();
-  auto last_keyframe_sdc = keyframes_sdc[last_keyframe];
+
+  SpatialDistributionCube<double> current_sdc;
+
+  if (config.map_sts_use_last_frame) {
+    std::set<size_t> curr_lms;
+    for (const auto& kpid : curr_kpts) {
+      if (map.landmarkExists(kpid)) curr_lms.insert(kpid);
+    }
+    std::vector<Vec3d> points;
+    for (const auto& [lm_id, lm_3d] : get_landmarks_3d_pos(curr_lms)) points.emplace_back(lm_3d);
+    current_sdc = SpatialDistributionCube<double>(points);
+  } else {
+    auto last_keyframe = map.getLastKeyframe();
+    current_sdc = keyframes_sdc[last_keyframe];
+  }
 
   std::set<TimeCamId> candidate_kfs;
   for (const auto& [kf_id, sdc] : keyframes_sdc) {
-    if (last_keyframe_sdc.hasOverlap(keyframes_sdc[kf_id])) candidate_kfs.insert(kf_id);
+    if (current_sdc.hasOverlap(keyframes_sdc[kf_id])) candidate_kfs.insert(kf_id);
     if (static_cast<int>(candidate_kfs.size()) >= config.map_sts_max_size) break;
   }
 

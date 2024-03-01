@@ -109,6 +109,7 @@ struct VioConfig {
   bool vio_always_get_covisibility_map;
   MapCovisibilityCriteria map_covisibility_criteria;
   int map_sts_max_size;
+  bool map_sts_use_last_frame;
 
   double mapper_obs_std_dev;
   double mapper_obs_huber_thresh;

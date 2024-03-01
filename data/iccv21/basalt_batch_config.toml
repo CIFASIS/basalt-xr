@@ -62,6 +62,7 @@
 
 "config.map_covisibility_criteria": "MAP_COV_DEFAULT",
 "config.map_sts_max_size": 7,
+"config.map_sts_use_last_frame": true,
 
 "config.mapper_obs_std_dev" = 0.25
 "config.mapper_obs_huber_thresh" = 1.5

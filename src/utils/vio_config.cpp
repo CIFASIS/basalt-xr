@@ -109,6 +109,7 @@ VioConfig::VioConfig() {
   vio_always_get_covisibility_map = false;
   map_covisibility_criteria = MapCovisibilityCriteria::MAP_COV_DEFAULT;
   map_sts_max_size = 7;
+  map_sts_use_last_frame = true;
 
   mapper_obs_std_dev = 0.25;
   mapper_obs_huber_thresh = 1.5;
@@ -297,6 +298,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.vio_always_get_covisibility_map));
   ar(CEREAL_NVP(config.map_covisibility_criteria));
   ar(CEREAL_NVP(config.map_sts_max_size));
+  ar(CEREAL_NVP(config.map_sts_use_last_frame));
 
   ar(CEREAL_NVP(config.mapper_obs_std_dev));
   ar(CEREAL_NVP(config.mapper_obs_huber_thresh));

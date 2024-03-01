@@ -86,11 +86,11 @@ class MapDatabase {
 
   void computeMapVisualData();
 
-  void handleCovisibilityReq();
+  void handleCovisibilityReq(const std::vector<size_t>& curr_kpts);
 
   void computeSpatialDistributions(const std::set<TimeCamId>& kfs);
 
-  void computeSTSMap();
+  void computeSTSMap(const std::vector<size_t>& curr_kpts);
 
   inline void maybe_join() {
     if (reading_thread) {
@@ -109,7 +109,7 @@ class MapDatabase {
 
   tbb::concurrent_bounded_queue<MapStamp::Ptr> in_map_stamp_queue;
   tbb::concurrent_bounded_queue<MapDatabaseVisualizationData::Ptr>* out_vis_queue = nullptr;
-  tbb::concurrent_bounded_queue<int> in_covi_req_queue;
+  tbb::concurrent_bounded_queue<std::shared_ptr<std::vector<KeypointId>>> in_covi_req_queue;
   tbb::concurrent_bounded_queue<LandmarkDatabase<Scalar>::Ptr>* out_covi_res_queue = nullptr;
 
  private:

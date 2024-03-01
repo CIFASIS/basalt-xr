@@ -456,7 +456,11 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
             }
           }
         }
-        out_covi_req_queue->push(1);
+        std::vector<KeypointId> keypoint_ids;
+        for (size_t i = 0; i < curr_frame->keypoints.size(); i++) {
+          for (const auto& kv : curr_frame->keypoints[i]) keypoint_ids.emplace_back(kv.first);
+        }
+        out_covi_req_queue->push(std::make_shared<std::vector<KeypointId>>(keypoint_ids));
         get_map = false;
       }
 
@@ -475,6 +479,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
     if (out_marg_queue) out_marg_queue->push(nullptr);
     if (out_vio_data_queue) out_vio_data_queue->push(nullptr);
     if (out_state_queue) out_state_queue->push(nullptr);
+    if (out_covi_req_queue) out_covi_req_queue->push(nullptr);
 
     finished = true;
 
