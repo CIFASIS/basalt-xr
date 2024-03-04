@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <memory>
 #include <thread>
+#include <mutex>
 
 namespace basalt {
 
@@ -92,9 +93,13 @@ class MapDatabase {
   void computeSTSMap();
 
   inline void maybe_join() {
-    if (processing_thread) {
-      processing_thread->join();
-      processing_thread.reset();
+    if (reading_thread) {
+      reading_thread->join();
+      reading_thread.reset();
+    }
+    if (writing_thread) {
+      writing_thread->join();
+      writing_thread.reset();
     }
   }
 
@@ -109,9 +114,11 @@ class MapDatabase {
 
  private:
   VioConfig config;
-  std::shared_ptr<std::thread> processing_thread;
+  std::shared_ptr<std::thread> reading_thread;
+  std::shared_ptr<std::thread> writing_thread;
   MapDatabaseVisualizationData::Ptr map_visual_data;
   LandmarkDatabase<Scalar> map;
+  std::mutex mutex;
 
   // Covisibility
   Eigen::aligned_map<TimeCamId, SpatialDistributionCube<double>> keyframes_sdc;

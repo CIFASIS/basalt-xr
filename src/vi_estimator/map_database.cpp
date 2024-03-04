@@ -10,10 +10,17 @@ MapDatabase::MapDatabase(const VioConfig& config, const Calibration<double>& cal
 }
 
 void MapDatabase::initialize() {
-  auto proc_func = [&]() {
+  auto read_func = [&]() {
+    while (true) {
+      std::unique_lock<std::mutex> lock(mutex);
+      int _;
+      if (in_covi_req_queue.pop(_)) handleCovisibilityReq();
+    }
+  };
+
+  auto write_func = [&]() {
     basalt::MapStamp::Ptr map_stamp;
     while (true) {
-      // TODO@brunozanotti: this should be try_pop?
       in_map_stamp_queue.pop(map_stamp);
 
       if (map_stamp == nullptr) {
@@ -22,9 +29,7 @@ void MapDatabase::initialize() {
         break;
       }
 
-      int _;
-      while (in_covi_req_queue.try_pop(_)) handleCovisibilityReq();
-
+      std::unique_lock<std::mutex> lock(mutex);
       map.mergeLMDB(map_stamp->lmdb, true);
 
       if (config.map_covisibility_criteria == MapCovisibilityCriteria::MAP_COV_STS) {
@@ -41,7 +46,9 @@ void MapDatabase::initialize() {
       }
     }
   };
-  processing_thread.reset(new std::thread(proc_func));
+
+  reading_thread.reset(new std::thread(read_func));
+  writing_thread.reset(new std::thread(write_func));
 }
 
 void MapDatabase::get_map_points(Eigen::aligned_vector<Vec3d>& points, std::vector<int>& ids) {
