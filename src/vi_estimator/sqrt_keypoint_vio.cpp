@@ -1524,6 +1524,17 @@ bool SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
           lqr->get_dense_H_b(H, b);
 
+          for (const int64_t& ts : ltkfs) {
+            if (aom.abs_order_map.count(ts) < 0) {
+              printf("UNEXPECTED: ltkf ts=%ld not in aom\n", ts);
+              continue;
+            }
+            const auto& [idx, size] = aom.abs_order_map.at(ts);
+            H.template block(idx, 0, size, H.cols()).setZero();
+            H.diagonal().template segment<POSE_SIZE>(idx).array() = 1e20;
+            b.template segment(idx, size).setZero();
+          }
+
           stats.add("get_dense_H_b", t.reset()).format("ms");
 
           int iter = 0;
