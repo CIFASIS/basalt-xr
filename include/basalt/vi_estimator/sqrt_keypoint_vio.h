@@ -115,7 +115,9 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   void takeLongTermKeyframe() override;
   void GetCovisibilityMap() override;
   void addCovisibilityMap() override;
+  void removeCovisibilityMap() override;
   void addZeroKeyframeToMargData(FrameId toadd_ts);
+  void removeZeroKeyframeFromMargData(FrameId torm_ts);
 
   typename ImuData<Scalar>::Ptr popFromImuDataQueue();
 
@@ -216,6 +218,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   size_t frame_count = 0;
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
+  std::set<int64_t> tmpkfs{};  // Temporal keyframes
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
   Eigen::aligned_map<int64_t, size_t> frame_idx;
   bool get_map=false;

@@ -188,6 +188,48 @@ void SqrtKeypointVioEstimator<Scalar>::addZeroKeyframeToMargData(FrameId toadd_t
 }
 
 template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::removeZeroKeyframeFromMargData(FrameId torm_ts) {
+  size_t total_rows = marg_data.H.rows();
+  size_t old_total_cols = marg_data.H.cols();
+  size_t new_total_cols = old_total_cols - POSE_SIZE;
+  MatX Hm;
+  Hm.setZero(total_rows, new_total_cols);
+
+  AbsOrderMap order{};
+  size_t idx = SIZE_MAX;
+  for (const auto& [ts, idxsize] : marg_data.order.abs_order_map) {
+    if (torm_ts == ts) {
+      idx = order.total_size;
+      continue;
+    }
+
+    const auto& [_, size] = idxsize;
+    order.abs_order_map[ts] = std::make_pair(order.total_size, size);
+    order.total_size += size;
+    order.items++;
+  }
+
+  if (idx == SIZE_MAX) return; // torm_ts not in the marg_data absolute order map
+
+  size_t bef = idx;                       // Side size to the left (before)
+  size_t aft = new_total_cols - idx ;     // Cols after idx (after)
+  size_t i = idx;                         // Index to remove at
+  size_t s = POSE_SIZE;                   // Number of inserted vars
+
+  if (i == 0) {                                                                                         // If at the beginning
+    Hm.template block(0, 0, total_rows, aft) = marg_data.H.template block(0, i + s, total_rows, aft);   // right
+  } else if (i == order.total_size) {                                                                   // If at the end
+    Hm.template block(0, 0, total_rows, bef) = marg_data.H.template block(0, 0, total_rows, bef);       // left
+  } else {                                                                                              // If in the middle
+    Hm.template block(0, 0, total_rows, bef) = marg_data.H.template block(0, 0, total_rows, bef);       // left
+    Hm.template block(0, i, total_rows, aft) = marg_data.H.template block(0, i + s, total_rows, aft);   // right
+  }
+
+  marg_data.H = Hm;
+  marg_data.order = order;
+}
+
+template <class Scalar>
 void SqrtKeypointVioEstimator<Scalar>::addCovisibilityMap() {
   if (show_uimat(UIMAT::HB_M_PRIOR_BEFORE)) {
     visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).H =
@@ -201,6 +243,7 @@ void SqrtKeypointVioEstimator<Scalar>::addCovisibilityMap() {
     if (kf_ids.find(kf_id) == kf_ids.end() && ltkfs.find(kf_id) == ltkfs.end()) {
       // Add Prior Keyframe as long term keyframe
       ltkfs.emplace(kf_id);
+      tmpkfs.emplace(kf_id);
       // Add pose to poses state window
       frame_poses.emplace(kf_id, PoseStateWithLin(kf_id, pos.template cast<Scalar>(), true));
       if (out_vis_queue) visual_data->ltframes[kf_id] = pos.template cast<double>();
@@ -218,6 +261,42 @@ void SqrtKeypointVioEstimator<Scalar>::addCovisibilityMap() {
   }
 
   lmdb.mergeLMDB(covisible_submap, false);
+}
+
+template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::removeCovisibilityMap() {
+  std::set<FrameId> keyframes_to_rm{};
+  std::set<FrameId> poses_to_marg{};
+  std::set<FrameId> states_to_marg_all{};
+
+  if (show_uimat(UIMAT::HB_M_PRIOR_BEFORE)) {
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).H =
+        std::make_shared<Eigen::MatrixXf>(marg_data.H.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).b =
+        std::make_shared<Eigen::VectorXf>(marg_data.b.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).aom = std::make_shared<AbsOrderMap>(marg_data.order);
+  }
+
+  for (const auto& kf_id : tmpkfs) {
+    if (ltkfs.count(kf_id) > 0) {
+      ltkfs.erase(kf_id);
+      frame_poses.erase(kf_id);
+      keyframes_to_rm.emplace(kf_id);
+      if (out_vis_queue) visual_data->ltframes.erase(kf_id);
+      removeZeroKeyframeFromMargData(kf_id);
+    }
+  }
+  tmpkfs.clear();
+
+  if (show_uimat(UIMAT::HB_M_PRIOR_AFTER)) {
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).H =
+        std::make_shared<Eigen::MatrixXf>(marg_data.H.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).b =
+        std::make_shared<Eigen::VectorXf>(marg_data.b.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).aom = std::make_shared<AbsOrderMap>(marg_data.order);
+  }
+
+  lmdb.removeKeyframes(keyframes_to_rm, poses_to_marg, states_to_marg_all);
 }
 
 template <class Scalar>
@@ -446,16 +525,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
 
       bool send_covisibility_request = out_covi_req_queue && (config.vio_always_get_covisibility_map || get_map);
       if (send_covisibility_request) {
-        // NOTE: Moving these keyframes to 'kf_ids' causes Basalt to marginalize them again, so they will have twice the
-        // influence in the optimization. This could be a potential issue.
-        if (covisible_submap != nullptr) {
-          for (const auto& [kf_id, _] : covisible_submap->getKeyframes()) {
-            if (ltkfs.count(kf_id) > 0) {
-              kf_ids.emplace(kf_id);
-              ltkfs.erase(kf_id);
-            }
-          }
-        }
+        if (covisible_submap != nullptr) removeCovisibilityMap();
         std::vector<KeypointId> keypoint_ids;
         for (size_t i = 0; i < curr_frame->keypoints.size(); i++) {
           for (const auto& kv : curr_frame->keypoints[i]) keypoint_ids.emplace_back(kv.first);

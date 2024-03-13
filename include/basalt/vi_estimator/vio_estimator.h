@@ -152,6 +152,7 @@ class VioEstimatorBase {
   virtual void takeLongTermKeyframe(){};
   virtual void GetCovisibilityMap(){};
   virtual void addCovisibilityMap(){};
+  virtual void removeCovisibilityMap(){};
 
   virtual inline void debug_finalize() {}
 
