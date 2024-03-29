@@ -100,6 +100,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   using OpticalFlowBase::show_gui;
   using OpticalFlowBase::t_ns;
   using OpticalFlowBase::transforms;
+  using OpticalFlowBase::opt_flow_stats_queue;
+  using OpticalFlowBase::curr_recalls;
 
   FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
       : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
@@ -129,6 +131,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       if (img == nullptr) {
         if (output_queue) output_queue->push(nullptr);
+        if (opt_flow_stats_queue) opt_flow_stats_queue->push(nullptr);
         if (config.optical_flow_recall_enable) std::cout << "Total recalls: " << recalls_count << std::endl;
         break;
       }
@@ -281,6 +284,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       output_queue->push(transforms);
     }
 
+    if (opt_flow_stats_queue) {
+      OpticalFlowStats::Ptr opt_flow_stats = std::make_shared<OpticalFlowStats>();
+      opt_flow_stats->t_ns = curr_t_ns;
+      // Here we are not taking into account if some recalls are filtered after detected. This should be a rare exception.
+      opt_flow_stats->recalls = curr_recalls;
+      for (size_t i = 0; i < num_cams; i++) opt_flow_stats->features += transforms->keypoints[i].size();
+      opt_flow_stats_queue->push(opt_flow_stats);
+    }
+    curr_recalls = 0;
     frame_counter++;
   }
 
@@ -564,6 +576,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       addKeypoint(cam_id, lm_id, curr_pose);
       recalls[cam_id][lm_id] = curr_pose;
       recalls_count++;
+      curr_recalls++;
     }
   }
 
