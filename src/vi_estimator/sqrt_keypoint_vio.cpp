@@ -678,7 +678,9 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     lmdb.addKeyframe(last_state_t_ns, frame_idx.at(last_state_t_ns), pos);
 
     int num_points_added = 0;
-    for (int i = 0; i < NUM_CAMS; i++) {
+
+    int num_cams_to_triangulate = config.vio_triangulate_with_all_cams ? NUM_CAMS : 1;
+    for (int i = 0; i < num_cams_to_triangulate; i++) {
       TimeCamId tcidl(opt_flow_meas->t_ns, i);
 
       for (int lm_id : unconnected_obs[i]) {
