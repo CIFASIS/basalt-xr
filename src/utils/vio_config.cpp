@@ -62,6 +62,7 @@ VioConfig::VioConfig() {
   optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
   optical_flow_matching_default_depth = 2.0;
   optical_flow_image_safe_radius = 0.0;
+  optical_flow_predict_with_imu = true;
   optical_flow_recall_enable = false;
   optical_flow_recall_all_cams = false;
   optical_flow_recall_num_points_cell = true;
@@ -256,6 +257,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_matching_guess_type));
   ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
   ar(CEREAL_NVP(config.optical_flow_image_safe_radius));
+  ar(CEREAL_NVP(config.optical_flow_predict_with_imu));
   ar(CEREAL_NVP(config.optical_flow_recall_enable));
   ar(CEREAL_NVP(config.optical_flow_recall_all_cams));
   ar(CEREAL_NVP(config.optical_flow_recall_num_points_cell));

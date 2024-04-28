@@ -318,7 +318,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     bool matching = cam1 != cam2;
     MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
     bool match_guess_uses_depth = guess_type != MatchingGuessType::SAME_PIXEL;
-    const bool use_depth = tracking || (matching && match_guess_uses_depth);
+    const bool use_depth = (tracking && config.optical_flow_predict_with_imu) || (matching && match_guess_uses_depth);
     const double depth = depth_guess;
 
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
@@ -340,7 +340,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         if (use_depth) {
           Vector2 t2_guess;
           Scalar _;
-          calib.projectBetweenCams(t1, depth, t2_guess, _, T_c1_c2, cam1, cam2);
+          if (config.optical_flow_predict_with_imu)
+            calib.projectBetweenCams(t1, depth, t2_guess, _, T_c1_c2, cam1, cam2);
+          else
+            calib.projectBetweenCams(t1, depth, t2_guess, _, cam1, cam2);
           off = t2 - t2_guess;
         }
 
