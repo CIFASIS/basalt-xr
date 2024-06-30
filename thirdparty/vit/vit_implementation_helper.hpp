@@ -39,23 +39,37 @@ typedef vit_camera_calibration_t CameraCalibration;
 typedef vit_inertial_calibration_t InertialCalibration;
 typedef vit_imu_calibration_t ImuCalibration;
 
+static const char *default_timing_titles[] = {
+    "frames_received",  // < Basalt computation starts
+    "opticalflow_produced",
+    // "vio_start",
+    // "imu_preintegrated",
+    // "landmarks_updated",
+    "optimized",
+    // "marginalized",
+    "pose_produced",  // Basalt computation ends
+	nullptr,
+};
+
 struct TimeStats {
 	uint32_t enabled_caps = 0;
 	int64_t ts = INT64_MIN;
 	std::vector<int64_t> timings{};
 	std::vector<std::vector<vit::PoseFeature>> features_per_cam{};
-	const char **timing_titles = nullptr;
+	const char **timing_titles = default_timing_titles;
 
 	TimeStats(size_t cams) { features_per_cam.reserve(cams); }
 	TimeStats() = default;
 
   public:
 	void addTime(const std::string_view name, int64_t ts = INT64_MIN) {
-		if ((enabled_caps & VIT_TRACKER_POSE_CAPABILITY_TIMING) == 0) {
-			return;
-		}
+		// if ((enabled_caps & VIT_TRACKER_POSE_CAPABILITY_TIMING) == 0) {
+		// 	return;
+		// }
 
 		if (timing_titles != nullptr) {
+			if (!isTimingTitleValid(name)) return;
+
 			const std::string expected(timing_titles[timings.size()]);
 			if (expected != name) {
 				std::cout << "Invalid timing stage\n";
@@ -69,6 +83,15 @@ struct TimeStats {
 		}
 
 		timings.push_back(ts);
+	}
+
+	bool isTimingTitleValid(const std::string_view name) const {
+		for (size_t i = 0; timing_titles[i] != nullptr; ++i) {
+			if (name == timing_titles[i]) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void addFeature(size_t cam, const vit::PoseFeature &feature) {

@@ -76,6 +76,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/linearization/landmark_block.hpp>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
+#include <vit_implementation_helper.hpp>
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
@@ -115,6 +116,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
   Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
   Eigen::aligned_vector<Sophus::SE3d> vio_T_w_i;
 
+  std::vector<vit::TimeStats> time_stats;
+
   std::vector<int64_t> gt_t_ns;
   Eigen::aligned_vector<Eigen::Vector3d> gt_t_w_i;
 
@@ -133,6 +136,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
   bool show_gui = true;
   std::string trajectory_fmt;
   bool save_features = false;
+  bool save_timing = false;
   std::string result_path;
   bool trajectory_groundtruth;
   bool print_queue = false;
@@ -163,6 +167,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
   Var<bool> save_groundtruth{"ui.save_groundtruth", false, true};
   Button save_traj_btn{"ui.save_traj", [this]() { saveTrajectoryButton(); }};
   Button save_features_btn{"ui.save_features", [this]() { saveFeaturesButton(); }};
+  Button save_timing_btn{"ui.save_timing", [this]() { saveTimingButton(); }};
 
   int start(int argc, char** argv) {
     bool print_queue = false;
@@ -192,6 +197,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
     app.add_option("--step-by-step", step_by_step, "Path to config file.");
     app.add_option("--save-trajectory", trajectory_fmt, "Save trajectory. Supported formats <tum, euroc, kitti>");
     app.add_option("--save-features", save_features, "Save features.");
+    app.add_option("--save-timing", save_timing, "Save timings.");
     app.add_option("--save-groundtruth", trajectory_groundtruth, "In addition to trajectory, save also ground turth");
     app.add_option("--use-imu", use_imu, "Use IM");
     app.add_option("--use-double", use_double, "Use double not float.");
@@ -346,6 +352,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
         vio_t_ns.emplace_back(data->t_ns);
         vio_t_w_i.emplace_back(T_w_i.translation());
         vio_T_w_i.emplace_back(T_w_i);
+
+        time_stats.emplace_back(data->input_images->stats);
 
         if (show_gui) {
           std::vector<float> vals;
@@ -700,6 +708,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
     }
 
     if (!aborted && save_features) saveFeaturesButton();
+
+    if (!aborted && save_timing) saveTimingButton();
 
     if (!aborted && !result_path.empty()) {
       double error = basalt::alignSVD(vio_t_ns, vio_t_w_i, gt_t_ns, gt_t_w_i);
@@ -1086,6 +1096,38 @@ struct basalt_vio_ui : vis::VIOUIBase {
     os.close();
 
     std::cout << "Saved features.csv" << std::endl;
+
+  }
+
+  void saveTimingButton() {
+    std::ofstream os("timing.csv");
+
+    // Write the time stats titles
+    os << "#";
+    if (!time_stats.empty() && time_stats[0].timing_titles != nullptr) {
+      const char **titles = time_stats[0].timing_titles;
+      size_t i = 0;
+      while (titles[i] != nullptr) {
+          if (i > 0) os << ",";
+          os << titles[i];
+          ++i;
+      }
+      std::cout << std::endl;
+      os << "\n";
+    }
+
+    // Write the timestamps
+    for (const auto &ts : time_stats) {
+        for (size_t i = 0; i < ts.timings.size(); ++i) {
+            if (i > 0) os << ",";
+            os << ts.timings[i];
+        }
+        os << "\n";
+    }
+
+    os.close();
+
+    std::cout << "Saved timing.csv" << std::endl;
 
   }
 };
