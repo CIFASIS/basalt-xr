@@ -901,6 +901,7 @@ Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues() const 
 
 template <class Scalar>
 bool SqrtKeypointVioEstimator<Scalar>::show_uimat(UIMAT m) const {
+  if (prev_opt_flow_res.count(last_state_t_ns) == 0) return false;
   UIMAT showed = prev_opt_flow_res.at(last_state_t_ns)->input_images->show_uimat;
 
   bool show_none = showed == UIMAT::NONE;
